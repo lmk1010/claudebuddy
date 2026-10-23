@@ -6,12 +6,15 @@ import LoginConsole from "./LoginConsole";
 import Art from "./Art";
 import Modal from "./Modal";
 import Help, { Steps } from "./Help";
+import IpBadge from "./IpBadge";
+import { useContextMenu, type MenuItem } from "./ContextMenu";
 import type { ProxyCandidate } from "../lib/bridge";
 import {
   IconCheck,
-  IconChevronRight,
   IconClock,
   IconClose,
+  IconCopy,
+  IconDots,
   IconFile,
   IconGear,
   IconGlobe,
@@ -40,10 +43,42 @@ interface Props {
   onDismissBanner: () => void;
   onCreate: () => void;
   onScanImport: () => void;
-  onOpenDetail: (account: Account) => void;
+  onOpenDetail: (account: Account, section?: EnvSection) => void;
+  onSetActive: (id: string) => void;
+  onNewIn: (id: string) => void;
+  onLogin: (id: string) => void;
+  onLogout: (id: string) => void;
+  onCheckExit: (id: string) => void;
+  onCopy: (text: string) => void;
+  onReveal: (path: string) => void;
 }
 
 export default function Accounts(p: Props) {
+  const menu = useContextMenu();
+  const envMenu = (a: Account): MenuItem[] => {
+    const signedIn = (p.status[a.id]?.auth ?? a.auth) === "signedIn";
+    return [
+      { label: "编辑…", icon: <IconGear size={14} />, hint: "↵", run: () => p.onOpenDetail(a) },
+      {
+        label: "设为当前环境",
+        icon: <IconCheck size={14} />,
+        disabled: a.id === p.activeId,
+        run: () => p.onSetActive(a.id),
+      },
+      { label: "在这个环境新建会话", icon: <IconTerminal size={14} />, run: () => p.onNewIn(a.id) },
+      "sep",
+      signedIn
+        ? { label: "退出登录", icon: <IconKey size={14} />, run: () => p.onLogout(a.id) }
+        : { label: "登录…", icon: <IconKey size={14} />, run: () => p.onLogin(a.id) },
+      { label: "网络出口…", icon: <IconGlobe size={14} />, run: () => p.onOpenDetail(a, "network") },
+      { label: "检测出口 IP", icon: <IconRefresh size={14} />, run: () => p.onCheckExit(a.id) },
+      "sep",
+      { label: "复制配置目录路径", icon: <IconCopy size={14} />, run: () => p.onCopy(`~/${a.configDir}`) },
+      { label: "在访达中打开目录", icon: <IconFile size={14} />, run: () => p.onReveal(`~/${a.configDir}`) },
+      "sep",
+      { label: "删除环境…", icon: <IconTrash size={14} />, danger: true, run: () => p.onOpenDetail(a, "danger") },
+    ];
+  };
   return (
     <div className="pg">
       <div className="pg-h">
@@ -86,7 +121,13 @@ export default function Accounts(p: Props) {
           const on = a.id === p.activeId;
           const n = p.sessionCount[a.id] ?? 0;
           return (
-            <button key={a.id} className={`ar${on ? " on" : ""}`} onClick={() => p.onOpenDetail(a)}>
+            <button
+              key={a.id}
+              className={`ar${on ? " on" : ""}`}
+              onClick={() => p.onOpenDetail(a)}
+              onContextMenu={(e) => menu.open(e, envMenu(a), a.label)}
+              title="点开编辑 · 右键更多"
+            >
               <span className="av" style={{ background: a.tint }}>
                 {a.label.slice(0, 1)}
               </span>
@@ -97,7 +138,7 @@ export default function Accounts(p: Props) {
                 </b>
                 <small>
                   <span className="mono">~/{a.configDir}</span>
-                  {s?.email || a.email ? ` · ${s?.email ?? a.email}` : " · 未登录"}
+                  {auth === "signedIn" && (s?.email || a.email) ? ` · ${s?.email ?? a.email}` : ""}
                 </small>
               </span>
               <span className="as" title={proxyLabel(a.proxy)}>
@@ -105,14 +146,24 @@ export default function Accounts(p: Props) {
               </span>
               <span className="as">{n > 0 ? `${n} 个会话` : relTime(a.lastUsedAt)}</span>
               <span className={`pill ${AUTH_PILL[auth]}`}>{AUTH_LABEL[auth]}</span>
-              <span className="ar-more" aria-hidden>
-                {auth === "suspended" ? <IconWarning size={13} /> : <IconChevronRight size={13} />}
+              <span
+                className="ar-more"
+                role="button"
+                title="更多"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  menu.open({ clientX: r.right - 220, clientY: r.bottom + 4, preventDefault: () => {} }, envMenu(a), a.label);
+                }}
+              >
+                {auth === "suspended" ? <IconWarning size={13} /> : <IconDots size={14} />}
               </span>
             </button>
           );
         })}
       </div>
-      <div className="pg-foot">点一行编辑：登录、网络出口、设备身份、痕迹清理都在里面。</div>
+      <div className="pg-foot">点一行编辑：登录、网络出口、设备身份、痕迹清理都在里面。右键或「⋯」有更多操作。</div>
+      {menu.node}
     </div>
   );
 }
@@ -605,7 +656,7 @@ export function EnvModal({
   );
 }
 
-function Row({ title, desc, tip, children }: { title: string; desc?: string; tip?: ReactNode; children?: ReactNode }) {
+function Row({ title, desc, tip, children }: { title: string; desc?: ReactNode; tip?: ReactNode; children?: ReactNode }) {
   return (
     <div className="em-row">
       <span className="em-row-t">
@@ -865,6 +916,11 @@ function NetworkSection({
                       {c.protocol}://{c.host}:{c.port}
                       {c.ip ? ` · 出口 ${c.ip}` : c.reason ? ` · ${c.reason}` : ""}
                     </small>
+                    {c.ip && (
+                      <small>
+                        <IpBadge ip={c.ip} compact />
+                      </small>
+                    )}
                   </span>
                   <span className="em-row-c">
                     <button
@@ -962,7 +1018,13 @@ function NetworkSection({
         )}
         <Row
           title="实测出口 IP"
-          desc={proxyLabel(p)}
+          desc={
+            exitIp || account.lastExitIp ? (
+              <IpBadge ip={exitIp || account.lastExitIp} />
+            ) : (
+              `${proxyLabel(p)} · 点「检测」看实际从哪出去`
+            )
+          }
           tip={
             <Help title="为什么要测出口 IP">
               <p>Anthropic 看到的是这个 IP，不是你填的代理地址。测一下才知道线路真的生效了。</p>

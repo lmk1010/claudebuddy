@@ -1340,6 +1340,54 @@ ipcMain.handle("shell:openExternal", async (_e, url) => {
   return true;
 });
 
+/**
+ * 查一个出口 IP 的归属：国家城市、运营商、ASN，以及是不是机房 / 代理 / 移动网络。
+ *
+ * 用 ip-api.com（免费、无 key、带 hosting/proxy/mobile 标记）。查的是已知 IP，
+ * 不需要走这个环境的代理，直连查即可。结果缓存在内存里，同一个 IP 不重复打。
+ */
+const ipInfoCache = new Map();
+ipcMain.handle("ip:info", async (_e, ip) => {
+  if (typeof ip !== "string" || !/^[0-9a-fA-F:.]{3,45}$/.test(ip)) return null;
+  if (ipInfoCache.has(ip)) return ipInfoCache.get(ip);
+  const url = `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,isp,org,as,mobile,proxy,hosting&lang=zh-CN`;
+  const raw = await new Promise((resolve) => {
+    execFile("curl", ["-sS", "--max-time", "6", url], { timeout: 8000 }, (err, out) => resolve(err ? null : out));
+  });
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(raw);
+    if (j.status !== "success") return null;
+    const info = {
+      ip,
+      country: j.country || "",
+      countryCode: j.countryCode || "",
+      region: j.regionName || "",
+      city: j.city || "",
+      isp: j.isp || "",
+      org: j.org || "",
+      as: j.as || "",
+      mobile: Boolean(j.mobile),
+      proxy: Boolean(j.proxy),
+      hosting: Boolean(j.hosting),
+    };
+    ipInfoCache.set(ip, info);
+    return info;
+  } catch {
+    return null;
+  }
+});
+
+/** 在访达里显示一个目录 —— 只允许家目录下的路径 */
+ipcMain.handle("shell:reveal", async (_e, p) => {
+  if (typeof p !== "string") return false;
+  const abs = path.resolve(p.replace(/^~(?=$|\/)/, os.homedir()));
+  if (!abs.startsWith(os.homedir())) return false;
+  if (!fs.existsSync(abs)) return false;
+  await shell.openPath(abs);
+  return true;
+});
+
 /** 账号的窗口是否还在跑（用于禁止轮换） */
 
 // ─────────────────────────────────────────── 自查：把窗口截图存到文件

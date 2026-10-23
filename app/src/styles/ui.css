@@ -1799,6 +1799,177 @@
   color: var(--t1);
 }
 
+/* ══════════════════════ 引导页：环境选择不撑高 ══════════════════════ */
+
+/* 原来一个环境一张两行卡，环境一多整列被撑高、底部按钮挤出窗口。
+   改成一行横向胶囊：高度固定，多了横向滚，两侧渐隐提示还有。 */
+.ob-pick {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.ob-pick .ob-item {
+  width: auto;
+  flex: none;
+  padding: 5px 14px 5px 5px;
+  border-radius: 999px;
+  gap: 8px;
+}
+.ob-pick .ob-item small,
+.ob-pick .ob-item .ob-item-add {
+  display: none;
+}
+.ob-pick .ob-item .ob-item-main b {
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ob-pick .ob-item.on {
+  background: var(--t1);
+  border-color: var(--t1);
+  color: var(--bg);
+}
+.ob-pick .ob-item .av {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+.ob-scan {
+  max-height: 168px;
+}
+
+/* ══════════════════════ 右键菜单 ══════════════════════ */
+
+.cmenu {
+  min-width: 220px;
+}
+.cmenu .pi > svg {
+  width: 14px;
+  height: 14px;
+}
+.pop .pi.danger,
+.pop .pi.danger > svg {
+  color: var(--danger);
+}
+.pop .pi.danger:hover {
+  background: rgba(198, 69, 69, 0.08);
+}
+.cmenu .pop-hint {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 行尾「⋯」：右键之外的第二个入口，悬停才出现 */
+.sv-more-btn:hover {
+  background: var(--sel);
+  color: var(--t1);
+}
+.ar .ar-more {
+  cursor: pointer;
+}
+.ar .ar-more:hover {
+  background: var(--sel);
+}
+
+/* 就地改名 */
+.rn-in {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  margin: -2px 0 -2px -6px;
+  border-radius: 6px;
+  border: var(--hair) solid var(--t3);
+  background: var(--pp);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t1);
+  box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.06);
+}
+.rn-in:focus {
+  outline: none;
+}
+.rw .rn-in {
+  flex: 1;
+  margin: 0;
+}
+
+/* ══════════════════════ 出口 IP 归属徽章 ══════════════════════ */
+
+.ipb {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--t3);
+  line-height: 1.5;
+}
+.ipb.compact {
+  font-size: 11px;
+}
+.ipb-dim {
+  color: var(--t4);
+}
+.ipb-geo {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+.ipb-kind {
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 17px;
+}
+.ipb-kind.ok {
+  background: rgba(78, 159, 99, 0.12);
+  color: var(--success);
+}
+.ipb-kind.mid {
+  background: rgba(181, 135, 58, 0.14);
+  color: #9a6e24;
+}
+[data-theme="dark"] .ipb-kind.mid {
+  color: #e2b46a;
+}
+.ipb-kind.bad {
+  background: rgba(198, 69, 69, 0.12);
+  color: var(--danger);
+}
+.ipb-more {
+  color: var(--t4);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 3px;
+  transition:
+    color var(--dur-snap) var(--ease-out),
+    background var(--dur-snap) var(--ease-out);
+}
+.ipb-more:hover {
+  color: var(--t1);
+  background: var(--hv);
+}
+.proxy-ip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.proxy-item-main small + small {
+  margin-top: 2px;
+}
+
 /* 环境菜单宽一点，名字和登录态放得下 */
 .pop-env {
   min-width: 260px;

@@ -5,6 +5,8 @@ import { AUTH_LABEL, shortTime } from "../lib/model";
 import {
   IconChevronDown,
   IconClose,
+  IconCopy,
+  IconFolder,
   IconGear,
   IconKey,
   IconPanel,
@@ -12,6 +14,8 @@ import {
   IconSparkle,
   IconTerminal,
 } from "./iconAliases";
+import { useContextMenu } from "./ContextMenu";
+import { IconEdit, RenameInput } from "./Rename";
 
 interface Props {
   /** 是否展开。收起时不卸载，只把宽度收到 0 —— 这样能过渡 */
@@ -32,6 +36,9 @@ interface Props {
   /** 底部环境菜单是否开着 —— 开着时这一行保持按下态 */
   accountMenuOpen: boolean;
   onToggleSidebar: () => void;
+  onRename: (id: string, title: string) => void;
+  onCopy: (text: string) => void;
+  onReveal: (path: string) => void;
 }
 
 /**
@@ -56,8 +63,13 @@ export default function Sidebar({
   onAccount,
   accountMenuOpen,
   onToggleSidebar,
+  onRename,
+  onCopy,
+  onReveal,
 }: Props) {
   const [width, setWidth] = useState(264);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const menu = useContextMenu();
   const dragRef = useRef<{ x: number; w: number } | null>(null);
 
   useEffect(() => {
@@ -149,17 +161,48 @@ export default function Sidebar({
             const live = w.id === activeId && view === "session";
             const acc = accById.get(w.accountId);
             return (
-              <button
+              <div
                 key={w.id}
+                role="button"
+                tabIndex={0}
                 className={`rw${live ? " on" : ""}`}
-                onClick={() => onSelectWindow(w.id)}
-                title={`${w.title} · ${acc?.label ?? ""}\n${w.cwd}`}
+                onClick={() => renaming !== w.id && onSelectWindow(w.id)}
+                onDoubleClick={() => setRenaming(w.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && renaming !== w.id) onSelectWindow(w.id);
+                }}
+                onContextMenu={(e) =>
+                  menu.open(
+                    e,
+                    [
+                      { label: "打开", icon: <IconTerminal size={14} />, run: () => onSelectWindow(w.id) },
+                      { label: "重命名", icon: <IconEdit />, hint: "双击", run: () => setRenaming(w.id) },
+                      "sep",
+                      { label: "复制目录路径", icon: <IconCopy size={14} />, run: () => onCopy(w.cwd) },
+                      { label: "在访达中打开", icon: <IconFolder size={14} />, run: () => onReveal(w.cwd) },
+                      "sep",
+                      { label: "关闭会话", icon: <IconClose size={14} />, danger: true, run: () => onCloseWindow(w.id) },
+                    ],
+                    `${w.title} · ${acc?.label ?? ""}`,
+                  )
+                }
+                title={`${w.title} · ${acc?.label ?? ""}\n${w.cwd}\n双击重命名 · 右键更多`}
               >
                 {/* 环境标记：每个环境一种颜色、一个首字，几个号的会话混在一起也一眼分得开 */}
                 <span className={`rw-env${live ? " live" : ""}`} style={{ background: acc?.tint }}>
                   {acc?.label.slice(0, 1)}
                 </span>
-                <span className="nm">{w.title}</span>
+                {renaming === w.id ? (
+                  <RenameInput
+                    value={w.title}
+                    onDone={(v) => {
+                      if (v) onRename(w.id, v);
+                      setRenaming(null);
+                    }}
+                  />
+                ) : (
+                  <span className="nm">{w.title}</span>
+                )}
                 <span
                   className="ws-x"
                   title="关闭会话"
@@ -171,11 +214,12 @@ export default function Sidebar({
                   <IconClose size={11} />
                 </span>
                 <span className="tm">{shortTime(w.lastActivityAt)}</span>
-              </button>
+              </div>
             );
           })
         )}
       </div>
+      {menu.node}
 
       <button
         className={`me${accountMenuOpen ? " open" : ""}`}

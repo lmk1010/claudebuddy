@@ -2,8 +2,21 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import type { Account, ShellWindow } from "../lib/model";
 import type { SessionSummary } from "../lib/bridge";
 import { fmtDuration, relTime, shortTime } from "../lib/model";
-import { IconClock, IconClose, IconPlus, IconRefresh, IconSearch, IconTerminal } from "./iconAliases";
+import {
+  IconClock,
+  IconClose,
+  IconCopy,
+  IconDots,
+  IconFolder,
+  IconGear,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
+  IconTerminal,
+} from "./iconAliases";
 import Help from "./Help";
+import { useContextMenu, type MenuItem } from "./ContextMenu";
+import { IconEdit, RenameInput } from "./Rename";
 
 interface Props {
   accounts: Account[];
@@ -18,6 +31,12 @@ interface Props {
   onResume: (accountId: string, cwd: string) => void;
   onNew: () => void;
   onSearch: () => void;
+  onRename: (id: string, title: string) => void;
+  /** 一次关掉一批（走二次确认） */
+  onCloseMany: (ids: string[], what: string) => void;
+  onCopy: (text: string) => void;
+  onReveal: (path: string) => void;
+  onEditAccount: (id: string) => void;
 }
 
 type Tab = "live" | "history";
@@ -34,6 +53,35 @@ export default function Sessions(p: Props) {
   const [tab, setTab] = useState<Tab>("live");
   const [env, setEnv] = useState<string>("all");
   const [q, setQ] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const menu = useContextMenu();
+
+  const liveMenu = (w: ShellWindow): MenuItem[] => {
+    const same = p.windows.filter((x) => x.accountId === w.accountId);
+    const acc = p.accounts.find((a) => a.id === w.accountId);
+    return [
+      { label: "打开", icon: <IconTerminal size={14} />, hint: "↵", run: () => p.onOpen(w.id) },
+      { label: "重命名", icon: <IconEdit />, run: () => setRenaming(w.id) },
+      "sep",
+      { label: "复制目录路径", icon: <IconCopy size={14} />, run: () => p.onCopy(w.cwd) },
+      { label: "在访达中打开", icon: <IconFolder size={14} />, run: () => p.onReveal(w.cwd) },
+      { label: `编辑环境「${acc?.label ?? ""}」…`, icon: <IconGear size={14} />, run: () => p.onEditAccount(w.accountId) },
+      "sep",
+      { label: "关闭会话", icon: <IconClose size={14} />, danger: true, run: () => p.onRequestClose(w.id) },
+      {
+        label: `关闭「${acc?.label ?? ""}」的全部会话`,
+        danger: true,
+        disabled: same.length < 2,
+        run: () => p.onCloseMany(same.map((x) => x.id), `「${acc?.label ?? ""}」的 ${same.length} 个会话`),
+      },
+    ];
+  };
+  const histMenu = (a: Account, s: SessionSummary): MenuItem[] => [
+    { label: "在原目录接着开", icon: <IconTerminal size={14} />, hint: "↵", run: () => p.onResume(a.id, s.cwd) },
+    "sep",
+    { label: "复制目录路径", icon: <IconCopy size={14} />, run: () => p.onCopy(s.cwd) },
+    { label: "在访达中打开", icon: <IconFolder size={14} />, run: () => p.onReveal(s.cwd) },
+  ];
 
   // 切到历史时，把要看的环境都读一遍（读过的不重读）
   useEffect(() => {
@@ -186,15 +234,27 @@ export default function Sessions(p: Props) {
                           className={`sv-row${w.id === p.activeWindowId ? " on" : ""}`}
                           role="button"
                           tabIndex={0}
-                          onClick={() => p.onOpen(w.id)}
+                          onClick={() => renaming !== w.id && p.onOpen(w.id)}
+                          onDoubleClick={() => setRenaming(w.id)}
+                          onContextMenu={(e) => menu.open(e, liveMenu(w), w.title)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") p.onOpen(w.id);
+                            if (e.key === "Enter" && renaming !== w.id) p.onOpen(w.id);
                           }}
-                          title={w.cwd}
+                          title={`${w.cwd}\n双击重命名 · 右键更多`}
                         >
                           <span className="sv-live" />
                           <span className="sv-nm">
-                            <b>{w.title}</b>
+                            {renaming === w.id ? (
+                              <RenameInput
+                                value={w.title}
+                                onDone={(v) => {
+                                  if (v) p.onRename(w.id, v);
+                                  setRenaming(null);
+                                }}
+                              />
+                            ) : (
+                              <b>{w.title}</b>
+                            )}
                             <small className="mono">{shortenHome(w.cwd)}</small>
                           </span>
                           <span className="sv-tag mono">{w.runsClaude ? "claude" : "zsh"}</span>
@@ -202,6 +262,16 @@ export default function Sessions(p: Props) {
                             <span>已运行 {fmtDuration((Date.now() - w.startedAt) / 1000)}</span>
                             <small>{shortTime(w.lastActivityAt)} 活动</small>
                           </span>
+                          <button
+                            className="mh-x sv-more-btn"
+                            title="更多"
+                            onClick={(e) => {
+                              const r = e.currentTarget.getBoundingClientRect();
+                              menu.open({ clientX: r.left, clientY: r.bottom + 4, preventDefault: () => {}, stopPropagation: () => e.stopPropagation() }, liveMenu(w), w.title);
+                            }}
+                          >
+                            <IconDots size={13} />
+                          </button>
                           <button
                             className="mh-x"
                             title="关闭会话"
@@ -221,6 +291,7 @@ export default function Sessions(p: Props) {
                           role="button"
                           tabIndex={0}
                           onClick={() => p.onResume(a.id, s.cwd)}
+                          onContextMenu={(e) => menu.open(e, histMenu(a, s), s.title)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") p.onResume(a.id, s.cwd);
                           }}
@@ -245,6 +316,7 @@ export default function Sessions(p: Props) {
           )}
         </div>
       </div>
+      {menu.node}
     </>
   );
 }

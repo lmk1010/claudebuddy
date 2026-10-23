@@ -79,6 +79,8 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
 
   /* ── 系统 ── */
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
+  reveal: (p) => ipcRenderer.invoke("shell:reveal", p),
+  ipInfo: (ip) => ipcRenderer.invoke("ip:info", ip),
 
   /* ── 项目与工作区 ── */
   pickFolder: () => ipcRenderer.invoke("dialog:pickFolder"),

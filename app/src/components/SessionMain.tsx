@@ -1,10 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
+import ContextMenu from "./ContextMenu";
+import { IconEdit } from "./Rename";
 import type { Account, GitInfo, ShellWindow } from "../lib/model";
 import { fmtDuration, proxyLabel } from "../lib/model";
 import TerminalView from "./TerminalView";
 import {
   IconClose,
   IconCode,
+  IconCopy,
+  IconFolder,
   IconPanel,
   IconPlus,
   IconTerminal,
@@ -237,84 +241,40 @@ export default function SessionMain({
       </div>
 
       {ctx && (
-        <TabMenu
+        <ContextMenu
           x={ctx.x}
           y={ctx.y}
+          title={windows.find((x) => x.id === ctx.id)?.title}
           onClose={() => setCtx(null)}
           items={[
-            { label: "重命名", hint: "双击", run: () => setRenaming(ctx.id) },
+            { label: "重命名", icon: <IconEdit />, hint: "双击", run: () => setRenaming(ctx.id) },
             {
-              label: "复制路径",
+              label: "复制目录路径",
+              icon: <IconCopy size={14} />,
               run: () => {
                 const w = windows.find((x) => x.id === ctx.id);
                 if (w) void navigator.clipboard.writeText(w.cwd).catch(() => {});
               },
             },
+            {
+              label: "在访达中打开",
+              icon: <IconFolder size={14} />,
+              run: () => {
+                const w = windows.find((x) => x.id === ctx.id);
+                if (w) void window.claudeBuddy.reveal(w.cwd);
+              },
+            },
             "sep",
-            { label: "关闭", hint: "⌘W", run: () => onRequestClose(ctx.id) },
+            { label: "关闭", icon: <IconClose size={14} />, hint: "⌘W", danger: true, run: () => onRequestClose(ctx.id) },
             {
               label: "关闭其他会话",
+              danger: true,
               disabled: windows.length < 2,
               run: () => onRequestCloseOthers(ctx.id),
             },
           ]}
         />
       )}
-    </>
-  );
-}
-
-type TabMenuItem = { label: string; hint?: string; disabled?: boolean; run: () => void } | "sep";
-
-/** 页签右键菜单：贴着鼠标开，靠窗口边时往回收 */
-function TabMenu({ x, y, items, onClose }: { x: number; y: number; items: TabMenuItem[]; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const { width, height } = el.getBoundingClientRect();
-    setPos({
-      left: Math.min(x, window.innerWidth - width - 8),
-      top: Math.min(y, window.innerHeight - height - 8),
-    });
-  }, [x, y]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <>
-      <div className="pop-backdrop" onMouseDown={onClose} onContextMenu={(e) => (e.preventDefault(), onClose())} />
-      <div
-        className="pop"
-        ref={ref}
-        role="menu"
-        style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: -9999, visibility: "hidden" }}
-      >
-        {items.map((it, i) =>
-          it === "sep" ? (
-            <div key={i} className="pop-sep" />
-          ) : (
-            <button
-              key={it.label}
-              className="pi"
-              role="menuitem"
-              disabled={it.disabled}
-              onClick={() => {
-                onClose();
-                it.run();
-              }}
-            >
-              <span className="pi-main">{it.label}</span>
-              {it.hint && <small>{it.hint}</small>}
-            </button>
-          ),
-        )}
-      </div>
     </>
   );
 }

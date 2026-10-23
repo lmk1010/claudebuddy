@@ -3,6 +3,7 @@ import type { Account, AccountStatusSnapshot } from "../lib/model";
 import type { CheckupResult, ProxyCandidate, ScannedDir } from "../lib/bridge";
 import LoginConsole from "./LoginConsole";
 import Art from "./Art";
+import IpBadge from "./IpBadge";
 import { IconCopy, IconRefresh } from "./iconAliases";
 
 /**
@@ -387,6 +388,11 @@ export default function Onboarding(p: Props) {
                     <small>
                       本机出口 {p.directIp ?? "读不到"}
                     </small>
+                    {p.directIp && (
+                      <small>
+                        <IpBadge ip={p.directIp} compact />
+                      </small>
+                    )}
                   </span>
                   {!hasProxy ? <span className="proxy-used">使用中</span> : null}
                 </button>
@@ -417,6 +423,11 @@ export default function Onboarding(p: Props) {
                             {c.label}
                             {c.ip ? ` · 出口 ${c.ip}` : ""}
                           </small>
+                          {c.ip && (
+                            <small>
+                              <IpBadge ip={c.ip} compact />
+                            </small>
+                          )}
                         </span>
                         {used ? <span className="proxy-used">使用中</span> : null}
                       </button>
@@ -483,6 +494,7 @@ export default function Onboarding(p: Props) {
               {ip ? (
                 <span className="proxy-ip">
                   <Tick /> {ip}
+                  <IpBadge ip={ip} compact />
                 </span>
               ) : (
                 <button className="proxy-check" onClick={() => p.onCheckExit(p.activeAccount!.id)}>

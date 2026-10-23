@@ -145,7 +145,8 @@ export default function Home(p: Props) {
             <div className="mh-meta">
               <span className={`pill ${AUTH_PILL[auth]}`}>{AUTH_LABEL[auth]}</span>
               <span className="mono">~/{acc?.configDir}</span>
-              {acc && p.status[acc.id]?.email && <span>{p.status[acc.id]!.email}</span>}
+              {/* 没登录时不显示邮箱 —— 「未登录」旁边挂一个邮箱会让人以为状态读错了 */}
+              {acc && signedIn && p.status[acc.id]?.email && <span>{p.status[acc.id]!.email}</span>}
               <button className="mh-edit" onClick={() => acc && p.onEditAccount(acc.id)}>
                 编辑环境
               </button>

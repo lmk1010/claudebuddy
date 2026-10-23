@@ -198,7 +198,10 @@ export default function App() {
          */
         const wins =
           Array.isArray(raw.windows) && raw.restoreSessions !== false
-            ? raw.windows.filter((w) => ids.has(w.accountId))
+            ? raw.windows
+                .filter((w) => ids.has(w.accountId))
+                // 老会话：开在家目录、名字还是用户名的，改叫「主目录」
+                .map((w) => (w.cwd === i.home && w.title === prettyName(i.home) ? { ...w, title: "主目录" } : w))
             : [];
         const keptActive = wins.some((w) => w.id === raw.activeWindowId);
         setState({
@@ -544,7 +547,8 @@ export default function App() {
 
   // ── 建会话
   const spawnWindow = useCallback((account: Account, cwd: string, runsClaude: boolean) => {
-    const base = prettyName(cwd);
+    // 家目录的目录名就是用户名，几个会话全叫同一个名字 分不清 —— 直接叫「主目录」
+    const base = cwd === home ? "主目录" : prettyName(cwd);
     const win: ShellWindow = {
       id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       title: base,
@@ -579,7 +583,7 @@ export default function App() {
     // 进会话先看终端本身，右栏要看再展开
     setInspectorOpen(false);
     void refreshAccount(account.id);
-  }, [refreshAccount]);
+  }, [refreshAccount, home]);
 
   // 记住最后建的窗口，把首句送进去
   useEffect(() => {
@@ -708,6 +712,24 @@ export default function App() {
 
   const renameWindow = useCallback((id: string, title: string) => {
     setState((s) => ({ ...s, windows: s.windows.map((w) => (w.id === id ? { ...w, title } : w)) }));
+  }, []);
+
+  const requestCloseMany = useCallback(
+    (ids: string[], what: string) => {
+      if (ids.length === 0) return;
+      setConfirm({
+        title: `关闭${what}？`,
+        body: "这些会话的终端进程都会被结束，正在跑的命令会中断。对话记录还在环境目录里。",
+        okLabel: `关闭 ${ids.length} 个`,
+        onOk: () => ids.forEach(closeWindow),
+      });
+    },
+    [closeWindow],
+  );
+
+  const reveal = useCallback(async (p: string) => {
+    const ok = await window.claudeBuddy.reveal(p);
+    if (!ok) setToast({ title: "打不开这个目录", body: "目录不存在，或者不在家目录下" });
   }, []);
 
   const patchAccount = useCallback((id: string, patch: Partial<Account>) => {
@@ -1017,6 +1039,9 @@ export default function App() {
         onAccount={(el) => setMenu(anchor("account", el))}
         accountMenuOpen={menu?.kind === "account"}
         onToggleSidebar={() => update({ sidebarOpen: false })}
+        onRename={renameWindow}
+        onCopy={copy}
+        onReveal={(p) => void reveal(p)}
       />
 
       <div className={`wm${view === "session" && activeWindow ? " term-bg" : ""}`}>
@@ -1038,6 +1063,11 @@ export default function App() {
             }}
             onNew={goNew}
             onSearch={() => setPalette(true)}
+            onRename={renameWindow}
+            onCloseMany={requestCloseMany}
+            onCopy={copy}
+            onReveal={(p) => void reveal(p)}
+            onEditAccount={(id) => setEditor({ id, section: "general" })}
           />
         )}
 
@@ -1123,7 +1153,28 @@ export default function App() {
             onDismissBanner={() => update({ bannerDismissed: true })}
             onCreate={() => setCreateOpen(true)}
             onScanImport={() => void scanImport()}
-            onOpenDetail={(a) => setEditor({ id: a.id, section: "general" })}
+            onOpenDetail={(a, section) => setEditor({ id: a.id, section: section ?? "general" })}
+            onSetActive={(id) => update({ activeAccountId: id })}
+            onNewIn={(id) => {
+              update({ activeAccountId: id });
+              goNew();
+            }}
+            onLogin={(id) => {
+              void login(id);
+              setEditor({ id, section: "general" });
+            }}
+            onLogout={(id) => {
+              const a = state.accounts.find((x) => x.id === id);
+              setConfirm({
+                title: `退出「${a?.label ?? ""}」的登录？`,
+                body: "会从 Keychain 清掉这个环境的凭据，之后要重新授权。",
+                okLabel: "退出登录",
+                onOk: () => void logout(id),
+              });
+            }}
+            onCheckExit={(id) => void checkExit(id)}
+            onCopy={copy}
+            onReveal={(p) => void reveal(p)}
           />
         )}
 

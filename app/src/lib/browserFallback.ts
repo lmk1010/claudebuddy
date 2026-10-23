@@ -213,6 +213,20 @@ export function installBrowserFallback(): void {
       window.open(url, "_blank");
       return true;
     },
+    reveal: async () => false,
+    ipInfo: async (ip) => ({
+      ip,
+      country: "美国",
+      countryCode: "US",
+      region: "加利福尼亚",
+      city: "洛杉矶",
+      isp: "Preview Networks",
+      org: "",
+      as: "AS00000 Preview",
+      mobile: false,
+      proxy: false,
+      hosting: true,
+    }),
     gitInfo: async () => ({ branch: "main", changes: [], totalAdd: 0, totalDel: 0 }),
     recentProjects: async () => previewRecent,
     sessionUsage: async () => null,

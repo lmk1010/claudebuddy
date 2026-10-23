@@ -208,6 +208,24 @@ export interface CleanupResult {
 
 /* ── 代理探测 ── */
 
+/** ip-api.com 查到的出口 IP 归属 */
+export interface IpInfo {
+  ip: string;
+  country: string;
+  countryCode: string;
+  region: string;
+  city: string;
+  isp: string;
+  org: string;
+  as: string;
+  /** 移动网络 */
+  mobile: boolean;
+  /** 被标记为代理 / VPN / Tor 出口 */
+  proxy: boolean;
+  /** 机房 / 云服务器 IP */
+  hosting: boolean;
+}
+
 export interface ProxyCandidate {
   host: string;
   port: number;
@@ -307,6 +325,10 @@ export interface ClaudeBuddyBridge {
   pickFolder(): Promise<string | null>;
   /** 在系统浏览器里打开链接（登录授权用） */
   openExternal(url: string): Promise<boolean>;
+  /** 在访达里打开目录（只限家目录下） */
+  reveal(path: string): Promise<boolean>;
+  /** 出口 IP 的归属与类型；查不到返回 null */
+  ipInfo(ip: string): Promise<IpInfo | null>;
   gitInfo(cwd: string): Promise<GitInfo>;
   recentProjects(id?: string): Promise<RecentProject[]>;
   sessionUsage(opts: { configDir: string; cwd: string }): Promise<SessionUsage | null>;
