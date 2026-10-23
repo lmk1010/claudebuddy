@@ -56,6 +56,8 @@ interface Props {
   onSetProxy: (id: string, proxy: Account["proxy"]) => void;
   onCheckExit: (id: string) => void;
   onFinish: () => void;
+  /** 有值时显示「返回应用」—— 重新进引导的老用户用 */
+  onExit?: () => void;
 }
 
 export default function Onboarding(p: Props) {
@@ -159,6 +161,12 @@ export default function Onboarding(p: Props) {
 
   return (
     <div className="ob">
+      {/* 从设置里重新打开引导的人，随时能回去，不用硬走完三步 */}
+      {p.onExit && (
+        <button className="ob-exit" onClick={p.onExit}>
+          返回应用
+        </button>
+      )}
       <div className="ob-art">
         <Art name="welcome" />
       </div>

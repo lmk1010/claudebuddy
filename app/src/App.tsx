@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
-import Home from "./components/Home";
 import SessionMain from "./components/SessionMain";
 import Inspector, { InspectorEmpty } from "./components/Inspector";
-import AccountsPage, { AccountDrawer } from "./components/Accounts";
+import AccountsPage, { CreateEnvDialog, EnvModal, ImportDialog, type EnvSection } from "./components/Accounts";
+import Sessions from "./components/Sessions";
+import Home from "./components/Home";
 import Settings from "./components/Settings";
 import CommandPalette from "./components/CommandPalette";
 import Onboarding from "./components/Onboarding";
-import { EmptyState } from "./components/States";
+import Modal, { ConfirmDialog } from "./components/Modal";
 import { assessSafety } from "./components/SafetyBadge";
 import {
   IconAccounts,
   IconAuto,
   IconCheck,
   IconClose,
+  IconGear,
   IconPanel,
   IconPlan,
   IconSettings,
@@ -21,11 +23,12 @@ import {
 } from "./components/iconAliases";
 import {
   ACCOUNT_TINTS,
+  LEGACY_TINTS,
+  nextTint,
   AUTH_LABEL,
   createAccount,
   defaultAccount,
   prettyName,
-  riskOf,
   compareEnvironments,
   suggestDistinctTerminal,
   type Account,
@@ -36,7 +39,6 @@ import {
   type ProxyConfig,
   type RecentProject,
   type RhythmStats,
-  type RiskLevel,
   type ShellWindow,
   type ThemeMode,
   type View,
@@ -51,6 +53,7 @@ import type {
   SessionSummary,
 } from "./lib/bridge";
 import "./styles/app.css";
+import "./styles/ui.css";
 
 /**
  * ClaudeBuddy 主应用。
@@ -97,7 +100,6 @@ interface AnchorRect {
 }
 
 type Menu =
-  | { kind: "new"; at: AnchorRect }
   | { kind: "account"; at: AnchorRect }
   | { kind: "permission"; at: AnchorRect }
   | null;
@@ -138,8 +140,16 @@ export default function App() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
   const [cloneOpen, setCloneOpen] = useState(false);
-  /** 账号详情抽屉：默认不显示，点开才有 */
-  const [drawerAccountId, setDrawerAccountId] = useState<string | null>(null);
+  /** 编辑环境弹窗：哪个环境、先停在哪个分类 */
+  const [editor, setEditor] = useState<{ id: string; section: EnvSection } | null>(null);
+  const drawerAccountId = editor?.id ?? null;
+  const [createOpen, setCreateOpen] = useState(false);
+  /** 二次确认（关会话等不可撤回的操作） */
+  const [confirm, setConfirm] = useState<{ title: string; body: string; okLabel: string; onOk: () => void } | null>(
+    null,
+  );
+  /** 让主界面输入框重新拿焦点的信号 —— 侧栏「新建会话」在主界面上再点一次时用 */
+  const [focusSignal, setFocusSignal] = useState(0);
   /** 每个环境的历史会话：undefined = 还没加载 */
   const [sessionsByAccount, setSessionsByAccount] = useState<
     Record<string, SessionSummary[] | undefined>
@@ -174,7 +184,12 @@ export default function App() {
       const raw = (await window.claudeBuddy.loadState()) as Partial<BuddyState> | null;
       if (!alive) return;
       if (raw && Array.isArray(raw.accounts) && raw.accounts.length > 0) {
-        const accs = raw.accounts.map(normalizeAccount);
+        // 旧版标识色全是墨灰、互相分不清 —— 按顺序换成新色板，第一个保持墨色
+        const accs = raw.accounts
+          .map(normalizeAccount)
+          .map((a, i) =>
+            LEGACY_TINTS.includes(a.tint.toLowerCase()) ? { ...a, tint: ACCOUNT_TINTS[i % ACCOUNT_TINTS.length] } : a,
+          );
         const ids = new Set(accs.map((a) => a.id));
         /**
          * 丢掉引用了已删除环境的会话。
@@ -529,9 +544,10 @@ export default function App() {
 
   // ── 建会话
   const spawnWindow = useCallback((account: Account, cwd: string, runsClaude: boolean) => {
+    const base = prettyName(cwd);
     const win: ShellWindow = {
       id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      title: prettyName(cwd),
+      title: base,
       accountId: account.id,
       cwd,
       runsClaude,
@@ -540,13 +556,28 @@ export default function App() {
     };
     setState((s) => ({
       ...s,
-      windows: [...s.windows, win],
+      // 同一个目录开第二个时，页签上要能分得清：api-server · 2
+      windows: [
+        ...s.windows,
+        {
+          ...win,
+          title: (() => {
+            const taken = new Set(s.windows.map((w) => w.title));
+            if (!taken.has(base)) return base;
+            let n = 2;
+            while (taken.has(`${base} · ${n}`)) n++;
+            return `${base} · ${n}`;
+          })(),
+        },
+      ],
       activeWindowId: win.id,
       activeAccountId: account.id,
       view: "session",
       lastCwd: cwd,
     }));
     setShowDiff(false);
+    // 进会话先看终端本身，右栏要看再展开
+    setInspectorOpen(false);
     void refreshAccount(account.id);
   }, [refreshAccount]);
 
@@ -572,16 +603,28 @@ export default function App() {
     [activeAccount, state.lastCwd, pickFolder, home, spawnWindow],
   );
 
+  /**
+   * 「新建会话」= 回到主界面、输入框拿焦点。
+   * 跟 Claude Desktop 的 New chat 一样：先落到起点，环境和目录都在眼前，写一句回车就开。
+   */
+  const goNew = useCallback(() => {
+    setState((s) => ({ ...s, view: "home" }));
+    setFocusSignal((n) => n + 1);
+  }, []);
+
+  /** 主界面回车：在当前环境 + 当前目录里起 Claude Code；没选过目录先选 */
   const homeSubmit = useCallback(
     async (text: string) => {
       const acc = activeAccount;
-      if (!acc || !state.lastCwd) return;
-      spawnWindow(acc, state.lastCwd, true);
+      if (!acc) return;
+      const cwd = state.lastCwd ?? (await pickFolder());
+      if (!cwd) return;
+      spawnWindow(acc, cwd, true);
       if (text) {
         setTimeout(() => window.claudeBuddy.writeTerm(lastIdRef.current, text + "\r"), 2400);
       }
     },
-    [activeAccount, state.lastCwd, spawnWindow],
+    [activeAccount, state.lastCwd, pickFolder, spawnWindow],
   );
 
   /**
@@ -611,12 +654,18 @@ export default function App() {
     [activeAccount, spawnWindow],
   );
 
+  /**
+   * 请求关闭：先弹确认，确认后才真的关。
+   * 直接关会丢掉这个会话的终端进程，而它可能正在跑任务。
+   */
   const closeWindow = useCallback((id: string) => {
     window.claudeBuddy.killTerm(id);
     setState((s) => {
+      const idx = s.windows.findIndex((w) => w.id === id);
       const windows = s.windows.filter((w) => w.id !== id);
+      // 关掉当前页签时落到相邻那一个（右边优先），跟浏览器一样
       const activeWindowId =
-        s.activeWindowId === id ? (windows[windows.length - 1]?.id ?? null) : s.activeWindowId;
+        s.activeWindowId === id ? (windows[Math.min(idx, windows.length - 1)]?.id ?? null) : s.activeWindowId;
       return {
         ...s,
         windows,
@@ -624,6 +673,45 @@ export default function App() {
         view: windows.length === 0 && s.view === "session" ? "home" : s.view,
       };
     });
+  }, []);
+
+  const requestCloseWindow = useCallback(
+    (id: string) => {
+      const w = state.windows.find((x) => x.id === id);
+      if (!w) return;
+      setConfirm({
+        title: `关闭「${w.title}」？`,
+        body: "这个会话的终端进程会被结束，正在跑的命令会中断。对话记录还在环境目录里。",
+        okLabel: "关闭会话",
+        onOk: () => closeWindow(id),
+      });
+    },
+    [state.windows, closeWindow],
+  );
+
+  const requestCloseOthers = useCallback(
+    (id: string) => {
+      const rest = state.windows.filter((x) => x.id !== id);
+      if (rest.length === 0) return;
+      setConfirm({
+        title: `关闭其他 ${rest.length} 个会话？`,
+        body: "这些会话的终端进程都会被结束，正在跑的命令会中断。",
+        okLabel: `关闭 ${rest.length} 个`,
+        onOk: () => {
+          for (const w of rest) closeWindow(w.id);
+          setState((s) => ({ ...s, activeWindowId: id }));
+        },
+      });
+    },
+    [state.windows, closeWindow],
+  );
+
+  const renameWindow = useCallback((id: string, title: string) => {
+    setState((s) => ({ ...s, windows: s.windows.map((w) => (w.id === id ? { ...w, title } : w)) }));
+  }, []);
+
+  const patchAccount = useCallback((id: string, patch: Partial<Account>) => {
+    setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
   }, []);
 
   // ── 账号操作
@@ -636,7 +724,7 @@ export default function App() {
   const addAccount = useCallback(
     (label: string): Account => {
       const taken = state.accounts.map((a) => a.configDir);
-      const base = createAccount(label, taken, ACCOUNT_TINTS[state.accounts.length % ACCOUNT_TINTS.length]);
+      const base = createAccount(label, taken, nextTint(state.accounts.map((a) => a.tint)));
       const used = state.accounts.map((a) => a.terminal).filter(Boolean);
       const acc: Account = { ...base, terminal: suggestDistinctTerminal(base, used) };
       setState((s) => ({
@@ -661,7 +749,7 @@ export default function App() {
         id: `acc-${configDir.replace(/^\./, "").replace(/[^a-z0-9]/g, "-")}`,
         label: label || configDir,
         configDir,
-        tint: ACCOUNT_TINTS[state.accounts.length % ACCOUNT_TINTS.length],
+        tint: nextTint(state.accounts.map((a) => a.tint)),
         note: "导入的已有环境",
       };
       setState((s) => ({ ...s, accounts: [...s.accounts, acc], activeAccountId: acc.id }));
@@ -767,10 +855,7 @@ export default function App() {
   }, []);
 
   const scanImport = useCallback(async () => {
-    const list = await window.claudeBuddy.accountScan();
-    setScanned(list);
-    if (list.length === 0) setToast({ title: "没有找到可导入的目录" });
-    else setToast({ title: `找到 ${list.length} 个已有环境`, body: "在下方选择要导入的" });
+    setScanned(await window.claudeBuddy.accountScan());
   }, []);
 
   const copy = useCallback((text: string) => {
@@ -794,23 +879,21 @@ export default function App() {
       }
       if (meta && e.key.toLowerCase() === "n") {
         e.preventDefault();
-        void (async () => {
-          const acc = activeAccount;
-          if (!acc) return;
-          const cwd = (await pickFolder()) ?? home;
-          spawnWindow(acc, cwd, true);
-        })();
+        goNew();
         return;
       }
       if (meta && e.key.toLowerCase() === "t") {
         e.preventDefault();
-        void newSession(true);
+        // 在当前会话的同一环境、同一目录再开一个；没有会话就回主界面
+        const acc = activeWindow && state.accounts.find((a) => a.id === activeWindow.accountId);
+        if (activeWindow && acc && state.view === "session") spawnWindow(acc, activeWindow.cwd, true);
+        else goNew();
         return;
       }
       if (meta && e.key.toLowerCase() === "w") {
-        if (activeWindow) {
+        if (activeWindow && state.view === "session") {
           e.preventDefault();
-          closeWindow(activeWindow.id);
+          requestCloseWindow(activeWindow.id);
         }
         return;
       }
@@ -829,16 +912,15 @@ export default function App() {
         setShowDiff((v) => !v);
         return;
       }
+      // 弹窗自己处理 Esc（带退场动画），这里只管菜单和命令面板
       if (e.key === "Escape") {
         if (palette) setPalette(false);
         else if (menu) setMenu(null);
-        else if (cloneOpen) setCloneOpen(false);
-        else if (drawerAccountId) setDrawerAccountId(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeAccount, activeWindow, closeWindow, home, menu, newSession, palette, pickFolder, spawnWindow, update, cloneOpen, drawerAccountId]);
+  }, [activeWindow, goNew, menu, palette, requestCloseWindow, spawnWindow, state.accounts, state.view, update]);
 
   useEffect(() => {
     if (!toast) return;
@@ -861,13 +943,6 @@ export default function App() {
     (window as any).__claudeBuddyState = () => state;
   }, [state]);
 
-  const riskOfProject = useCallback(
-    (cwd: string): RiskLevel => {
-      if (!stats || !activeWindow || activeWindow.cwd !== cwd) return "calm";
-      return riskOf(stats, state.rhythmThreshold);
-    },
-    [stats, activeWindow, state.rhythmThreshold],
-  );
 
   if (!ready) return <div className="shell" />;
 
@@ -905,6 +980,12 @@ export default function App() {
               update({ onboarded: true, view: "home" });
               void refreshAll();
             }}
+            onExit={
+              // 已经配过环境的人是从设置里回来重看引导的，给个出口
+              state.accounts.length > 1 || state.accounts.some((a) => a.auth === "signedIn")
+                ? () => update({ onboarded: true })
+                : undefined
+            }
           />
         </div>
       </div>
@@ -930,37 +1011,63 @@ export default function App() {
         view={view}
         username={username}
         onSelectWindow={(id) => update({ activeWindowId: id, view: "session" })}
-        onCloseWindow={closeWindow}
-        onNew={(el) => setMenu(anchor("new", el))}
-        onNav={(v) => {
-          if (v === "session" && !activeWindow) {
-            update({ view: state.windows.length ? "session" : "home" });
-            return;
-          }
-          update({ view: v });
-        }}
+        onCloseWindow={requestCloseWindow}
+        onNew={goNew}
+        onNav={(v) => update({ view: v })}
         onAccount={(el) => setMenu(anchor("account", el))}
+        accountMenuOpen={menu?.kind === "account"}
         onToggleSidebar={() => update({ sidebarOpen: false })}
       />
 
       <div className={`wm${view === "session" && activeWindow ? " term-bg" : ""}`}>
-        {view === "home" && (
+        {view === "sessions" && (
+          <Sessions
+            accounts={state.accounts}
+            windows={state.windows}
+            activeWindowId={state.activeWindowId}
+            history={sessionsByAccount}
+            onLoadHistory={async (id) => {
+              const list = await window.claudeBuddy.accountSessions(id);
+              setSessionsByAccount((m) => ({ ...m, [id]: list }));
+            }}
+            onOpen={(id) => update({ activeWindowId: id, view: "session" })}
+            onRequestClose={requestCloseWindow}
+            onResume={(id, cwd) => {
+              const acc = state.accounts.find((a) => a.id === id);
+              if (acc) spawnWindow(acc, cwd, true);
+            }}
+            onNew={goNew}
+            onSearch={() => setPalette(true)}
+          />
+        )}
+
+        {(view === "home" || (view === "session" && !activeWindow)) && (
           <Home
+            key={focusSignal}
             username={username}
-            account={activeAccount}
-            accountStatus={activeAccount ? status[activeAccount.id] : undefined}
+            accounts={state.accounts}
+            activeAccount={activeAccount}
+            status={status}
+            runningBy={state.windows.reduce<Record<string, number>>((m, w) => {
+              m[w.accountId] = (m[w.accountId] ?? 0) + 1;
+              return m;
+            }, {})}
             cwd={state.lastCwd}
             permission={state.permission}
             recent={recent}
-            windows={state.windows}
+            onSelectAccount={(id) => update({ activeAccountId: id })}
+            onEditAccount={(id) => setEditor({ id, section: "general" })}
+            onCreateAccount={() => setCreateOpen(true)}
+            onLogin={(id) => {
+              void login(id);
+              setEditor({ id, section: "general" });
+            }}
             onPickFolder={async () => {
               const cwd = await pickFolder();
               if (cwd) setToast({ title: `已选择 ${prettyName(cwd)}` });
             }}
-            onPickAccount={(el) => setMenu(anchor("account", el))}
             onPickPermission={(el) => setMenu(anchor("permission", el))}
-            onSettings={() => update({ view: "settings" })}
-            onSubmit={homeSubmit}
+            onStart={(t) => void homeSubmit(t)}
             onQuickStart={(proj) => {
               const acc = state.accounts.find((a) => a.id === proj.accountId) ?? activeAccount;
               if (!acc) return;
@@ -968,21 +1075,13 @@ export default function App() {
             }}
             onQuickBlank={() => void newSession(false)}
             onQuickClone={() => setCloneOpen(true)}
-            onOpenAll={() => update({ view: "accounts" })}
             onSearch={() => setPalette(true)}
-            onTogglePanel={() => update({ sidebarOpen: !state.sidebarOpen })}
-            onLoginHere={() => {
-              if (!activeAccount) return;
-              void login(activeAccount.id);
-              setDrawerAccountId(activeAccount.id);
-              update({ view: "accounts" });
-            }}
-            riskOfProject={riskOfProject}
+            onSettings={() => update({ view: "settings" })}
           />
         )}
 
         {view === "session" &&
-          (activeWindow ? (
+          activeWindow && (
             <SessionMain
               windows={state.windows}
               accounts={state.accounts}
@@ -997,45 +1096,43 @@ export default function App() {
               ptyOk={ptyOk}
               onSelect={(id) => update({ activeWindowId: id })}
               onToggleConsole={() => setShowDiff(false)}
+              onTogglePanel={() => setInspectorOpen((v) => !v)}
+              panelOpen={inspectorOpen}
+              onRequestClose={requestCloseWindow}
+              onRequestCloseOthers={requestCloseOthers}
+              onRename={renameWindow}
               showDiff={showDiff}
               onToggleDiff={() => setShowDiff((v) => !v)}
-              onNew={() => void newSession(true)}
-            />
-          ) : (
-            <EmptyState
-              onNew={() => void newSession(true)}
-              onOpenFolder={async () => {
-                const cwd = await pickFolder();
-                if (cwd && activeAccount) spawnWindow(activeAccount, cwd, true);
+              onNew={() => {
+                const acc = state.accounts.find((a) => a.id === activeWindow.accountId) ?? activeAccount;
+                if (acc) spawnWindow(acc, activeWindow.cwd, true);
               }}
             />
-          ))}
+          )}
 
         {view === "accounts" && (
           <AccountsPage
             accounts={state.accounts}
             activeId={activeAccount?.id ?? null}
             status={status}
-            exitIp={exitIp}
-            checking={checking}
-            loginTerm={loginTerm}
-            traces={traces}
-            keychain={keychain}
-            busy={busy}
+            sessionCount={state.windows.reduce<Record<string, number>>((m, w) => {
+              m[w.accountId] = (m[w.accountId] ?? 0) + 1;
+              return m;
+            }, {})}
             bannerDismissed={state.bannerDismissed}
             onDismissBanner={() => update({ bannerDismissed: true })}
-            onSelect={(id) => update({ activeAccountId: id })}
-            onCreate={addAccount}
-            onScanImport={scanImport}
-            onOpenDetail={(a) => {
-              update({ activeAccountId: a.id });
-              setDrawerAccountId(a.id);
-            }}
+            onCreate={() => setCreateOpen(true)}
+            onScanImport={() => void scanImport()}
+            onOpenDetail={(a) => setEditor({ id: a.id, section: "general" })}
           />
         )}
 
         {drawerAccountId && drawerAccount && (
-          <AccountDrawer
+          <EnvModal
+            key={drawerAccount.id}
+            initialSection={editor?.section}
+            canRemove={state.accounts.length > 1}
+            onPatch={(patch) => patchAccount(drawerAccount.id, patch)}
             account={drawerAccount}
             status={status[drawerAccount.id]}
             exitIp={exitIp[drawerAccount.id] ?? null}
@@ -1044,7 +1141,7 @@ export default function App() {
             traces={traces[drawerAccount.id]}
             keychain={keychain}
             busy={Boolean(busy[drawerAccount.id])}
-            onClose={() => setDrawerAccountId(null)}
+            onClose={() => setEditor(null)}
             onLogin={() => login(drawerAccount.id)}
             onLogout={() => logout(drawerAccount.id)}
             onCheckExit={() => checkExit(drawerAccount.id)}
@@ -1062,25 +1159,15 @@ export default function App() {
                 return n;
               });
             }}
-            onOpenTerminal={() => {
-              spawnWindow(drawerAccount, state.lastCwd ?? home, true);
-              setDrawerAccountId(null);
-              update({ view: "session" });
-            }}
+            onOpenTerminal={() => spawnWindow(drawerAccount, state.lastCwd ?? home, true)}
             onDiversify={() => diversify(drawerAccount)}
             similar={drawerSimilar}
-            clearing={Boolean(busy[drawerAccount.id])}
-            removing={Boolean(busy[drawerAccount.id])}
             sessions={sessionsByAccount[drawerAccount.id]}
             onLoadSessions={async () => {
               const list = await window.claudeBuddy.accountSessions(drawerAccount.id);
               setSessionsByAccount((m) => ({ ...m, [drawerAccount.id]: list }));
             }}
-            onOpenSession={(s) => {
-              spawnWindow(drawerAccount, s.cwd, true);
-              setDrawerAccountId(null);
-              update({ view: "session" });
-            }}
+            onOpenSession={(s) => spawnWindow(drawerAccount, s.cwd, true)}
             onRemove={async (purge) => {
               const acc = drawerAccount;
               setBusy((b) => ({ ...b, [acc.id]: true }));
@@ -1099,7 +1186,7 @@ export default function App() {
                     s.activeAccountId === acc.id ? (accounts[0]?.id ?? null) : s.activeAccountId,
                 };
               });
-              setDrawerAccountId(null);
+              setEditor(null);
               setToast({
                 title: `已移除 ${acc.label}`,
                 body: r.purged ? "磁盘目录也一起删了" : "目录保留在磁盘上",
@@ -1127,7 +1214,7 @@ export default function App() {
             state={state}
             update={update}
             onClose={() => update({ view: "home" })}
-            onAddAccount={() => addAccount(`账号 ${state.accounts.length + 1}`)}
+            onAddAccount={() => setCreateOpen(true)}
           />
         )}
 
@@ -1139,18 +1226,7 @@ export default function App() {
       </div>
 
       {view === "session" && (
-        <>
-          {/* 收起后留一个贴边的展开入口，不然面板一关就找不回来了 */}
-          {!inspectorOpen && (
-            <button
-              className="ib insp-open"
-              title="展开面板 ⌘B"
-              onClick={() => setInspectorOpen(true)}
-            >
-              <IconPanel />
-            </button>
-          )}
-          <div className={`insp-wrap${inspectorOpen ? "" : " shut"}`}>
+        <div className={`insp-wrap${inspectorOpen ? "" : " shut"}`}>
             {activeWindow ? (
               <Inspector
                 win={activeWindow}
@@ -1172,7 +1248,6 @@ export default function App() {
               <InspectorEmpty />
             )}
           </div>
-        </>
       )}
 
       {palette && (
@@ -1181,7 +1256,7 @@ export default function App() {
           accounts={state.accounts}
           onClose={() => setPalette(false)}
           onOpenWindow={(id) => update({ activeWindowId: id, view: "session" })}
-          onNew={() => void newSession(true)}
+          onNew={goNew}
           onNav={(v) => update({ view: v })}
           onTogglePanel={() => setInspectorOpen((v) => !v)}
           onToggleSidebar={() => update({ sidebarOpen: !state.sidebarOpen })}
@@ -1204,7 +1279,6 @@ export default function App() {
           <MenuBody
             menu={menu}
             state={state}
-            setMenu={setMenu}
             onPickAccount={(id) => {
               update({ activeAccountId: id });
               setMenu(null);
@@ -1213,16 +1287,17 @@ export default function App() {
               update({ permission: p });
               setMenu(null);
             }}
-            onNewWith={(acc) => {
+            onEditAccount={(id) => {
               setMenu(null);
-              void (async () => {
-                const cwd = (await pickFolder()) ?? home;
-                spawnWindow(acc, cwd, true);
-              })();
+              setEditor({ id, section: "general" });
             }}
             onManageAccounts={() => {
               setMenu(null);
               update({ view: "accounts" });
+            }}
+            onGuide={() => {
+              setMenu(null);
+              update({ onboarded: false });
             }}
             onOpenSettings={() => {
               setMenu(null);
@@ -1234,6 +1309,38 @@ export default function App() {
 
       {cloneOpen && <CloneDialog onClose={() => setCloneOpen(false)} onClone={(u) => void cloneRepo(u)} />}
 
+      {createOpen && (
+        <CreateEnvDialog
+          existing={state.accounts.map((a) => a.label)}
+          onClose={() => setCreateOpen(false)}
+          onCreate={(label) => {
+            const acc = addAccount(label);
+            void refreshAccount(acc.id);
+            // 建完直接进编辑，第一件事就是登录
+            setTimeout(() => setEditor({ id: acc.id, section: "general" }), 160);
+          }}
+        />
+      )}
+
+      {scanned && (
+        <ImportDialog
+          list={scanned}
+          imported={state.accounts.map((a) => a.configDir)}
+          onImport={importDir}
+          onClose={() => setScanned(null)}
+        />
+      )}
+
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.title}
+          body={confirm.body}
+          okLabel={confirm.okLabel}
+          onOk={confirm.onOk}
+          onClose={() => setConfirm(null)}
+        />
+      )}
+
       {toast && (
         <div className="toast">
           <div>
@@ -1242,8 +1349,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {scanned ? null : null}
     </div>
   );
 }
@@ -1257,7 +1362,7 @@ export default function App() {
  * 菜单该往上开还是往下开，取决于它自己有多高 —— 那只有渲染出来才知道，
  * 所以定位挪到 MenuBody 里做（useLayoutEffect 先量后摆，不会闪）。
  */
-function anchor(kind: "new" | "account" | "permission", el: HTMLElement): Menu {
+function anchor(kind: "account" | "permission", el: HTMLElement): Menu {
   const r = el.getBoundingClientRect();
   return {
     kind,
@@ -1269,7 +1374,13 @@ function isTheme(v: unknown): v is ThemeMode {
   return v === "light" || v === "dark" || v === "system";
 }
 function isView(v: unknown): v is View {
-  return v === "home" || v === "session" || v === "accounts" || v === "settings";
+  return (
+    v === "home" ||
+    v === "sessions" ||
+    v === "session" ||
+    v === "accounts" ||
+    v === "settings"
+  );
 }
 
 /** 老状态文件升级：补齐新增字段，避免旧数据把新字段变成 undefined */
@@ -1342,19 +1453,19 @@ function useAnchoredPosition(at: AnchorRect) {
 function MenuBody({
   menu,
   state,
-  setMenu,
   onPickAccount,
   onPickPermission,
-  onNewWith,
+  onEditAccount,
   onManageAccounts,
+  onGuide,
   onOpenSettings,
 }: {
+  onGuide: () => void;
   menu: NonNullable<Menu>;
   state: BuddyState;
-  setMenu: (m: Menu) => void;
   onPickAccount: (id: string) => void;
   onPickPermission: (p: PermissionMode) => void;
-  onNewWith: (a: Account) => void;
+  onEditAccount: (id: string) => void;
   onManageAccounts: () => void;
   onOpenSettings: () => void;
 }) {
@@ -1397,10 +1508,10 @@ function MenuBody({
     );
   }
 
-  if (menu.kind === "account") {
-    return (
-      <div className="pop" ref={ref} style={style} data-dir={dir} role="menu">
-        <div className="pop-hint">每个账号独立目录、独立出口、独立身份</div>
+  const cur = state.accounts.find((a) => a.id === state.activeAccountId) ?? state.accounts[0];
+  return (
+      <div className="pop pop-env" ref={ref} style={style} data-dir={dir} role="menu">
+        <div className="pop-hint">切换环境 · 新会话会建在选中的环境里</div>
         {state.accounts.map((a) => {
           const on = a.id === state.activeAccountId;
           return (
@@ -1419,9 +1530,19 @@ function MenuBody({
           );
         })}
         <div className="pop-sep" />
+        {cur && (
+          <button className="pi" onClick={() => onEditAccount(cur.id)} role="menuitem">
+            <IconGear size={15} />
+            <span className="pi-main">编辑「{cur.label}」…</span>
+          </button>
+        )}
         <button className="pi" onClick={onManageAccounts} role="menuitem">
           <IconAccounts size={15} />
-          <span className="pi-main">管理账号…</span>
+          <span className="pi-main">管理环境…</span>
+        </button>
+        <button className="pi" onClick={onGuide} role="menuitem">
+          <IconAuto size={15} />
+          <span className="pi-main">新手引导</span>
         </button>
         <button className="pi" onClick={onOpenSettings} role="menuitem">
           <IconSettings size={15} />
@@ -1429,25 +1550,6 @@ function MenuBody({
           <small>⌘,</small>
         </button>
       </div>
-    );
-  }
-
-  return (
-    <div className="pop" ref={ref} style={style} data-dir={dir} role="menu">
-      <div className="pop-hint">选一个账号，新会话用它自己的环境</div>
-      {state.accounts.map((a) => (
-        <button key={a.id} className="pi" onClick={() => onNewWith(a)} role="menuitem">
-          <span className="pop-dot" style={{ background: a.tint }} />
-          <span className="pi-main">{a.label}</span>
-          <small>~/{a.configDir}</small>
-        </button>
-      ))}
-      <div className="pop-sep" />
-      <button className="pi" onClick={() => setMenu(null)} role="menuitem">
-        <IconClose size={15} />
-        <span className="pi-main">取消</span>
-      </button>
-    </div>
   );
 }
 
@@ -1461,34 +1563,36 @@ function CloneDialog({ onClose, onClone }: { onClose: () => void; onClone: (url:
   const [url, setUrl] = useState("");
   const ok = /^(https?:\/\/|git@|ssh:\/\/)\S+$/.test(url.trim());
   return (
-    <div className="pal-mask" onMouseDown={onClose}>
-      <div className="dlg" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="dlg-h">
-          <h2>从 Git 克隆</h2>
-          <button className="ib" title="关闭 esc" onClick={onClose}>
-            <IconClose />
-          </button>
-        </div>
-        <p>粘贴仓库地址，下一步选放在哪个目录下。克隆完成后会在仓库里直接启动 Claude Code。</p>
-        <input
-          className="dlg-in mono selectable"
-          autoFocus
-          value={url}
-          placeholder="https://github.com/owner/repo.git"
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && ok) onClone(url.trim());
-          }}
-        />
-        <div className="dlg-acts">
-          <button className="btn ghost" onClick={onClose}>
-            取消
-          </button>
-          <button className="btn pri" disabled={!ok} onClick={() => onClone(url.trim())}>
-            选择目录并克隆
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal onClose={onClose} className="dlg-sm" label="从 Git 克隆">
+      {(close) => (
+        <>
+          <div className="dlg-h">
+            <h2>从 Git 克隆</h2>
+            <button className="ib" title="关闭 esc" onClick={close}>
+              <IconClose />
+            </button>
+          </div>
+          <p>粘贴仓库地址，下一步选放在哪个目录下。克隆完成后会在仓库里直接启动 Claude Code。</p>
+          <input
+            className="dlg-in mono selectable"
+            autoFocus
+            value={url}
+            placeholder="https://github.com/owner/repo.git"
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && ok) onClone(url.trim());
+            }}
+          />
+          <div className="dlg-acts">
+            <button className="btn ghost" onClick={close}>
+              取消
+            </button>
+            <button className="btn pri" disabled={!ok} onClick={() => onClone(url.trim())}>
+              选择目录并克隆
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }

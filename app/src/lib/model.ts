@@ -30,7 +30,7 @@
 export type ThemeMode = "light" | "dark" | "system";
 
 /** 顶层视图 */
-export type View = "home" | "session" | "accounts" | "settings";
+export type View = "home" | "sessions" | "session" | "accounts" | "settings";
 
 /** 权限模式 —— 对应 claude --permission-mode */
 export type PermissionMode =
@@ -313,7 +313,22 @@ export interface GitInfo {
 
 // ─────────────────────────────────────────── 默认值与工厂
 
-export const ACCOUNT_TINTS = ["#141413", "#3d3b36", "#6b6862", "#9a968c"] as const;
+/**
+ * 环境标识色。
+ *
+ * 原来四档全是墨灰，侧栏、页签上几个环境的标记长一个样，等于没标。
+ * 换成六个低饱和、彼此拉得开的色相，深浅两种主题下都能一眼分清。
+ */
+export const ACCOUNT_TINTS = ["#3d3b36", "#c4704f", "#4f7fb0", "#4e9a86", "#b5873a", "#8466ae"] as const;
+
+/** 旧版的墨灰色板 —— 读到这些就按顺序换成新色板里的颜色 */
+export const LEGACY_TINTS = ["#141413", "#3d3b36", "#6b6862", "#9a968c"];
+
+/** 挑一个还没被用掉的标识色 */
+export function nextTint(used: string[]): string {
+  const taken = new Set(used.map((t) => t.toLowerCase()));
+  return ACCOUNT_TINTS.find((t) => !taken.has(t)) ?? ACCOUNT_TINTS[used.length % ACCOUNT_TINTS.length];
+}
 
 export const DIRECT_PROXY: ProxyConfig = { protocol: "none", host: "", port: 0 };
 
@@ -360,7 +375,7 @@ export function defaultAccount(): Account {
     id: "default",
     label: "默认",
     configDir: ".claude",
-    tint: "#141413",
+    tint: "#3d3b36",
     auth: "unknown",
     proxy: { ...DIRECT_PROXY },
     identity: { userID: null, machineID: null, rotateOnNextLaunch: false },

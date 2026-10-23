@@ -28,15 +28,37 @@ type Cat = "general" | "appearance" | "terminal" | "accounts" | "rhythm" | "diag
 
 /** 每个分类一个图标：跟左侧主导航同一套「图标 + 名字」读法，
  *  这样从侧栏进来到设置里，眼睛不用重新学一遍怎么认项。 */
-const CATS: { id: Cat; label: string; icon: typeof IconSettings }[] = [
-  { id: "general", label: "通用", icon: IconSettings },
-  { id: "appearance", label: "外观", icon: IconSun },
-  { id: "terminal", label: "终端", icon: IconTerminal },
-  { id: "accounts", label: "账号", icon: IconAccounts },
-  { id: "rhythm", label: "节奏看护", icon: IconPulse },
-  { id: "diagnose", label: "体检", icon: IconGlobe },
-  { id: "keys", label: "快捷键", icon: IconGrid },
-  { id: "about", label: "关于", icon: IconInfo },
+type CatItem = { id: Cat; label: string; icon: typeof IconSettings };
+
+/**
+ * 分组，不平铺。
+ *
+ * 八项平排一列时，人得从头读到尾才知道自己要的那项在哪；
+ * 分组之后是先定位组、再定位项，扫视路径短一半。分组标题不设交互，
+ * 只做视觉上的段落。
+ */
+const GROUPS: { title: string; items: CatItem[] }[] = [
+  {
+    title: "常规",
+    items: [
+      { id: "general", label: "通用", icon: IconSettings },
+      { id: "appearance", label: "外观", icon: IconSun },
+      { id: "terminal", label: "终端", icon: IconTerminal },
+      { id: "keys", label: "快捷键", icon: IconGrid },
+    ],
+  },
+  {
+    title: "环境",
+    items: [
+      { id: "accounts", label: "环境", icon: IconAccounts },
+      { id: "diagnose", label: "体检", icon: IconGlobe },
+      { id: "rhythm", label: "节奏看护", icon: IconPulse },
+    ],
+  },
+  {
+    title: "其他",
+    items: [{ id: "about", label: "关于", icon: IconInfo }],
+  },
 ];
 
 /**
@@ -63,22 +85,28 @@ export default function Settings({ state, update, onClose, onAddAccount }: Props
       </div>
       <div className="st">
         <nav className="st-nav">
-          {CATS.map((c) => {
-            const Icon = c.icon;
-            return (
-              <button
-                key={c.id}
-                className={cat === c.id ? "on" : ""}
-                onClick={() => setCat(c.id)}
-              >
-                <Icon size={15} />
-                <span>{c.label}</span>
-              </button>
-            );
-          })}
+          {GROUPS.map((g) => (
+            <div className="st-grp" key={g.title}>
+              <span className="st-grp-t">{g.title}</span>
+              {g.items.map((c) => {
+                const Icon = c.icon;
+                return (
+                  <button
+                    key={c.id}
+                    className={cat === c.id ? "on" : ""}
+                    onClick={() => setCat(c.id)}
+                  >
+                    <Icon size={15} />
+                    <span>{c.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
-        <div className="st-body">
+        {/* key={cat} 让内容在切换时重新挂载，动画才有东西可播 */}
+        <div className="st-body" key={cat}>
           {cat === "appearance" && (
             <>
               <h1>外观</h1>
@@ -241,10 +269,14 @@ export default function Settings({ state, update, onClose, onAddAccount }: Props
           {cat === "general" && (
             <>
               <h1>通用</h1>
-              <Row title="启动时恢复上次的会话" desc="关掉后每次打开都回到主页">
-                <button className="tg on" aria-pressed />
+              <Row title="启动时恢复上次的会话" desc="关掉后每次打开都回到首页">
+                <button
+                  className={`tg${state.restoreSessions ? " on" : ""}`}
+                  aria-pressed={state.restoreSessions}
+                  onClick={() => update({ restoreSessions: !state.restoreSessions })}
+                />
               </Row>
-              <Row title="重新走一遍引导" desc="三步引导，不会动已有会话">
+              <Row title="新手引导" desc="检查电脑 → 建环境登录 → 配网络，三步。不会动已有的环境和会话，随时能返回">
                 <button className="btn" onClick={() => update({ onboarded: false })}>
                   重新开始
                 </button>
@@ -254,10 +286,9 @@ export default function Settings({ state, update, onClose, onAddAccount }: Props
 
           {cat === "accounts" && (
             <>
-              <h1>账号</h1>
+              <h1>环境</h1>
               <p style={{ fontSize: 12.5, color: "var(--t3)", lineHeight: 1.75, marginBottom: 8 }}>
-                每个账号对应一份独立的 <code>~/.claude-*</code> 配置目录。目录由主进程创建并校验，
-                渲染层只能按 id 引用 —— 这是隔离能成立的前提。
+                每个环境对应一份独立的 <code>~/.claude-*</code> 配置目录。登录、代理、痕迹清理在侧栏「环境」里点一行编辑。
               </p>
               {state.accounts.map((a) => (
                 <Row key={a.id} title={a.label} desc={`~/${a.configDir}`}>
@@ -266,10 +297,10 @@ export default function Settings({ state, update, onClose, onAddAccount }: Props
                   </span>
                 </Row>
               ))}
-              <Row title="添加账号" desc="自动建一个新的配置目录">
+              <Row title="新建环境" desc="自动建一个新的配置目录，建好直接登录">
                 <button className="btn" onClick={onAddAccount}>
                   <IconPlus />
-                  添加账号
+                  新建环境
                 </button>
               </Row>
             </>

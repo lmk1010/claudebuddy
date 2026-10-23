@@ -1,8 +1,9 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Account, GitInfo, ShellWindow } from "../lib/model";
 import { fmtDuration, proxyLabel } from "../lib/model";
 import TerminalView from "./TerminalView";
 import {
+  IconClose,
   IconCode,
   IconPanel,
   IconPlus,
@@ -23,6 +24,14 @@ interface Props {
   ptyOk: boolean;
   onSelect: (id: string) => void;
   onToggleConsole: () => void;
+  /** 右栏开关。之前这个按钮错绑到了 onToggleConsole，点了只会切终端/改动 */
+  onTogglePanel: () => void;
+  panelOpen: boolean;
+  /** 关闭会话请求。交给上层弹二次确认，不直接关 */
+  onRequestClose: (id: string) => void;
+  /** 关掉除它以外的所有会话（同样走二次确认） */
+  onRequestCloseOthers: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   showDiff: boolean;
   onToggleDiff: () => void;
   /** ⌘T：在当前账号下再开一个窗口 */
@@ -47,6 +56,11 @@ export default function SessionMain({
   copyOnSelect,
   ptyOk,
   onSelect,
+  onTogglePanel,
+  panelOpen,
+  onRequestClose,
+  onRequestCloseOthers,
+  onRename,
   onToggleConsole,
   showDiff,
   onToggleDiff,
@@ -59,12 +73,22 @@ export default function SessionMain({
   }, [accounts]);
 
   const running = active ? Date.now() - active.startedAt : 0;
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null);
 
   return (
     <>
       <div className="sh">
         <div className="sh-l">
           <span className="sh-t">{active?.title ?? "会话"}</span>
+          {active && accountById.get(active.accountId) && (
+            <span className="sh-env" title={`~/${accountById.get(active.accountId)!.configDir}`}>
+              <span className="tw-tab-av" style={{ background: accountById.get(active.accountId)!.tint }}>
+                {accountById.get(active.accountId)!.label.slice(0, 1)}
+              </span>
+              {accountById.get(active.accountId)!.label}
+            </span>
+          )}
           {active?.branch ? <span className="sh-br">branch {active.branch}</span> : null}
           <span className="sh-dot" />
           <span className="sh-st">
@@ -83,7 +107,11 @@ export default function SessionMain({
               改动 <em>{git?.changes.length ?? 0}</em>
             </button>
           </div>
-          <button className="ib" data-on={false} title="检查器 ⌘B" onClick={onToggleConsole}>
+          <button
+            className={`ib${panelOpen ? " on" : ""}`}
+            title={panelOpen ? "收起右栏 ⌘B" : "展开右栏 ⌘B"}
+            onClick={onTogglePanel}
+          >
             <IconPanel />
           </button>
         </div>
@@ -91,20 +119,74 @@ export default function SessionMain({
 
       <div className="tw">
         <div className="tw-bar">
-          {windows.map((w) => (
-            <button
-              key={w.id}
-              className={`tw-tab${active?.id === w.id ? " on" : ""}`}
-              onClick={() => onSelect(w.id)}
-              title={w.cwd}
-            >
-              <i />
-              {w.runsClaude ? "claude" : "zsh"}
+          <div className="tw-tabs">
+            {windows.map((w) => {
+              const acc = accountById.get(w.accountId);
+              return (
+                <div
+                  key={w.id}
+                  role="tab"
+                  aria-selected={active?.id === w.id}
+                  tabIndex={0}
+                  className={`tw-tab${active?.id === w.id ? " on" : ""}`}
+                  onClick={() => onSelect(w.id)}
+                  onDoubleClick={() => setRenaming(w.id)}
+                  onAuxClick={(e) => {
+                    // 中键关闭，浏览器页签的老习惯
+                    if (e.button === 1) onRequestClose(w.id);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setCtx({ id: w.id, x: e.clientX, y: e.clientY });
+                  }}
+                  title={`${w.title} · ${acc?.label ?? ""}\n${w.cwd}\n双击重命名 · 右键更多`}
+                >
+                  <span className="tw-tab-av" style={{ background: acc?.tint }}>
+                    {acc?.label.slice(0, 1)}
+                  </span>
+                  {renaming === w.id ? (
+                    <input
+                      className="tw-tab-in"
+                      autoFocus
+                      defaultValue={w.title}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onBlur={(e) => {
+                        const v = e.currentTarget.value.trim();
+                        if (v && v !== w.title) onRename(w.id, v);
+                        setRenaming(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                        if (e.key === "Escape") {
+                          e.stopPropagation();
+                          e.currentTarget.value = w.title;
+                          e.currentTarget.blur();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="tw-tab-t">{w.title}</span>
+                  )}
+                  {!w.runsClaude && <span className="tw-tab-k">zsh</span>}
+                  {/* 页签自己的关闭入口：hover 或当前页签才露出来，免得一排叉号把标签挤碎 */}
+                  <button
+                    className="tw-tab-x"
+                    title="关闭会话 ⌘W"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRequestClose(w.id);
+                    }}
+                  >
+                    <IconClose size={10} />
+                  </button>
+                </div>
+              );
+            })}
+            <button className="tw-add" title="新会话 ⌘T" onClick={onNew}>
+              <IconPlus />
             </button>
-          ))}
-          <button className="tw-add" title="新会话 ⌘T" onClick={onNew}>
-            <IconPlus />
-          </button>
+          </div>
           {/* 设计稿 685：右侧只放分支 · 配置目录 · 出口 · 路径，都是等宽小字 */}
           <span className="tw-meta">
             {active?.branch ? `${active.branch} · ` : ""}
@@ -152,6 +234,86 @@ export default function SessionMain({
             </>
           )}
         </div>
+      </div>
+
+      {ctx && (
+        <TabMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={[
+            { label: "重命名", hint: "双击", run: () => setRenaming(ctx.id) },
+            {
+              label: "复制路径",
+              run: () => {
+                const w = windows.find((x) => x.id === ctx.id);
+                if (w) void navigator.clipboard.writeText(w.cwd).catch(() => {});
+              },
+            },
+            "sep",
+            { label: "关闭", hint: "⌘W", run: () => onRequestClose(ctx.id) },
+            {
+              label: "关闭其他会话",
+              disabled: windows.length < 2,
+              run: () => onRequestCloseOthers(ctx.id),
+            },
+          ]}
+        />
+      )}
+    </>
+  );
+}
+
+type TabMenuItem = { label: string; hint?: string; disabled?: boolean; run: () => void } | "sep";
+
+/** 页签右键菜单：贴着鼠标开，靠窗口边时往回收 */
+function TabMenu({ x, y, items, onClose }: { x: number; y: number; items: TabMenuItem[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setPos({
+      left: Math.min(x, window.innerWidth - width - 8),
+      top: Math.min(y, window.innerHeight - height - 8),
+    });
+  }, [x, y]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <>
+      <div className="pop-backdrop" onMouseDown={onClose} onContextMenu={(e) => (e.preventDefault(), onClose())} />
+      <div
+        className="pop"
+        ref={ref}
+        role="menu"
+        style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: -9999, visibility: "hidden" }}
+      >
+        {items.map((it, i) =>
+          it === "sep" ? (
+            <div key={i} className="pop-sep" />
+          ) : (
+            <button
+              key={it.label}
+              className="pi"
+              role="menuitem"
+              disabled={it.disabled}
+              onClick={() => {
+                onClose();
+                it.run();
+              }}
+            >
+              <span className="pi-main">{it.label}</span>
+              {it.hint && <small>{it.hint}</small>}
+            </button>
+          ),
+        )}
       </div>
     </>
   );

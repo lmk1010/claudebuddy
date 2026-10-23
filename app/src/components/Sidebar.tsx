@@ -9,6 +9,7 @@ import {
   IconKey,
   IconPanel,
   IconPlus,
+  IconSparkle,
   IconTerminal,
 } from "./iconAliases";
 
@@ -25,9 +26,11 @@ interface Props {
   username: string;
   onSelectWindow: (id: string) => void;
   onCloseWindow: (id: string) => void;
-  onNew: (anchor: HTMLElement) => void;
+  onNew: () => void;
   onNav: (view: View) => void;
   onAccount: (anchor: HTMLElement) => void;
+  /** 底部环境菜单是否开着 —— 开着时这一行保持按下态 */
+  accountMenuOpen: boolean;
   onToggleSidebar: () => void;
 }
 
@@ -51,6 +54,7 @@ export default function Sidebar({
   onNew,
   onNav,
   onAccount,
+  accountMenuOpen,
   onToggleSidebar,
 }: Props) {
   const [width, setWidth] = useState(264);
@@ -76,8 +80,11 @@ export default function Sidebar({
 
   const sessions = [...windows].sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 
+  const accById = new Map(accounts.map((a) => [a.id, a]));
+
   const nav: { icon: typeof IconTerminal; label: string; view: View; count?: string }[] = [
-    { icon: IconTerminal, label: "会话", view: "session", count: sessions.length ? String(sessions.length) : "" },
+    { icon: IconSparkle, label: "首页", view: "home" },
+    { icon: IconTerminal, label: "会话", view: "sessions", count: sessions.length ? String(sessions.length) : "" },
     { icon: IconKey, label: "环境", view: "accounts", count: accounts.length ? String(accounts.length) : "" },
     { icon: IconGear, label: "设置", view: "settings" },
   ];
@@ -104,7 +111,12 @@ export default function Sidebar({
         </span>
       </div>
 
-      <button className="new" onClick={(e) => onNew(e.currentTarget)}>
+      {/* 直接建在当前环境里 —— 环境在主界面顶部、或底部那一行切 */}
+      <button
+        className="new"
+        onClick={onNew}
+        title={activeAccount ? `在「${activeAccount.label}」里新建会话` : "新建会话"}
+      >
         <IconPlus />
         新建会话
         <span className="kbd">⌘N</span>
@@ -113,7 +125,9 @@ export default function Sidebar({
       {nav.map((n) => (
         <button
           key={n.view}
-          className={`nv${view === n.view ? " on" : ""}`}
+          /* 「会话」要在总览和终端里都保持高亮 —— 终端属于会话，
+             进了终端却让会话那一项熄灭，会让人以为自己跑到了别处。 */
+          className={`nv${view === n.view || (n.view === "sessions" && view === "session") ? " on" : ""}`}
           onClick={() => onNav(n.view)}
         >
           <n.icon />
@@ -133,13 +147,18 @@ export default function Sidebar({
         ) : (
           sessions.map((w) => {
             const live = w.id === activeId && view === "session";
+            const acc = accById.get(w.accountId);
             return (
               <button
                 key={w.id}
                 className={`rw${live ? " on" : ""}`}
                 onClick={() => onSelectWindow(w.id)}
+                title={`${w.title} · ${acc?.label ?? ""}\n${w.cwd}`}
               >
-                <span className={`dt${live ? " live" : ""}`} />
+                {/* 环境标记：每个环境一种颜色、一个首字，几个号的会话混在一起也一眼分得开 */}
+                <span className={`rw-env${live ? " live" : ""}`} style={{ background: acc?.tint }}>
+                  {acc?.label.slice(0, 1)}
+                </span>
                 <span className="nm">{w.title}</span>
                 <span
                   className="ws-x"
@@ -158,7 +177,13 @@ export default function Sidebar({
         )}
       </div>
 
-      <button className="me" onClick={(e) => onAccount(e.currentTarget)}>
+      <button
+        className={`me${accountMenuOpen ? " open" : ""}`}
+        onClick={(e) => onAccount(e.currentTarget)}
+        aria-haspopup="menu"
+        aria-expanded={accountMenuOpen}
+        title="切换环境"
+      >
         <span className="av" style={activeAccount ? { background: activeAccount.tint } : undefined}>
           {(activeAccount?.label || username || "M").slice(0, 1)}
         </span>

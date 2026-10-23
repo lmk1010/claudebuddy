@@ -1,0 +1,1818 @@
+/* ClaudeBuddy · 交互层补丁
+ *
+ * 弹窗外壳、编辑环境弹窗、会话主界面、页签、底部环境行。
+ * 放在 app.css 之后加载，同名选择器以这里为准。
+ */
+
+/* ══════════════════════ 弹窗外壳 ══════════════════════ */
+
+/* 遮罩盖住整扇窗（含侧栏）。之前挂在主区里，侧栏还亮着能点 */
+.mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  background: rgba(20, 20, 19, 0.22);
+  animation: mask-in 180ms var(--ease-out) both;
+}
+[data-theme="dark"] .mask {
+  background: rgba(0, 0, 0, 0.5);
+}
+.mask > .dlg {
+  animation: dlg-in 240ms var(--ease) both;
+}
+.mask.out {
+  animation: mask-out 150ms var(--ease-out) both;
+  pointer-events: none;
+}
+.mask.out > .dlg {
+  animation: dlg-out 150ms var(--ease-out) both;
+}
+@keyframes mask-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes mask-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes dlg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+@keyframes dlg-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+.dlg {
+  position: relative;
+  background: var(--pp);
+  border: var(--hair) solid var(--ln2);
+  border-radius: 16px;
+  box-shadow:
+    0 28px 72px -18px rgba(20, 20, 19, 0.32),
+    0 2px 8px rgba(20, 20, 19, 0.06);
+  max-height: calc(100vh - 80px);
+  max-width: 100%;
+}
+[data-theme="dark"] .dlg {
+  box-shadow:
+    0 28px 72px -18px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.dlg-sm,
+.dlg-md {
+  padding: 20px 22px 18px;
+  width: 440px;
+  display: flex;
+  flex-direction: column;
+}
+.dlg-md {
+  width: 560px;
+}
+.dlg-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px -8px 6px 0;
+}
+.dlg-h h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: -0.015em;
+}
+.dlg > p {
+  font-size: 12.5px;
+  color: var(--t3);
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+.dlg-in {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: var(--hair) solid var(--ln2);
+  font-size: 13.5px;
+  transition:
+    border-color var(--dur-snap) var(--ease-out),
+    box-shadow var(--dur-snap) var(--ease-out);
+}
+.dlg-in:focus {
+  outline: none;
+  border-color: var(--t3);
+  box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.06);
+}
+.dlg-err {
+  min-height: 18px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--danger);
+}
+.dlg-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* 二次确认：比编辑弹窗小，只问一件事 */
+.dlg.confirm {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  width: 400px;
+  height: auto;
+  padding: 20px 22px 18px;
+  border-radius: 14px;
+  animation: dlg-in 220ms var(--ease) both;
+}
+.mask.out > .dlg.confirm {
+  animation: dlg-out 150ms var(--ease-out) both;
+}
+
+/* 导入列表 */
+.imp-list {
+  border: var(--hair) solid var(--ln);
+  border-radius: 12px;
+  overflow-y: auto;
+  max-height: 340px;
+}
+.imp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+}
+.imp-row + .imp-row {
+  border-top: var(--hair) solid var(--ln);
+}
+.imp-main {
+  flex: 1;
+  min-width: 0;
+}
+.imp-main b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.imp-main small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.imp-empty {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--t4);
+  font-size: 12.5px;
+}
+
+/* ══════════════════════ 编辑环境弹窗 ══════════════════════ */
+
+.dlg.em {
+  width: 900px;
+  height: 620px;
+  max-height: calc(100vh - 80px);
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  overflow: hidden;
+}
+.em-side {
+  background: var(--sd);
+  border-right: var(--hair) solid var(--ln);
+  padding: 18px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.em-who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 16px;
+}
+.em-who .av {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 15px;
+}
+.em-who-t {
+  min-width: 0;
+}
+.em-who-t b {
+  display: block;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.em-who-t small {
+  display: block;
+  font-size: 11px;
+  color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.em-nav {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+/* 选中底色单独一层，切换时滑过去 */
+.em-ind {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  border-radius: 8px;
+  background: var(--sel);
+  transition:
+    transform 260ms var(--ease),
+    height 260ms var(--ease);
+  pointer-events: none;
+}
+.em-nav button {
+  position: relative;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--t2);
+  text-align: left;
+  font-size: 13px;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out);
+}
+.em-nav button > svg {
+  color: var(--t4);
+  flex: none;
+  transition: color var(--dur-snap) var(--ease-out);
+}
+.em-nav button:hover:not(.on) {
+  background: var(--hv);
+}
+.em-nav button.on {
+  color: var(--t1);
+  font-weight: 500;
+}
+.em-nav button.on > svg,
+.em-nav button:hover > svg {
+  color: var(--t2);
+}
+.em-nav button:active {
+  transform: scale(0.985);
+}
+.em-badge {
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--coral);
+}
+.em-sep {
+  height: var(--hair);
+  background: var(--ln);
+  margin: 8px 10px;
+}
+.em-nav button.em-danger,
+.em-nav button.em-danger > svg {
+  color: var(--danger);
+}
+.em-nav button.em-danger.on {
+  color: var(--danger);
+}
+.em-foot {
+  padding: 10px 8px 0;
+}
+
+.em-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.em-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 16px 14px 32px;
+  flex: none;
+}
+.em-head h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.018em;
+  line-height: 1.15;
+}
+.em-head p {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.em-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 32px 32px;
+  animation: em-in-down 260ms var(--ease) both;
+}
+.em-body[data-dir="up"] {
+  animation-name: em-in-up;
+}
+@keyframes em-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes em-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* 一组设置项：发丝线描边的圆角卡片，行之间一条线 */
+.em-card {
+  border: var(--hair) solid var(--ln);
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.em-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 56px;
+  padding: 10px 16px;
+}
+.em-row + .em-row,
+.em-sess + .em-sess,
+.em-trace + .em-trace,
+.em-kc + .em-kc {
+  border-top: var(--hair) solid var(--ln);
+}
+.em-row-t {
+  min-width: 0;
+}
+.em-row-t b {
+  display: block;
+  font-weight: 500;
+  font-size: 13px;
+}
+.em-row-t small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.em-row-c {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 60%;
+}
+.em-val {
+  font-size: 12.5px;
+  color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.em-code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--t2);
+  background: var(--tile);
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+[data-theme="dark"] .em-code {
+  background: rgba(250, 249, 245, 0.06);
+}
+.em-in {
+  height: 32px;
+  width: 200px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--pp);
+  border: var(--hair) solid var(--ln2);
+  font-size: 13px;
+  transition:
+    border-color var(--dur-snap) var(--ease-out),
+    box-shadow var(--dur-snap) var(--ease-out);
+}
+.em-in:focus {
+  outline: none;
+  border-color: var(--t3);
+  box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.06);
+}
+.em-proxy {
+  display: flex;
+  gap: 6px;
+}
+.em-proxy .em-in {
+  width: 140px;
+}
+.em-proxy .em-port {
+  width: 76px;
+}
+.em-ipline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.em-tints {
+  display: flex;
+  gap: 8px;
+}
+.em-tint {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 var(--hair) rgba(255, 255, 255, 0.16),
+    0 0 0 2px var(--bg),
+    0 0 0 2px transparent;
+  transition:
+    box-shadow var(--dur-snap) var(--ease-out),
+    transform var(--dur-base) var(--spring);
+}
+.em-tint:hover {
+  transform: scale(1.08);
+}
+.em-tint.on {
+  box-shadow:
+    inset 0 0 0 var(--hair) rgba(255, 255, 255, 0.16),
+    0 0 0 2px var(--bg),
+    0 0 0 3.5px var(--t2);
+}
+
+.em-sub,
+.em-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--t4);
+  padding: 0 4px 8px;
+}
+.em-sub {
+  margin-top: 24px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.em-note {
+  margin-top: 12px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--t3);
+}
+.em-empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--t4);
+  border: var(--hair) dashed var(--ln2);
+  border-radius: 12px;
+}
+.em-acts {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.em-login {
+  margin-top: 14px;
+}
+.em-body .det-warn {
+  margin-top: 12px;
+}
+.em-body .sim {
+  margin-top: 16px;
+}
+
+.em-sess {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 16px;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.em-sess:hover {
+  background: var(--hv);
+}
+.em-sess-t {
+  display: block;
+  font-size: 13px;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.em-sess-m {
+  display: flex;
+  gap: 12px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--t4);
+}
+.em-sess-m .mono:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.em-trace {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.em-trace:hover:not(.locked) {
+  background: var(--hv);
+}
+.em-trace.locked {
+  cursor: default;
+}
+.em-trace-n {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.em-trace-n small {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--t4);
+}
+.em-trace .mono {
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.em-trace input,
+.em-row input[type="radio"] {
+  accent-color: var(--t1);
+  width: 15px;
+  height: 15px;
+}
+.em-kc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--t2);
+}
+.em-kc svg {
+  color: var(--t4);
+}
+.em-confirm {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(198, 69, 69, 0.06);
+  border: var(--hair) solid rgba(198, 69, 69, 0.24);
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+/* ══════════════════════ 环境页 ══════════════════════ */
+
+.pg-acts {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.ar {
+  grid-template-columns: 32px minmax(0, 1fr) auto auto auto 28px;
+}
+.ar-cur {
+  margin-left: 8px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--t3);
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--tile);
+  vertical-align: 1px;
+}
+.ar .ar-more {
+  transition:
+    transform var(--dur-base) var(--ease),
+    color var(--dur-snap) var(--ease-out);
+}
+.ar:hover .ar-more {
+  color: var(--t1);
+  transform: translateX(2px);
+}
+
+/* ══════════════════════ 会话主界面 ══════════════════════ */
+
+.mh {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  padding: 28px 24px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mh > * {
+  width: 100%;
+  max-width: 760px;
+}
+.mh .greet {
+  margin: 4vh 0 26px;
+}
+
+/* 环境切换：一条分段条，选中底色滑过去 */
+.mh-envs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.envtabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--sd);
+  border: var(--hair) solid var(--ln);
+  max-width: calc(100% - 40px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.envtabs-ind {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  border-radius: 9px;
+  background: var(--pp);
+  box-shadow:
+    0 1px 2px rgba(20, 20, 19, 0.08),
+    0 0 0 var(--hair) var(--ln);
+  transition:
+    transform 280ms var(--ease),
+    width 280ms var(--ease);
+  pointer-events: none;
+}
+.envtab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px 0 6px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--t3);
+  white-space: nowrap;
+  transition:
+    color var(--dur-snap) var(--ease-out),
+    background var(--dur-snap) var(--ease-out);
+}
+.envtab:hover:not(.on) {
+  color: var(--t1);
+  background: var(--hv);
+}
+.envtab.on {
+  color: var(--t1);
+  font-weight: 500;
+}
+.envtab:active {
+  transform: scale(0.97);
+}
+.envtab em {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--t4);
+  font-weight: 400;
+}
+.envtab-st {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--t4);
+  opacity: 0.5;
+}
+.envtab-st.ok {
+  background: var(--success);
+  opacity: 1;
+}
+.envtab-st.bad {
+  background: var(--danger);
+  opacity: 1;
+}
+.av.xs {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--sans);
+  font-weight: 500;
+}
+
+.mh-env {
+  animation: env-swap 280ms var(--ease) both;
+}
+@keyframes env-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.mh-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 11.5px;
+  color: var(--t4);
+}
+.mh-meta .mono {
+  font-size: 11px;
+}
+.mh-edit {
+  color: var(--t3);
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out);
+}
+.mh-edit:hover {
+  background: var(--hv);
+  color: var(--t1);
+}
+.mh .composer-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.mh .sugg {
+  margin: 14px 0 34px;
+}
+.mh-sec {
+  margin-bottom: 28px;
+}
+.mh-sec .gl {
+  padding: 0 4px 8px;
+}
+.mh-empty {
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--t4);
+  border: var(--hair) dashed var(--ln2);
+  border-radius: 12px;
+}
+.mh-list {
+  border: var(--hair) solid var(--ln);
+  border-radius: 12px;
+  background: var(--pp);
+  padding: 4px;
+}
+.mh-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 8px 0 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    transform var(--dur-slow) var(--spring);
+}
+.mh-row:hover {
+  background: var(--hv);
+}
+.mh-row:active {
+  transform: scale(0.995);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.mh-row.on {
+  background: var(--sel);
+}
+.mh-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  flex: none;
+  animation: live-breathe 1.8s var(--ease-out) infinite;
+}
+.mh-nm {
+  flex: 1;
+  min-width: 0;
+}
+.mh-nm b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mh-nm small {
+  display: block;
+  font-size: 11px;
+  color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mh-env-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t3);
+  flex: none;
+}
+.mh-env-tag .av.xs {
+  width: 16px;
+  height: 16px;
+  font-size: 9.5px;
+  border-radius: 5px;
+}
+.mh-kind {
+  font-size: 11px;
+  color: var(--t3);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--tile);
+  flex: none;
+}
+[data-theme="dark"] .mh-kind {
+  background: rgba(250, 249, 245, 0.06);
+}
+.mh-tm {
+  font-size: 11px;
+  color: var(--t4);
+  flex: none;
+  width: 104px;
+  text-align: right;
+}
+.mh-x {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--t4);
+  flex: none;
+  opacity: 0;
+  transition:
+    opacity var(--dur-snap) var(--ease-out),
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out);
+}
+.mh-row:hover .mh-x,
+.mh-row:focus-within .mh-x {
+  opacity: 1;
+}
+.mh-x:hover {
+  background: rgba(198, 69, 69, 0.1);
+  color: var(--danger);
+}
+.mh .rc-grid .rc {
+  text-align: left;
+}
+
+/* ══════════════════════ 会话页签 ══════════════════════ */
+
+.tw-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  height: 100%;
+}
+.tw-tabs::-webkit-scrollbar {
+  display: none;
+}
+.tw-tab {
+  gap: 7px;
+  padding: 0 6px 0 9px;
+  max-width: 220px;
+  min-width: 0;
+  cursor: pointer;
+  border-radius: 7px 7px 0 0;
+  font-family: var(--sans);
+  font-size: 12px;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out);
+  animation: tab-in 220ms var(--ease) both;
+}
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.tw-tab:hover:not(.on) {
+  background: rgba(127, 127, 127, 0.08);
+  color: var(--ttabt);
+}
+.tw-tab-av {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #faf9f5;
+  flex: none;
+}
+.tw-tab-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tw-tab-k {
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
+.tw-tab-in {
+  width: 120px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--pp);
+  color: var(--t1);
+  border: var(--hair) solid var(--ln2);
+  font-size: 12px;
+}
+.tw-tab-in:focus {
+  outline: none;
+  border-color: var(--t3);
+}
+.tw-tab-x {
+  width: 18px;
+  height: 18px;
+  margin-left: 0;
+  border-radius: 5px;
+  color: inherit;
+  flex: none;
+}
+.tw-tab-x:hover {
+  background: rgba(127, 127, 127, 0.18);
+  color: var(--ttabt);
+}
+.tw-add {
+  border-radius: 7px;
+  align-self: center;
+  height: 26px;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.tw-add:hover {
+  background: rgba(127, 127, 127, 0.1);
+  color: var(--ttabt);
+}
+.sh-env {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px 0 3px;
+  border-radius: 7px;
+  background: var(--hv);
+  font-size: 12px;
+  color: var(--t2);
+}
+.pop .pi:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ══════════════════════ 侧栏底部环境行 ══════════════════════ */
+
+/* 分隔线挪到外面一圈（伪元素），按钮本身是完整圆角块 ——
+   原来 border-top 画在按钮上，hover 底色只亮下半截、上沿是一条直线，看着像没反应。 */
+.me {
+  position: relative;
+  margin-top: 10px;
+  padding: 8px;
+  border-top: 0;
+  border-radius: 10px;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    box-shadow var(--dur-snap) var(--ease-out),
+    transform var(--dur-slow) var(--spring);
+}
+.me::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: -6px;
+  height: var(--hair);
+  background: var(--ln);
+}
+.me:hover {
+  background: var(--sel);
+}
+.me.open {
+  background: var(--sel);
+  box-shadow: inset 0 0 0 var(--hair) var(--ln2);
+}
+.me:active {
+  transform: scale(0.985);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.me .g {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: var(--t4);
+  transition:
+    color var(--dur-snap) var(--ease-out),
+    transform 240ms var(--ease);
+}
+.me:hover .g {
+  color: var(--t1);
+}
+.me.open .g {
+  color: var(--t1);
+  transform: rotate(180deg);
+}
+.me .av {
+  transition: transform var(--dur-base) var(--spring);
+}
+.me:hover .av {
+  transform: scale(1.05);
+}
+
+/* ══════════════════════ 侧栏会话行：环境标记 ══════════════════════ */
+
+.rw-env {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #faf9f5;
+  position: relative;
+}
+/* 当前打开的那个会话：右下角一颗绿点 */
+.rw-env.live::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 2px var(--sd);
+}
+.rw.on .rw-env.live::after {
+  box-shadow: 0 0 0 2px var(--sel);
+}
+
+/* ══════════════════════ 侧栏收起：给红绿灯让位 ══════════════════════ */
+
+/* 收起后不再留一条 44px 的窄轨（红绿灯有 70px 宽，直接压在按钮和标题上）。
+   展开按钮浮在红绿灯右边，主区顶栏左侧让出同样的宽度。 */
+.shell.ws-closed > .ws-open {
+  position: absolute;
+  z-index: 5;
+  left: 80px;
+  top: 9px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  animation: fade-in 200ms var(--ease) both;
+  -webkit-app-region: no-drag;
+}
+.shell.ws-closed > .ws-open:hover {
+  background: var(--hv);
+}
+.shell.ws-closed .wm > .wh,
+.shell.ws-closed .wm > .sh {
+  padding-left: 124px;
+}
+.shell.ws-closed .wm .pg {
+  padding-top: 64px;
+}
+
+/* ══════════════════════ 首页：整组垂直居中 ══════════════════════ */
+
+.hm {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  padding: 0 24px 48px;
+}
+/* margin:auto 让整组在可视区居中；内容超高时自然回到顶部、不被裁 */
+.hm-c {
+  margin: auto;
+  width: 100%;
+  max-width: 720px;
+  padding-bottom: 6vh;
+}
+.hm .greet {
+  margin-bottom: 24px;
+}
+.hm .sugg {
+  margin: 14px 0 0;
+}
+
+/* ══════════════════════ 会话页 ══════════════════════ */
+
+.sv {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px 48px 48px;
+}
+.sv-h {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.sv-h h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.sv-h p {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--t3);
+}
+.sv-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: var(--hair) solid var(--ln);
+}
+.sv-seg {
+  max-width: none;
+  flex: none;
+}
+.sv-seg .envtab {
+  padding: 0 12px;
+  gap: 6px;
+}
+.sv-filter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.sv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: var(--hair) solid var(--ln);
+  font-size: 12.5px;
+  color: var(--t3);
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out),
+    border-color var(--dur-snap) var(--ease-out);
+}
+.sv-chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--c);
+}
+.sv-chip em {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--t4);
+}
+.sv-chip:hover {
+  background: var(--hv);
+  color: var(--t1);
+}
+.sv-chip.on {
+  background: var(--t1);
+  border-color: var(--t1);
+  color: var(--bg);
+}
+.sv-chip.on em {
+  color: inherit;
+  opacity: 0.7;
+}
+.sv-q {
+  height: 30px;
+  width: 180px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: var(--hair) solid var(--ln);
+  background: var(--pp);
+  font-size: 12.5px;
+}
+.sv-q:focus {
+  outline: none;
+  border-color: var(--t3);
+}
+.sv-body {
+  animation: env-swap 240ms var(--ease) both;
+}
+.sv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--t4);
+  border: var(--hair) dashed var(--ln2);
+  border-radius: 14px;
+}
+.sv-grp {
+  margin-bottom: 22px;
+}
+.sv-grp-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 8px;
+  font-size: 13px;
+}
+.sv-grp-h b {
+  font-weight: 500;
+}
+.sv-grp-h .mono {
+  font-size: 11px;
+  color: var(--t4);
+}
+.sv-grp-n {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--t4);
+}
+/* 每组列表左边一条环境色，组和组之间靠颜色就能分开 */
+.sv-list {
+  position: relative;
+  border: var(--hair) solid var(--ln);
+  border-radius: 12px;
+  background: var(--pp);
+  padding: 4px;
+  overflow: hidden;
+}
+.sv-list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--c);
+}
+.sv-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.sv-row + .sv-row {
+  margin-top: 1px;
+}
+.sv-row:hover {
+  background: var(--hv);
+}
+.sv-row.on {
+  background: var(--sel);
+}
+.sv-live,
+.sv-idle {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.sv-live {
+  background: var(--success);
+  animation: live-breathe 1.8s var(--ease-out) infinite;
+}
+.sv-idle {
+  background: var(--ln2);
+}
+.sv-nm {
+  flex: 1;
+  min-width: 0;
+}
+.sv-nm b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sv-nm small {
+  display: block;
+  font-size: 11px;
+  color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sv-tag {
+  font-size: 11px;
+  color: var(--t3);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--tile);
+  flex: none;
+}
+[data-theme="dark"] .sv-tag {
+  background: rgba(250, 249, 245, 0.06);
+}
+.sv-tm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+  min-width: 96px;
+  font-size: 11.5px;
+  color: var(--t3);
+  line-height: 1.35;
+}
+.sv-tm small {
+  font-size: 10.5px;
+  color: var(--t4);
+}
+.sv-go {
+  font-size: 12px;
+  color: var(--t4);
+  padding: 4px 10px;
+  border-radius: 7px;
+  flex: none;
+  opacity: 0;
+  transition:
+    opacity var(--dur-snap) var(--ease-out),
+    background var(--dur-snap) var(--ease-out);
+}
+.sv-row:hover .sv-go {
+  opacity: 1;
+  background: var(--sel);
+  color: var(--t1);
+}
+.sv-row:hover .mh-x,
+.sv-row:focus-within .mh-x {
+  opacity: 1;
+}
+.sv-more {
+  padding: 8px 4px 0;
+  font-size: 11.5px;
+  color: var(--t4);
+}
+
+/* ── 会话页 · Claude 风格收口 ──
+   去掉每组左边的彩条和外框卡片：Claude 的列表是一行一条、发丝线分隔、悬停才有底色。
+   环境靠组标题上的小色块区分就够了，颜色只出现在一处。
+   筛选胶囊选中态用跟侧栏一样的 --sel 底，不用整块黑。 */
+.sv-list {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+.sv-list::before {
+  content: none;
+}
+.sv-row {
+  min-height: 56px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 10px;
+  position: relative;
+}
+.sv-row + .sv-row {
+  margin-top: 0;
+}
+.sv-row + .sv-row::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: var(--hair);
+  background: var(--ln);
+  transition: opacity var(--dur-snap) var(--ease-out);
+}
+/* 悬停/选中那一行和它下一行之间的线藏掉，底色块才完整 */
+.sv-row:hover::before,
+.sv-row:hover + .sv-row::before,
+.sv-row.on::before,
+.sv-row.on + .sv-row::before {
+  opacity: 0;
+}
+.sv-grp-h {
+  padding: 0 12px 6px;
+  border-bottom: 0;
+}
+.sv-grp-h b {
+  font-size: 13px;
+}
+.sv-grp {
+  margin-bottom: 26px;
+}
+.sv-tag {
+  background: transparent;
+  padding: 0;
+  color: var(--t4);
+}
+[data-theme="dark"] .sv-tag {
+  background: transparent;
+}
+.sv-chip {
+  border-color: transparent;
+  background: transparent;
+  height: 30px;
+  padding: 0 12px;
+}
+.sv-chip:hover {
+  background: var(--hv);
+}
+.sv-chip.on {
+  background: var(--sel);
+  border-color: transparent;
+  color: var(--t1);
+  font-weight: 500;
+}
+.sv-chip.on em {
+  opacity: 1;
+  color: var(--t3);
+}
+.sv-bar {
+  border-bottom: var(--hair) solid var(--ln);
+}
+.sv-q {
+  border-color: var(--ln2);
+  border-radius: 9px;
+}
+
+/* ══════════════════════ 说明问号 ══════════════════════ */
+
+.help {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: var(--hair) solid var(--ln2);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--t4);
+  vertical-align: 1px;
+  flex: none;
+  cursor: help;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out),
+    border-color var(--dur-snap) var(--ease-out);
+}
+.help:hover,
+.help.on {
+  background: var(--t1);
+  border-color: var(--t1);
+  color: var(--bg);
+}
+.help-back {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+}
+.help-card {
+  position: fixed;
+  z-index: 80;
+  width: 280px;
+  padding: 12px 14px 13px;
+  border-radius: 12px;
+  background: var(--pp);
+  border: var(--hair) solid var(--ln2);
+  box-shadow: var(--pop);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--t2);
+  text-align: left;
+  font-weight: 400;
+  animation: pop-in var(--dur-base) var(--ease-out);
+}
+.help-card.wide {
+  width: 340px;
+}
+.help-card > b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+  margin-bottom: 6px;
+}
+.help-body p + p,
+.help-body p + ol,
+.help-body ol + p {
+  margin-top: 6px;
+}
+.help-body b {
+  color: var(--t1);
+  font-weight: 500;
+}
+.help-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+.help-steps li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.help-steps li > span {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--tile);
+  color: var(--t2);
+  font-size: 10.5px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+[data-theme="dark"] .help-steps li > span {
+  background: rgba(250, 249, 245, 0.08);
+}
+.mh-envs .help {
+  margin-left: 0;
+}
+.sv-bar > .help {
+  margin-left: -4px;
+}
+.em-bar-t {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ══════════════════════ 保姆级引导 ══════════════════════ */
+
+/* 编辑弹窗「通用」顶部的配置进度：还差哪步、点哪里 */
+.em-guide {
+  border: var(--hair) solid var(--ln2);
+  border-radius: 12px;
+  background: var(--pp);
+  padding: 14px 16px 6px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.em-guide-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.em-guide-h b {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.em-guide-h > span {
+  font-size: 11.5px;
+  color: var(--t4);
+}
+.em-guide-bar {
+  margin-left: auto;
+  width: 120px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tile);
+  overflow: hidden;
+}
+.em-guide-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--coral);
+  transition: width 400ms var(--ease);
+}
+.em-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+.em-step + .em-step {
+  border-top: var(--hair) solid var(--ln);
+}
+.em-step-n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t2);
+  border: var(--hair) solid var(--ln2);
+}
+.em-step.done .em-step-n {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.em-step-t {
+  flex: 1;
+  min-width: 0;
+}
+.em-step-t b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.em-step.done .em-step-t b {
+  color: var(--t3);
+}
+.em-step-t small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--t3);
+  line-height: 1.55;
+}
+.em-login-top {
+  margin: -6px 0 18px;
+}
+
+/* 网络页顶部的「不知道填什么」提示条 */
+.em-tipbox {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: var(--coral-soft, #f5e4dd);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--t2);
+}
+[data-theme="dark"] .em-tipbox {
+  background: rgba(204, 120, 92, 0.12);
+}
+.em-tipbox b {
+  color: var(--t1);
+  font-weight: 600;
+  margin-right: 4px;
+}
+.em-tipbox .btn {
+  flex: none;
+}
+.em-scan {
+  margin-bottom: 4px;
+}
+
+/* 新建环境弹窗里的三步说明 */
+.dlg-guide {
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: var(--hair) solid var(--ln);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--t2);
+}
+.dlg-guide b {
+  color: var(--t1);
+  font-weight: 500;
+}
+
+/* 重新进引导时的出口 */
+.ob {
+  position: relative;
+}
+.ob-exit {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 5;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: var(--hair) solid var(--ln2);
+  background: var(--pp);
+  font-size: 12.5px;
+  color: var(--t2);
+  -webkit-app-region: no-drag;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.ob-exit:hover {
+  background: var(--sel);
+  color: var(--t1);
+}
+
+/* 环境菜单宽一点，名字和登录态放得下 */
+.pop-env {
+  min-width: 260px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mask,
+  .mask > .dlg,
+  .em-body,
+  .mh-env,
+  .tw-tab,
+  .em-ind,
+  .envtabs-ind {
+    animation: none !important;
+    transition: none !important;
+  }
+}
