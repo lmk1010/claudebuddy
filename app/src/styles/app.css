@@ -4053,8 +4053,13 @@
   .envbar:active,
   .new:active,
   .rc:active,
-  .tw-tab:active {
+  .tw-tab:active,
+  .ws,
+  .insp-wrap,
+  .ws-open,
+  .insp-open {
     transform: none;
+    transition: none;
   }
 }
 
@@ -4256,4 +4261,75 @@
 /* 重新检查：整屏唯一的常驻按钮，压在最后 */
 .diag-refresh {
   margin-top: 20px;
+}
+
+/* ───────────────────────────── 折叠（侧栏 / 右侧面板） */
+
+/* 侧栏：把宽度收到 0，而不是卸载组件。
+   直接卸载是瞬时的，看起来就像「点了没反应」—— 过渡本身就是反馈。 */
+.ws {
+  width: var(--w, var(--sidebar-w));
+  transition:
+    width 240ms var(--ease),
+    opacity 160ms var(--ease),
+    padding 240ms var(--ease);
+}
+.ws.shut {
+  width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-right-color: transparent;
+}
+
+/* 收起后留在流里的窄轨，不是浮层 —— 浮层会盖住会话标题 */
+.ws-open {
+  width: 44px;
+  height: 100%;
+  border-radius: 0;
+  border-right: var(--hair) solid var(--ln);
+  background: var(--sd);
+  align-content: start;
+  padding-top: 10px;
+  animation: railIn 180ms var(--ease) both;
+}
+@keyframes railIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 右侧面板：同一套手法，方向和侧栏相反 */
+.insp-wrap {
+  flex: none;
+  display: flex;
+  min-width: 0;
+  width: var(--panel-w);
+  transition:
+    width 240ms var(--ease),
+    opacity 160ms var(--ease);
+}
+.insp-wrap .insp {
+  width: 100%;
+}
+.insp-wrap.shut {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.insp-open {
+  width: 40px;
+  height: 100%;
+  border-radius: 0;
+  border-left: var(--hair) solid var(--ln);
+  background: var(--sd);
+  align-content: start;
+  padding-top: 10px;
+  animation: railIn 180ms var(--ease) both;
 }

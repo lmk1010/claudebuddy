@@ -48,9 +48,9 @@ export default function Accounts(p: Props) {
     <div className="pg">
       <div className="pg-h">
         <div>
-          <h1>账号</h1>
+          <h1>环境</h1>
           <p>
-            {p.accounts.length} 个账号 · 全部本机存储 · 每个独立目录、独立出口
+            {p.accounts.length} 个环境 · 全部本机存储 · 每个独立目录、独立出口
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -64,9 +64,9 @@ export default function Accounts(p: Props) {
       {!p.bannerDismissed && (
         <div className="banner">
           <div>
-            <b>每个账号一间屋子</b>
+            <b>每个环境一间屋子</b>
             <p>
-              凭据、对话记录、file-history 全落在各自的配置目录里。切账号就是换一间屋子，
+              凭据、对话记录、file-history 全落在各自的配置目录里。切环境就是换一间屋子，
               不会串号，也不用反复登录。
             </p>
           </div>
@@ -125,7 +125,7 @@ export default function Accounts(p: Props) {
         <input
           className="ob-input"
           value={newLabel}
-          placeholder="新账号名字，例如 主力 / 工作"
+          placeholder="新环境名字，例如 主力 / 工作"
           onChange={(e) => setNewLabel(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && newLabel.trim()) {
@@ -145,7 +145,7 @@ export default function Accounts(p: Props) {
           }}
         >
           <IconPlus />
-          添加账号
+          添加环境
         </button>
       </div>
     </div>

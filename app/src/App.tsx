@@ -129,7 +129,13 @@ export default function App() {
   const [menu, setMenu] = useState<Menu>(null);
   const [palette, setPalette] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  /**
+   * 右侧面板默认收起。
+   *
+   * 它显示的是「这个会话在跑什么」，而绝大多数时间用户在看终端本身；
+   * 默认展开等于把三分之一宽度让给一个暂时不需要看的报表。
+   */
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [toast, setToast] = useState<{ title: string; body?: string } | null>(null);
   const [cloneOpen, setCloneOpen] = useState(false);
   /** 账号详情抽屉：默认不显示，点开才有 */
@@ -168,12 +174,24 @@ export default function App() {
       const raw = (await window.claudeBuddy.loadState()) as Partial<BuddyState> | null;
       if (!alive) return;
       if (raw && Array.isArray(raw.accounts) && raw.accounts.length > 0) {
+        const accs = raw.accounts.map(normalizeAccount);
+        const ids = new Set(accs.map((a) => a.id));
+        /**
+         * 丢掉引用了已删除环境的会话。
+         * 留着的话启动时会拿一个不存在的 accountId 去 spawn，
+         * 终端里直接冒一句「启动失败：未知账号」。
+         */
+        const wins =
+          Array.isArray(raw.windows) && raw.restoreSessions !== false
+            ? raw.windows.filter((w) => ids.has(w.accountId))
+            : [];
+        const keptActive = wins.some((w) => w.id === raw.activeWindowId);
         setState({
           ...EMPTY_STATE,
           ...raw,
-          accounts: raw.accounts.map(normalizeAccount),
-          windows: Array.isArray(raw.windows) && raw.restoreSessions !== false ? raw.windows : [],
-          activeWindowId: raw.restoreSessions !== false ? (raw.activeWindowId ?? null) : null,
+          accounts: accs,
+          windows: wins,
+          activeWindowId: raw.restoreSessions !== false && keptActive ? (raw.activeWindowId ?? null) : null,
           activeAccountId: raw.activeAccountId ?? raw.accounts[0]?.id ?? null,
           theme: isTheme(raw.theme) ? raw.theme : "system",
           view: isView(raw.view) && !(raw.restoreSessions === false && raw.view === "session") ? raw.view : "home",
@@ -894,7 +912,6 @@ export default function App() {
   }
 
   const view: View = state.view;
-  const showInspector = view === "session" && activeWindow && inspectorOpen;
 
   return (
     <div className={`shell${state.sidebarOpen ? "" : " ws-closed"}`}>
@@ -903,7 +920,8 @@ export default function App() {
           <IconPanel />
         </button>
       )}
-      {state.sidebarOpen && <Sidebar
+      <Sidebar
+        open={state.sidebarOpen}
         windows={state.windows}
         accounts={state.accounts}
         activeId={state.activeWindowId}
@@ -923,7 +941,7 @@ export default function App() {
         }}
         onAccount={(el) => setMenu(anchor("account", el))}
         onToggleSidebar={() => update({ sidebarOpen: false })}
-      />}
+      />
 
       <div className={`wm${view === "session" && activeWindow ? " term-bg" : ""}`}>
         {view === "home" && (
@@ -1120,27 +1138,42 @@ export default function App() {
         )}
       </div>
 
-      {view === "session" &&
-        (showInspector ? (
-          <Inspector
-            win={activeWindow}
-            accountLabel={activeAccount?.label ?? "—"}
-            accountEmail={activeAccount ? status[activeAccount.id]?.email : undefined}
-            proxy={activeAccount?.proxy}
-            stats={stats}
-            threshold={state.rhythmThreshold}
-            usage={usage}
-            git={git}
-            safety={safety}
-            safetyOpen={safetyOpen}
-            onToggleSafety={() => setSafetyOpen((v) => !v)}
-            onCopy={copy}
-            onShowDiff={() => setShowDiff(true)}
-            onClose={() => setInspectorOpen(false)}
-          />
-        ) : (
-          <InspectorEmpty />
-        ))}
+      {view === "session" && (
+        <>
+          {/* 收起后留一个贴边的展开入口，不然面板一关就找不回来了 */}
+          {!inspectorOpen && (
+            <button
+              className="ib insp-open"
+              title="展开面板 ⌘B"
+              onClick={() => setInspectorOpen(true)}
+            >
+              <IconPanel />
+            </button>
+          )}
+          <div className={`insp-wrap${inspectorOpen ? "" : " shut"}`}>
+            {activeWindow ? (
+              <Inspector
+                win={activeWindow}
+                accountLabel={activeAccount?.label ?? "—"}
+                accountEmail={activeAccount ? status[activeAccount.id]?.email : undefined}
+                proxy={activeAccount?.proxy}
+                stats={stats}
+                threshold={state.rhythmThreshold}
+                usage={usage}
+                git={git}
+                safety={safety}
+                safetyOpen={safetyOpen}
+                onToggleSafety={() => setSafetyOpen((v) => !v)}
+                onCopy={copy}
+                onShowDiff={() => setShowDiff(true)}
+                onClose={() => setInspectorOpen(false)}
+              />
+            ) : (
+              <InspectorEmpty />
+            )}
+          </div>
+        </>
+      )}
 
       {palette && (
         <CommandPalette

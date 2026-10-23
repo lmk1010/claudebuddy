@@ -526,7 +526,7 @@ export default function Onboarding(p: Props) {
         <div className="ob-foot">
           {step === 1 && "只检查本机环境，不上传任何东西"}
           {step === 2 && "每个环境的凭证、对话、设备码都是分开的"}
-          {step === 3 && "以后在「账号」里随时能改"}
+          {step === 3 && "以后在「环境」里随时能改"}
         </div>
       </div>
     </div>

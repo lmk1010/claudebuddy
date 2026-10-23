@@ -80,7 +80,7 @@ export default function CommandPalette({
       { id: "side", icon: IconPanel, title: "折叠侧栏", keys: ["⌘", "\\"], run: onToggleSidebar },
       { id: "diff", icon: IconFile, title: "查看本次改动", keys: ["⌘", "D"], run: onOpenDiff },
       { id: "home", icon: IconTerminal, title: "回到主页", run: () => onNav("home") },
-      { id: "acc", icon: IconKey, title: "管理账号", run: () => onNav("accounts") },
+      { id: "acc", icon: IconKey, title: "管理环境", run: () => onNav("accounts") },
       { id: "set", icon: IconGear, title: "打开设置", keys: ["⌘", ","], run: () => onNav("settings") },
     );
     // 账号直接可搜：切环境是最常用的动作
@@ -89,7 +89,7 @@ export default function CommandPalette({
         id: `a-${a.id}`,
         icon: IconKey,
         title: `切到 ${a.label}（~/${a.configDir}）`,
-        hint: "账号",
+        hint: "环境",
         run: () => onSwitchAccount(a.id),
       });
     }

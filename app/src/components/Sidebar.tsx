@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { Account, AccountStatusSnapshot, ShellWindow, View } from "../lib/model";
 import { AUTH_LABEL, shortTime } from "../lib/model";
 import {
@@ -12,6 +13,8 @@ import {
 } from "./iconAliases";
 
 interface Props {
+  /** 是否展开。收起时不卸载，只把宽度收到 0 —— 这样能过渡 */
+  open: boolean;
   windows: ShellWindow[];
   accounts: Account[];
   activeId: string | null;
@@ -31,10 +34,11 @@ interface Props {
 /**
  * 侧栏 —— 设计稿的 .ws。
  *
- * 结构固定：红绿灯让位 → 新建会话 → 三个导航（会话 / 账号 / 设置）
+ * 结构固定：红绿灯让位 → 新建会话 → 三个导航（会话 / 环境 / 设置）
  * → 「最近」列表 → 底部账号。列表行 32px，行间不画线。
  */
 export default function Sidebar({
+  open,
   windows,
   accounts,
   activeId,
@@ -74,12 +78,15 @@ export default function Sidebar({
 
   const nav: { icon: typeof IconTerminal; label: string; view: View; count?: string }[] = [
     { icon: IconTerminal, label: "会话", view: "session", count: sessions.length ? String(sessions.length) : "" },
-    { icon: IconKey, label: "账号", view: "accounts", count: accounts.length ? String(accounts.length) : "" },
+    { icon: IconKey, label: "环境", view: "accounts", count: accounts.length ? String(accounts.length) : "" },
     { icon: IconGear, label: "设置", view: "settings" },
   ];
 
   return (
-    <aside className="ws" style={{ width }}>
+    <aside
+      className={`ws${open ? "" : " shut"}`}
+      style={{ "--w": `${width}px` } as CSSProperties}
+    >
       <div
         className="ws-resize"
         onMouseDown={(e) => {

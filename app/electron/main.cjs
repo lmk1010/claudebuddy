@@ -473,7 +473,18 @@ ipcMain.handle("app:info", () => ({
   forcedTheme: process.env.CLAUDE_BUDDY_THEME || null,
 }));
 
-ipcMain.handle("state:load", () => loadState());
+ipcMain.handle("state:load", () => {
+  const state = loadState();
+  /**
+   * 加载时就要把账号表交给主进程。
+   *
+   * PTY 的 spawn 走的是主进程这张表，而渲染层加载完不一定会立刻回存。
+   * 只在 state:save 里同步的话，启动后第一次开终端必然拿到空表，
+   * 于是报「未知账号」—— 看上去像数据丢了，其实只是没同步。
+   */
+  if (state && Array.isArray(state.accounts)) syncAccounts(state.accounts);
+  return state;
+});
 ipcMain.handle("state:save", (_e, state) => {
   saveState(state);
   // 账号表由主进程持有；渲染层只是编辑器，目录名在这里再过一道白名单

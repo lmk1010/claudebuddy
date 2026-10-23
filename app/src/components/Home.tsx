@@ -190,7 +190,7 @@ export default function Home({
             <button
               className="chip"
               onClick={(e) => onPickAccount(e.currentTarget)}
-              title={`账号：${account?.label ?? "—"}（决定配置目录、出口 IP 与设备身份）`}
+              title={`环境：${account?.label ?? "—"}（决定配置目录、出口 IP 与设备身份）`}
             >
               <IconKey />
               <span className="mono">{account?.configDir ?? "—"}</span>
