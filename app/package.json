@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "app": "CLAUDE_BUDDY_DEV_URL=http://localhost:5320 electron .",
     "start": "electron .",
-    "dmg": "npm run build && electron-builder --mac dmg --arm64"
+    "dmg": "bash scripts/package-mac.sh",
+    "dmg:electron-builder": "npm run build && electron-builder --mac dmg --arm64"
   },
   "dependencies": {
     "@lydell/node-pty": "^1.2.0-beta.15",
