@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeoX Shell — Design System</title>
+<link rel="icon" href="assets/app-icon.png">
+<style>
+  @font-face{font-family:"Anthropic Sans";src:url("../app/public/assets/fonts/AnthropicSans-Variable.woff2") format("woff2");font-weight:300 800;font-display:swap}
+  @font-face{font-family:"Anthropic Serif";src:url("../app/public/assets/fonts/AnthropicSerif-Variable.woff2") format("woff2");font-weight:300 800;font-display:swap}
+  @font-face{font-family:"JetBrains Mono";src:url("../app/public/assets/fonts/JetBrainsMono-400.woff2") format("woff2");font-weight:400;font-display:swap}
+  @font-face{font-family:"JetBrains Mono";src:url("../app/public/assets/fonts/JetBrainsMono-700.woff2") format("woff2");font-weight:700;font-display:swap}
+
+  :root{
+    /* 墨 */
+    --ink:#141413; --ink-2:#3D3B36; --ink-3:#6B6862; --ink-4:#9A968C;
+    /* 暖面 */
+    --cream:#FAF9F5; --paper:#FFFFFF; --side:#F3F1EA; --tile:#EFE9DE; --tile-strong:#E8E0D1;
+    /* 唯一电压 */
+    --coral:#CC785C; --coral-ink:#B5603F; --coral-soft:#F5E4DD;
+    /* 暗 */
+    --navy:#181715; --navy-soft:#1F1E1B; --navy-elev:#262420; --navy-side:#1A1917;
+    /* 语法 / 状态 */
+    --teal:#5DB8A6; --amber:#E8A55A; --success:#4E9F63; --danger:#C64545;
+    --line:rgba(20,20,19,.10); --line-strong:rgba(20,20,19,.16); --line-dark:rgba(250,249,245,.10);
+    --shadow:0 1px 2px rgba(20,20,19,.05),0 4px 14px rgba(20,20,19,.04);
+    --pop:0 12px 40px rgba(20,20,19,.12),0 2px 6px rgba(20,20,19,.06);
+    /* 动效标尺：5 档时长 / 3 条手调曲线 / 1 条真弹簧（取自 CDS） */
+    --dur-fast:60ms; --dur-snap:120ms; --dur-base:200ms; --dur-sheet:300ms; --dur-slow:450ms;
+    --ease-out:cubic-bezier(0,0,.2,1);
+    --ease:cubic-bezier(.32,.72,0,1);
+    --ease-overshoot:cubic-bezier(.34,1.3,.64,1);
+    --spring:linear(0,.2459,.6526,.9468,1.0764,1.0915,1.0585,1.0219,.9993,.9914,.9921,.9957,.9988,1.0004,1);
+    --press-btn:.975; --press-card:.99;
+    /* 字重：semibold 是 580 不是 600，bold 是 600 不是 700 */
+    --w-regular:400; --w-medium:500; --w-semibold:580; --w-bold:600;
+    --focus-ring:inset 0 0 0 1px var(--cream),0 0 0 1px var(--coral),0 0 6px 1px rgba(204,120,92,.28);
+    --scroll-fade:28px;
+    --serif:"Anthropic Serif","EB Garamond",Georgia,"Songti SC",serif;
+    --sans:"Anthropic Sans",Inter,-apple-system,"PingFang SC",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:24px}
+  body{font-family:var(--sans);font-size:14px;line-height:1.6;color:var(--ink);background:var(--cream);-webkit-font-smoothing:antialiased}
+  svg.i{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:62;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  code{font-family:var(--mono);font-size:.88em;background:var(--tile);padding:1px 5px;border-radius:4px;color:var(--ink-2);white-space:nowrap}
+  b{font-weight:var(--w-semibold)}
+
+  /* ───────── 文档骨架: 左目录 + 正文 (跟 Claude Desktop 侧栏同一套) ───────── */
+  .doc{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  .toc{position:sticky;top:0;height:100vh;overflow:auto;background:var(--side);border-right:1px solid var(--line);padding:22px 14px 28px}
+  .toc-brand{display:flex;align-items:center;gap:10px;padding:2px 8px 22px}
+  .toc-brand img{width:28px;height:28px;border-radius:7px}
+  .toc-brand b{font-family:var(--serif);font-weight:500;font-size:17px;letter-spacing:-.01em}
+  .toc-brand span{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-4);letter-spacing:.06em}
+  .toc h6{font-family:var(--mono);font-size:10px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);padding:16px 10px 6px}
+  .toc a{display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:8px;color:var(--ink-2);text-decoration:none;font-size:13px;transition:background .12s var(--ease)}
+  .toc a:hover{background:rgba(20,20,19,.05)}
+  .toc a.on{background:var(--tile-strong);color:var(--ink);font-weight:500}
+  .toc a .n{font-family:var(--mono);font-size:10px;color:var(--ink-4);width:16px}
+  main.body{min-width:0}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 56px}
+
+  /* 封面 */
+  .cover{padding:88px 0 64px;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+  .cover .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+  .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+  .kicker .sp{width:13px;height:13px;color:var(--coral)}
+  .cover h1{font-family:var(--serif);font-weight:400;font-size:64px;line-height:1.02;letter-spacing:-.03em;margin:20px 0 18px}
+  .cover p{font-size:16px;line-height:1.7;color:var(--ink-2);max-width:46ch}
+  .cover .meta{display:grid;grid-template-columns:repeat(2,auto);justify-content:start;gap:10px 36px;margin-top:30px;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+  .cover .meta b{display:block;font-family:var(--sans);font-size:13px;color:var(--ink);font-weight:500}
+  .cover .art{border-radius:16px;overflow:hidden}
+  .cover .art img{width:100%;display:block}
+
+  /* 区块 */
+  .sec{padding:72px 0;border-bottom:1px solid var(--line)}
+  .sec:last-child{border-bottom:0}
+  .sec h2{font-family:var(--serif);font-weight:400;font-size:38px;line-height:1.1;letter-spacing:-.022em;margin:14px 0 12px}
+  .lede{font-size:15px;line-height:1.75;color:var(--ink-3);max-width:62ch;margin-bottom:36px}
+  .lede b{color:var(--ink-2)}
+  h3{font-size:14px;font-weight:600;margin:0 0 14px;letter-spacing:-.003em}
+  .sub{margin-top:48px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .cap{font-size:12px;line-height:1.65;color:var(--ink-4);margin-top:12px}
+  .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);margin-bottom:14px}
+
+  @media (max-width:1000px){
+    .doc{grid-template-columns:1fr}
+    .toc{display:none}
+    .wrap{padding:0 20px}
+    .cover .wrap,.grid2,.grid3{grid-template-columns:1fr}
+    .cover h1{font-size:44px}
+  }
+</style>
+<style>
+  /* 品牌 */
+  .brand-row{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:20px}
+  .brand-tile{border-radius:16px;border:1px solid var(--line);padding:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:260px}
+  .brand-tile img{width:132px;height:132px;border-radius:28px}
+  .brand-tile figcaption{font-size:12px;color:var(--ink-3)}
+  .on-cream{background:var(--side)}
+  .on-navy{background:var(--navy)} .on-navy figcaption{color:#9A968C}
+  .lockups{align-items:flex-start;background:var(--paper);gap:18px}
+  .lockup{display:flex;align-items:center;gap:12px}
+  .lockup img{width:40px;height:40px;border-radius:10px}
+  .lockup span{font-family:var(--serif);font-weight:500;font-size:26px;letter-spacing:-.015em}
+  .lockup em{font-style:normal;color:var(--ink-3)}
+  .lockup.sm img{width:24px;height:24px;border-radius:6px} .lockup.sm span{font-size:16px}
+  .lockup.dark{background:var(--navy-soft);padding:10px 16px 10px 10px;border-radius:12px} .lockup.dark span{color:var(--cream);font-size:18px} .lockup.dark img{width:28px;height:28px;border-radius:7px} .lockup.dark em{color:#9A968C}
+  .do,.dont{border-radius:14px;padding:20px 22px;border:1px solid var(--line);background:var(--paper)}
+  .do ul,.dont ul{list-style:none;display:grid;gap:8px;font-size:13px;color:var(--ink-2)}
+  .lbl.ok{color:var(--success)} .lbl.no{color:var(--danger)}
+
+  /* 色板 */
+  .sw-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:8px}
+  .sw{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto auto;column-gap:12px;align-items:center;padding:10px;border-radius:12px;background:var(--paper);border:1px solid var(--line)}
+  .sw i{grid-row:1/4;width:44px;height:44px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--line)}
+  .sw b{font-size:13px;font-weight:500;line-height:1.3}
+  .sw code{background:none;padding:0;font-size:11px;color:var(--ink-3)}
+  .sw span{font-size:11px;color:var(--ink-4);line-height:1.35}
+
+  /* 字阶 */
+  .ramp{border-top:1px solid var(--line)}
+  .tr{display:grid;grid-template-columns:200px 1fr;gap:28px;align-items:baseline;padding:18px 0;border-bottom:1px solid var(--line)}
+  .spec{font-family:var(--mono);font-size:10.5px;line-height:1.75;color:var(--ink-4)}
+  .spec b{display:block;color:var(--ink-2);font-weight:400}
+  .fig{font-family:var(--serif);font-size:44px;line-height:1;letter-spacing:-.03em}
+  .unit{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-left:8px}
+  .lockrow{display:flex;gap:56px;flex-wrap:wrap;padding:8px 0}
+
+  /* 层次 */
+  .depth{border-radius:14px;padding:22px;min-height:150px}
+  .depth p{font-size:13px;color:var(--ink-2)}
+  .d0{background:var(--side)} .d1{background:var(--paper);border:1px solid var(--line)} .d2{background:var(--paper);border:1px solid var(--line);box-shadow:var(--pop)}
+  .spec-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:18px}
+  .spec-table th{text-align:left;font-family:var(--mono);font-weight:400;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);padding:0 16px 10px 0;border-bottom:1px solid var(--line)}
+  .spec-table td{padding:12px 16px 12px 0;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  .spec-table td.m{font-family:var(--mono);font-size:12px;color:var(--ink)}
+  .spec-table tr:last-child td{border-bottom:0}
+
+  /* 图标 + 插画 */
+  .icon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+  .ic{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 6px 12px;border-radius:12px;background:var(--paper);border:1px solid var(--line);color:var(--ink-2);transition:all .12s var(--ease)}
+  .ic:hover{color:var(--ink);border-color:var(--line-strong);transform:translateY(-1px)}
+  .ic svg.i{width:20px;height:20px}
+  .ic span{font-family:var(--mono);font-size:10px;color:var(--ink-4)}
+  .illus{display:grid;grid-template-columns:1.5fr 1.5fr 1fr 1fr;gap:16px}
+  .illus figure{border-radius:14px;overflow:hidden;background:#FAF9F5;border:1px solid var(--line)}
+  .illus img{width:100%;height:200px;object-fit:cover;display:block}
+  .illus figcaption{font-size:12px;color:var(--ink-3);padding:10px 14px;border-top:1px solid var(--line);background:var(--paper)}
+  .illus figcaption b{font-family:var(--mono);font-weight:400;font-size:11px;color:var(--ink)}
+  .prompt{margin-top:20px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+  .prompt summary{cursor:pointer;padding:12px 16px;font-size:13px;color:var(--ink-2)}
+  .prompt pre{font-family:var(--mono);font-size:11.5px;line-height:1.7;color:var(--ink-2);padding:0 16px 16px;white-space:pre-wrap}
+  @media (max-width:1000px){.brand-row,.illus{grid-template-columns:1fr}.tr{grid-template-columns:1fr;gap:6px}}
+</style>
+<style>
+  /* ───────── 页面样机: 原生 1280×800 画, 外层按宽度等比缩放 (见底部脚本) ───────── */
+  .shot-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:22px}
+  .shot-head .lede{margin:0}
+  .notes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}
+  .note{font-size:12.5px;line-height:1.65;color:var(--ink-3);padding-top:12px;border-top:1px solid var(--line)}
+  .note b{display:block;color:var(--ink);font-weight:500;margin-bottom:2px}
+  .note.warn{border-top-color:rgba(198,69,69,.3);background:rgba(198,69,69,.04);padding:12px 14px;border-radius:8px;margin-top:16px}
+  /* h3 小标题：动效章节里用来分「时长/曲线/按压」几段 */
+  h3.sub{font-family:var(--sans);font-size:13px;font-weight:var(--w-semibold);color:var(--ink);margin:52px 0 12px;letter-spacing:-.005em}
+  /* 小标题后紧跟的表格/段落：给足呼吸，别贴在一起。
+     早前这里写成 margin-top:0，结果表头直接压在上一段文字上。 */
+  h3.sub+table.spec-table{margin-top:20px}
+  h3.sub+p{margin-bottom:0}
+  /* 按压对照演示：左右两块，可以直接按下去试 */
+  .demo-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0 4px}
+  .demo{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .demo-lbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)}
+  .press-demo{width:104px;height:38px;display:grid;place-items:center;border-radius:8px;background:var(--coral);color:#fff;font-size:13px;font-weight:var(--w-medium);cursor:pointer;user-select:none}
+  .p-fast{transition:transform 450ms var(--spring)}
+  .p-fast:active{transform:scale(var(--press-btn));transition:transform var(--dur-fast) var(--ease-out)}
+  .p-spring{transition:transform 450ms var(--spring)}
+  .p-spring:active{transform:scale(var(--press-btn))}
+  .demo-code{font-family:var(--mono);font-size:10.5px;line-height:1.7;color:var(--ink-3);text-align:center}
+  .screen{position:relative;width:100%}
+  .w{--bg:var(--cream);--sd:var(--side);--pp:var(--paper);--t1:var(--ink);--t2:var(--ink-2);--t3:var(--ink-3);--t4:var(--ink-4);--ln:var(--line);--ln2:var(--line-strong);--sel:var(--tile-strong);--tl:var(--tile);--hv:rgba(20,20,19,.05);
+     position:absolute;left:0;top:0;width:1280px;height:800px;transform-origin:0 0;
+     display:grid;grid-template-columns:264px 1fr;background:var(--bg);color:var(--t1);
+     border-radius:14px;overflow:hidden;border:1px solid var(--ln2);box-shadow:0 30px 80px rgba(20,20,19,.14),0 4px 14px rgba(20,20,19,.06);font-size:13.5px}
+  .w.r3{grid-template-columns:264px 1fr 296px}
+  .w.nosd{grid-template-columns:1fr}
+  .w.dark{--bg:var(--navy-soft);--sd:var(--navy-side);--pp:var(--navy-elev);--t1:#FAF9F5;--t2:#D6D2C8;--t3:#9A968C;--t4:#6B6862;--ln:var(--line-dark);--ln2:rgba(250,249,245,.16);--sel:#2E2B27;--tl:#2A2824;--hv:rgba(250,249,245,.05)}
+  /* 侧栏 */
+  .ws{background:var(--sd);border-right:1px solid var(--ln);display:flex;flex-direction:column;padding:12px 10px 10px;min-width:0}
+  .lights{display:flex;align-items:center;gap:8px;height:24px;padding:0 6px;margin-bottom:14px}
+  .lights i{width:12px;height:12px;border-radius:50%;background:#FF5F57}.lights i:nth-child(2){background:#FEBC2E}.lights i:nth-child(3){background:#28C840}
+  .lights .sp{margin-left:auto;color:var(--t3)}
+  .new{display:flex;align-items:center;gap:9px;height:36px;padding:0 12px;border-radius:10px;background:var(--pp);border:1px solid var(--ln);box-shadow:0 1px 2px rgba(20,20,19,.04);font-weight:500;margin-bottom:10px}
+  .new .kbd{margin-left:auto}
+  .nv{display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:8px;color:var(--t2)}
+  .nv.on{background:var(--sel);color:var(--t1);font-weight:500}
+  .nv .c{margin-left:auto;font-size:11.5px;color:var(--t4)}
+  .gl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--t4);padding:18px 10px 6px;display:flex;justify-content:space-between}
+  .rw{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;color:var(--t2);white-space:nowrap}
+  .rw.on{background:var(--sel);color:var(--t1);font-weight:500}
+  .rw .dt{width:6px;height:6px;border-radius:50%;background:var(--t4);flex:none}
+  .rw .dt.live{background:var(--success);box-shadow:0 0 0 3px rgba(78,159,99,.18)}
+  .rw .nm{overflow:hidden;text-overflow:ellipsis;flex:1}
+  .rw .tm{font-size:11px;color:var(--t4);font-weight:400}
+  .me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px 8px 4px;border-top:1px solid var(--ln)}
+  .av{width:28px;height:28px;border-radius:50%;background:var(--t1);color:var(--bg);display:grid;place-items:center;font-family:var(--serif);font-size:14px}
+  .me .who{line-height:1.25}.me .who small{display:block;font-size:11px;color:var(--t4)}
+  .me .g{margin-left:auto;color:var(--t3)}
+  /* 主区 */
+  .wm{display:flex;flex-direction:column;min-width:0;position:relative}
+  .wh{height:48px;display:flex;align-items:center;gap:10px;padding:0 16px 0 20px;flex:none}
+  .wh .tt{font-weight:500}
+  .wh .pth{font-family:var(--mono);font-size:11.5px;color:var(--t3)}
+  .wh .acts{margin-left:auto;display:flex;gap:2px;color:var(--t3)}
+  .ib{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--t3)}
+  .ib.on{background:var(--sel);color:var(--t1)}
+  .wst{height:28px;flex:none;display:flex;align-items:center;gap:18px;padding:0 20px;font-family:var(--mono);font-size:10.5px;color:var(--t4);border-top:1px solid var(--ln)}
+  .wst .ok{color:var(--success)}
+  /* 右栏 */
+  .wr{background:var(--sd);border-left:1px solid var(--ln);padding:14px 16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+  .wr .hd{display:flex;align-items:center;justify-content:space-between;height:28px;font-weight:500}
+  .pn{background:var(--pp);border:1px solid var(--ln);border-radius:12px;padding:14px}
+  .pn .lbl{margin-bottom:10px}
+  .bar{height:4px;border-radius:2px;background:var(--tl);overflow:hidden;margin:12px 0 10px}.bar i{display:block;height:100%;background:var(--success);border-radius:2px}
+  .kv{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;color:var(--t3)}.kv b{font-weight:400;color:var(--t1);font-family:var(--mono);font-size:11.5px}
+  .fl{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;padding:5px 0;color:var(--t2)}
+  .fl .ad{margin-left:auto;color:var(--success)}.fl .dl{color:var(--danger)}
+  /* 终端 */
+  .term{flex:1;margin:0 16px 14px;border-radius:12px;background:var(--navy);color:#E9E5DA;font-family:var(--mono);font-size:12.5px;line-height:1.78;padding:16px 20px;overflow:hidden;border:1px solid rgba(20,20,19,.2)}
+  .term .m{color:#8C887F}.term .c{color:#D98A6C}.term .t{color:#6CC4B2}.term .a{color:#EDB06B}.term .g{color:#6BBF7E}.term .wt{color:#FAF9F5}
+  .term .inbox{max-width:560px;border:1px solid #4A4740;border-radius:8px;padding:5px 12px;margin:2px 0 4px}.term .r{color:#E27272}
+  .term .box{border:1px solid #D98A6C;border-radius:8px;padding:10px 14px;margin:2px 0 12px;display:inline-block;min-width:440px}
+  .term .cur{display:inline-block;width:8px;height:15px;background:#E9E5DA;vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .tabs{display:flex;align-items:center;gap:4px;padding:0 16px 8px}
+  .tab{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:8px;color:var(--t3);font-size:12.5px}
+  .tab.on{background:var(--pp);border:1px solid var(--ln);color:var(--t1);box-shadow:0 1px 2px rgba(20,20,19,.04)}
+  /* 通用小件 */
+  .kbd{font-family:var(--mono);font-size:10.5px;color:var(--t3);border:1px solid var(--ln2);border-bottom-width:2px;border-radius:5px;padding:0 5px;line-height:16px;background:var(--pp)}
+  .pill{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500}
+  .pill:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+  .p-ok{background:rgba(78,159,99,.13);color:var(--success)}.p-warn{background:rgba(232,165,90,.18);color:#A9701F}.p-bad{background:rgba(198,69,69,.12);color:var(--danger)}.p-idle{background:var(--tl);color:var(--t3)}
+  .chip{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:9px;border:1px solid var(--ln);background:var(--pp);color:var(--t2);font-size:12.5px}
+  .chip .mono{font-family:var(--mono);font-size:11.5px}
+  .btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 16px;border-radius:10px;font-weight:500;font-size:13.5px;border:1px solid var(--ln2);background:var(--pp);color:var(--t1)}
+  .btn.pri{background:var(--coral);border-color:var(--coral);color:#FFF}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--t2)}
+  .send{width:34px;height:34px;border-radius:50%;background:var(--coral);color:#fff;display:grid;place-items:center}
+  .send svg.i{stroke-width:80}
+  .seg{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--tl)}
+  .seg span{height:28px;padding:0 14px;border-radius:7px;display:flex;align-items:center;font-size:12.5px;color:var(--t3)}
+  .seg span.on{background:var(--pp);color:var(--t1);font-weight:500;box-shadow:0 1px 2px rgba(20,20,19,.08)}
+  .tg{width:32px;height:19px;border-radius:999px;background:var(--tl);position:relative;box-shadow:inset 0 0 0 1px var(--ln)}
+  .tg:after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;background:var(--pp);box-shadow:0 1px 2px rgba(20,20,19,.2);transition:left .12s var(--ease)}
+  .tg.on{background:var(--t1)}.tg.on:after{left:15px}
+  .composer{background:var(--pp);border:1px solid var(--ln2);border-radius:18px;box-shadow:var(--shadow);padding:16px 16px 12px}
+  .composer .ph{color:var(--t4);font-size:15px;min-height:52px}
+  .composer .row{display:flex;align-items:center;gap:8px}
+  .composer .row .send{margin-left:auto}
+  @media (max-width:1000px){.notes{grid-template-columns:1fr}.shot-head{display:block}}
+</style>
+<style>
+  /* 首次启动 */
+  .ob{display:grid;grid-template-columns:1fr 1fr;align-items:center;height:100%}
+  .ob-art{height:100%;display:flex;align-items:center;justify-content:center;padding-left:24px}
+  .ob-art img{width:100%;display:block}
+  /* 插画纸色跟 cream 差半档, 边缘羽化掉, 不留方框 */
+  .ob-art img,.empty img,.cover .art img{-webkit-mask-image:radial-gradient(farthest-side,#000 82%,transparent);mask-image:radial-gradient(farthest-side,#000 82%,transparent)}
+  .ob-copy{padding:0 96px 0 40px}
+  .ob-icon{width:56px;height:56px;border-radius:14px;margin-bottom:26px}
+  .ob-copy h1{font-family:var(--serif);font-weight:400;font-size:40px;line-height:1.1;letter-spacing:-.025em;margin-bottom:14px}
+  .ob-copy>p{font-size:15px;line-height:1.7;color:var(--t2);max-width:40ch;margin-bottom:30px}
+  .steps{list-style:none;display:grid;gap:18px;margin-bottom:34px}
+  .steps li{display:flex;gap:14px;align-items:flex-start}
+  .steps li>span{width:26px;height:26px;border-radius:50%;border:1px solid var(--ln2);display:grid;place-items:center;font-family:var(--serif);font-size:14px;flex:none;color:var(--t2)}
+  .steps b{display:block;font-weight:500;font-size:14px}
+  .steps small{font-size:12.5px;color:var(--t3)}
+  .ob-acts{display:flex;gap:8px;margin-bottom:18px}
+  .ob-foot{font-size:12px;color:var(--t4);display:flex;align-items:center;gap:4px}
+  /* 主页 */
+  .home{width:680px;margin:52px auto 0}
+  .greet{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:30px}
+  .greet img{width:30px;height:30px;border-radius:8px}
+  .greet h1{font-family:var(--serif);font-weight:400;font-size:40px;letter-spacing:-.025em;line-height:1}
+  .sugg{display:flex;gap:8px;justify-content:center;margin:16px 0 46px}
+  .sugg .chip{background:transparent}
+  .rc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .rc{background:var(--pp);border:1px solid var(--ln);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px}
+  .rc-t{display:flex;align-items:center;justify-content:space-between}
+  .rc-t b{font-weight:500}
+  .rc code{background:none;padding:0;font-size:11px;color:var(--t4)}
+  .rc p{font-family:var(--mono);font-size:11.5px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rc small{font-size:11px;color:var(--t4)}
+</style>
+<style>
+  /* 页面通用 */
+  .pg{padding:8px 48px 0;max-width:960px;width:100%;margin:0 auto}
+  .pg-h{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+  .pg-h h1,.st-body h1,.empty h1{font-family:var(--serif);font-weight:400;font-size:30px;letter-spacing:-.02em;line-height:1.1}
+  .pg-h p{font-size:13px;color:var(--t3);margin-top:6px}
+  .banner{display:grid;grid-template-columns:1fr 300px;align-items:center;gap:24px;border-radius:14px;background:var(--sd);padding:0 0 0 24px;overflow:hidden;margin-bottom:22px;height:136px}
+  .banner b{font-family:var(--serif);font-weight:400;font-size:18px}
+  .banner p{font-size:12.5px;color:var(--t3);margin-top:6px;line-height:1.65}
+  .banner img{width:100%;height:136px;object-fit:cover;mix-blend-mode:multiply}
+  .acc{background:var(--pp);border:1px solid var(--ln);border-radius:14px;padding:6px}
+  .ar{display:grid;grid-template-columns:32px 1.3fr 1.2fr .8fr 80px 80px 30px;align-items:center;gap:14px;height:62px;padding:0 12px;border-radius:10px}
+  .ar.on{background:var(--sel)}
+  .ar .av{width:32px;height:32px;font-size:15px}
+  .an b{font-weight:500;display:block;line-height:1.3}.an small{font-size:11.5px;color:var(--t4)}
+  .ar code{background:none;padding:0;font-size:12px;color:var(--t2)}
+  .as,.al{font-size:12px;color:var(--t3)}
+  .ar.on .al{color:var(--t1);font-weight:500}
+  /* 设置 */
+  .st{display:grid;grid-template-columns:180px 1fr;gap:40px;padding:8px 48px 0;max-width:960px;margin:0 auto;width:100%}
+  .st-nav{display:flex;flex-direction:column;gap:2px;padding-top:4px}
+  .st-nav a{height:32px;display:flex;align-items:center;padding:0 12px;border-radius:8px;color:var(--t2)}
+  .st-nav a.on{background:var(--sel);color:var(--t1);font-weight:500}
+  .st-body h1{margin-bottom:18px}
+  .st-body h2{font-family:var(--serif);font-weight:400;font-size:19px;margin:22px 0 4px;padding-top:20px;border-top:1px solid var(--ln)}
+  .sr{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:56px}
+  .sr b{font-weight:500;display:block}.sr small{font-size:12px;color:var(--t3)}
+  .tip{display:flex;align-items:center;gap:16px;margin-top:18px;padding:10px 16px 10px 10px;border-radius:12px;background:var(--sd)}
+  .tip img{width:64px;height:64px;border-radius:10px;object-fit:cover;mix-blend-mode:multiply}
+  .tip b{font-weight:500}.tip p{font-size:12.5px;color:var(--t3)}
+  /* 空 */
+  .empty{margin:auto;text-align:center;max-width:420px;padding-bottom:60px}
+  .empty img{width:240px;height:240px;object-fit:cover;margin-bottom:0}
+  .empty p{font-size:14px;color:var(--t3);line-height:1.7;margin:12px 0 26px}
+  /* 命令面板 */
+  /* 命令面板: 遮罩盖整扇窗, 面板浮在遮罩之上, 一整块纸 —— 内部只有输入框下一条线 */
+  .ov{position:absolute;inset:0;background:rgba(20,20,19,.16);z-index:10}
+  .w.dark .ov{background:rgba(0,0,0,.4)}
+  .pal{position:absolute;z-index:11;left:50%;top:112px;transform:translateX(-50%);width:620px;background:var(--pp);border-radius:16px;
+       box-shadow:0 0 0 1px var(--ln2),0 24px 64px -12px rgba(20,20,19,.28),0 4px 12px rgba(20,20,19,.06);overflow:hidden}
+  .pal-in{display:flex;align-items:center;gap:12px;height:58px;padding:0 20px;border-bottom:1px solid var(--ln);font-size:17px;color:var(--t1)}
+  .pal-in svg.i{color:var(--t3)}
+  .pal-in .q{flex:1}.pal-in .q:after{content:"";display:inline-block;width:1.5px;height:18px;background:var(--coral);vertical-align:-3px;margin-left:1px;animation:blink 1.1s steps(1) infinite}
+  .pal-g{padding:8px}
+  .pal-g .gl{padding:8px 10px 4px}
+  .pi{display:flex;align-items:center;gap:12px;height:38px;padding:0 10px;border-radius:9px;color:var(--t2)}
+  .pi.on{background:var(--sel);color:var(--t1)}
+  .pi em{font-style:normal;font-weight:650;color:var(--t1)}
+  .pi small{font-family:var(--mono);font-size:11px;color:var(--t4)}
+  .pi .k{margin-left:auto;display:flex;gap:3px}
+  .pal-f{display:flex;gap:18px;padding:4px 20px 14px;font-size:11.5px;color:var(--t4)}
+  .pal-f span{display:flex;align-items:center;gap:5px}
+  .term .tail{display:flex;justify-content:space-between}
+</style>
+<style>
+  .kit{--bg:var(--cream);--sd:var(--side);--pp:var(--paper);--t1:var(--ink);--t2:var(--ink-2);--t3:var(--ink-3);--t4:var(--ink-4);--ln:var(--line);--ln2:var(--line-strong);--sel:var(--tile-strong);--tl:var(--tile)}
+  .kit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .kc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .kr{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .menu{background:var(--paper);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--pop);padding:6px;width:240px}
+  .menu .pi{height:32px;font-size:13px}
+  .menu .sep{height:1px;background:var(--line);margin:4px 6px}
+  .toast{display:flex;align-items:center;gap:12px;background:var(--paper);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--pop);padding:12px 8px 12px 14px}
+  .toast b{display:block;font-weight:500;font-size:13px}.toast small{font-size:11.5px;color:var(--ink-3)}
+  .toast .ib{margin-left:auto}
+  .tip-pop{position:absolute;top:0;left:0;background:var(--ink);color:var(--cream);font-size:12px;padding:4px 8px;border-radius:6px;display:flex;align-items:center;gap:6px}
+  .audit{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}
+  .audit label{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px;color:var(--ink-2);cursor:pointer}
+  .audit input{appearance:none;width:15px;height:15px;border-radius:4px;border:1px solid var(--line-strong);background:var(--paper);display:grid;place-items:center;flex:none}
+  .audit input:checked{background:var(--ink);border-color:var(--ink)}
+  .audit input:checked:after{content:"";width:7px;height:4px;border:1.6px solid var(--cream);border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
+  .audit label:has(input:checked){color:var(--ink-4);text-decoration:line-through}
+  @media (max-width:1000px){.kit-grid,.audit{grid-template-columns:1fr}}
+</style>
+<style>
+  /* ── 会话页 · 主区: 标题行 + 一台“终端机” ── */
+  .sh{height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 24px}
+  .sh-l{display:flex;align-items:center;gap:10px;min-width:0}
+  .sh-t{font-family:var(--serif);font-size:19px;letter-spacing:-.01em}
+  .sh-br{font-family:var(--mono);font-size:11px;color:var(--t3);border:1px solid var(--ln);border-radius:6px;padding:1px 7px}
+  .sh-dot{width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px rgba(78,159,99,.16);margin-left:4px}
+  .sh-st{font-size:12px;color:var(--t3)}
+  .sh-r{display:flex;align-items:center;gap:8px}
+  .seg.sm{padding:2px;border-radius:9px}
+  .seg.sm span{height:26px;padding:0 11px;gap:6px;font-size:12px;border-radius:7px}
+  .seg.sm svg.i{width:13px;height:13px}
+  .seg.sm em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--t4)}
+  .tw{flex:1;min-height:0;margin:0 20px 20px;border-radius:14px;background:var(--navy);display:flex;flex-direction:column;overflow:hidden;
+      box-shadow:0 0 0 1px rgba(20,20,19,.22),0 1px 0 rgba(255,255,255,.04) inset,0 18px 40px -18px rgba(20,20,19,.35)}
+  .w.dark .tw{box-shadow:0 0 0 1px rgba(250,249,245,.08),0 18px 40px -18px rgba(0,0,0,.6)}
+  .tw-bar{height:40px;flex:none;display:flex;align-items:center;gap:2px;padding:0 10px;background:#1D1C19;border-bottom:1px solid #2A2824}
+  .tw-tab{display:flex;align-items:center;gap:7px;height:26px;padding:0 12px;border-radius:7px;font-family:var(--mono);font-size:11.5px;color:#8C887F}
+  .tw-tab.on{background:#2A2824;color:#F2EEE4}
+  .tw-tab i{width:6px;height:6px;border-radius:50%;background:#6BBF7E}
+  .tw-add{width:26px;height:26px;display:grid;place-items:center;color:#6B6862}
+  .tw-add svg.i{width:13px;height:13px}
+  .tw-meta{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:#6B6862;padding-right:4px}
+  .tw .term{margin:0;border:0;border-radius:0;background:transparent;padding:18px 24px 16px;font-size:12.5px;line-height:1.7;display:flex;flex-direction:column;gap:10px}
+  .term .box{display:block;width:max-content;min-width:0;border-color:rgba(217,138,108,.55);border-radius:10px;padding:10px 16px;margin:0 0 4px;line-height:1.75}
+  .term .u{color:#F2EEE4;padding:6px 12px;border-radius:8px;background:rgba(250,249,245,.05);width:max-content;max-width:100%}
+  .term .df{border-radius:8px;overflow:hidden;margin:-4px 0 0 18px;max-width:640px}
+  .term .df div{background:rgba(107,191,126,.10);color:#8FD19E;padding:0 12px;white-space:nowrap}
+  .term .df b{display:inline-block;width:28px;color:#5E7D63;font-weight:400}
+  .term .think{margin-top:2px}
+  .term .todo{margin:-4px 0 0 18px;color:#B8B3A8;line-height:1.85}
+  .term .todo span{color:#6B6862;margin-right:8px}
+  .term .todo .dn{color:#6B6862;text-decoration:line-through}
+  .term .todo .cur-t{color:#F2EEE4}.term .todo .cur-t span{color:#D98A6C}
+  .term .sp-rot{display:inline-block;animation:sprot 2.4s linear infinite}
+  @keyframes sprot{to{transform:rotate(360deg)}}
+  .term .inbox{max-width:none;margin-top:auto;border-color:#3A3733;border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px}
+  .term .inbox .ph{color:#5A5650}
+  .term .tail{display:flex;justify-content:space-between;font-size:11px;padding:0 4px;margin-top:-4px}
+
+  /* ── 会话页 · 右栏: 检查器, 不堆卡片, 发丝线分段 ── */
+  .insp{padding:0;gap:0;background:var(--sd)}
+  .in-h{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 20px;font-family:var(--serif);font-size:17px}
+  .in-s{padding:18px 20px;border-top:1px solid var(--ln)}
+  .in-k{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--t4);margin-bottom:12px}
+  .in-k .mono,.in-k b{font-family:var(--mono);letter-spacing:0;text-transform:none;font-size:11px;font-weight:400;color:var(--t2)}
+  .in-fig{display:flex;align-items:baseline;margin-bottom:12px}
+  .in-fig .fig{font-size:48px}
+  .spark{position:relative;height:44px;display:flex;align-items:flex-end;gap:3px;margin-bottom:10px}
+  .spark span{flex:1;border-radius:2px 2px 0 0;background:color-mix(in srgb,var(--success) 55%,var(--sd))}
+  .spark span:last-of-type{background:var(--success)}
+  .spark .th{position:absolute;left:0;right:0;border-top:1px dashed var(--ln2)}
+  .spark .th b{position:absolute;right:0;top:-15px;font-family:var(--mono);font-size:9.5px;font-weight:400;color:var(--t4)}
+  .in-cap{font-size:11.5px;color:var(--t3)}
+  .in-cap b{font-family:var(--mono);font-weight:400;color:var(--t1)}
+  .ctx{height:6px;border-radius:3px;background:var(--tl);overflow:hidden;margin-bottom:10px}
+  .ctx i{display:block;height:100%;background:var(--t1);border-radius:3px}
+  .chg{display:flex;align-items:center;gap:8px;height:30px;color:var(--t2)}
+  .chg svg.i{width:13px;height:13px;color:var(--t4)}
+  .chg .p{flex:1;font-family:var(--mono);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chg .p em{font-style:normal;color:var(--t4)}
+  .chg .ds{display:flex;gap:2px}.chg .ds i{width:6px;height:6px;border-radius:1.5px;background:var(--success)}.chg .ds i.o{background:var(--tl)}
+  .chg .ad{font-family:var(--mono);font-size:11px;color:var(--success);width:26px;text-align:right}
+  .in-btn{display:flex;align-items:center;gap:8px;height:32px;margin-top:10px;padding:0 10px;border-radius:9px;border:1px solid var(--ln);background:var(--pp);font-size:12.5px;color:var(--t2)}
+  .in-btn .kbd{margin-left:auto}
+  .in-meta{display:grid;gap:8px;margin-top:auto}
+  .in-meta div{display:flex;justify-content:space-between;font-size:12px;color:var(--t3)}
+  .in-meta b{font-weight:400;font-size:11.5px;color:var(--t1);display:flex;align-items:center;gap:6px}
+  .in-meta b svg.i{width:12px;height:12px;color:var(--t4)}
+  .mono{font-family:var(--mono)}
+
+  /* ── 终端跟随主题: 同色系定制, 不再是一块黑板 ──
+   *   浅色 = 比主区再亮半档的暖纸 + 侧栏色标题条; 暗色 = 比主区抬半档的暖炭。
+   *   语法色按底色重调: 浅底用压暗的同色相, 保证 4.5:1。 */
+  .tw{--tb:#FFFEFB;--tbar:#F6F3EC;--tline:rgba(20,20,19,.08);--tfg:#2B2A26;--tm:#9A968C;--tg:#3E8A53;--tt:#2B8676;--ta:#B06F24;--tc:#C0653F;
+      --tdf:rgba(78,159,99,.09);--tdft:#2F7A45;--tdfn:#9DB8A3;--tu:#F4EFE5;--tin:rgba(20,20,19,.14);--ttab:#FFFFFF;--ttabt:#2B2A26;
+      background:var(--tb);box-shadow:0 0 0 1px var(--ln),0 1px 2px rgba(20,20,19,.04),0 12px 32px -16px rgba(20,20,19,.16)}
+  .w.dark .tw{--tb:#24221F;--tbar:#1F1D1A;--tline:rgba(250,249,245,.07);--tfg:#ECE7DC;--tm:#827E75;--tg:#79C38B;--tt:#6CC4B2;--ta:#E3AA66;--tc:#DD906F;
+      --tdf:rgba(121,195,139,.10);--tdft:#93D3A2;--tdfn:#5E7D63;--tu:rgba(250,249,245,.06);--tin:rgba(250,249,245,.14);--ttab:#2E2B27;--ttabt:#F2EEE4;
+      box-shadow:0 0 0 1px var(--ln),0 16px 36px -18px rgba(0,0,0,.55)}
+  /* 不再单独悬浮: 整个中栏就是终端面, 不加第二道边框和投影 */
+  .tw{margin:0;border-radius:0;box-shadow:none!important}
+  .wm:has(> .tw){background:#FFFEFB}
+  .w.dark .wm:has(> .tw){background:#24221F}
+  .wm:has(> .tw) .sh{height:52px}
+  .tw .tw-bar{background:transparent;border-bottom:1px solid var(--tline);padding:0 20px 0 18px;height:38px;align-items:flex-end;gap:4px}
+  .tw .tw-tab{height:30px;border-radius:0;padding:0 10px;margin-bottom:-1px;border-bottom:2px solid transparent}
+  .tw .tw-tab.on{background:transparent;box-shadow:none;border-bottom-color:var(--tfg);font-weight:600}
+  .tw .tw-add{height:30px}
+  .tw .tw-meta{align-self:center}
+  .tw .term{padding:20px 28px 18px}
+  .tw .tw-tab{color:var(--tm)}
+  .tw .tw-tab.on{background:var(--ttab);color:var(--ttabt);box-shadow:0 0 0 1px var(--tline),0 1px 2px rgba(20,20,19,.05)}
+  .tw .tw-add,.tw .tw-meta{color:var(--tm)}
+  .tw .term{color:var(--tfg)}
+  .tw .term .m{color:var(--tm)}.tw .term .g{color:var(--tg)}.tw .term .t{color:var(--tt)}.tw .term .a{color:var(--ta)}.tw .term .c{color:var(--tc)}.tw .term .wt{color:var(--tfg);font-weight:600}
+  .tw .term .box{border-color:color-mix(in srgb,var(--tc) 45%,transparent)}
+  .tw .term .u{background:var(--tu);color:var(--tfg)}
+  .tw .term .df div{background:var(--tdf);color:var(--tdft)}
+  .tw .term .df b{color:var(--tdfn)}
+  .tw .term .todo{color:var(--tfg)}
+  .tw .term .todo span,.tw .term .todo .dn{color:var(--tm)}
+  .tw .term .todo .cur-t{color:var(--tfg);font-weight:600}.tw .term .todo .cur-t span{color:var(--tc)}
+  .tw .term .inbox{border-color:var(--tin);background:color-mix(in srgb,var(--tb) 60%,var(--pp))}
+  .tw .term .inbox .ph{color:var(--tm);opacity:.7}
+  .tw .term .cur{background:var(--tc)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-plus" viewBox="0 0 1000 1000"><path d="M472 800Q472 812 480.0 820.0Q488 828 500 828Q512 828 520.0 820.0Q528 812 528 800V200Q528 188 520.0 180.0Q512 172 500 172Q488 172 480.0 180.0Q472 188 472 200ZM800 528Q812 528 820.0 520.0Q828 512 828 500Q828 488 820.0 480.0Q812 472 800 472H200Q188 472 180.0 480.0Q172 488 172 500Q172 512 180.0 520.0Q188 528 200 528Z"/></symbol><symbol id="i-minus" viewBox="0 0 1000 1000"><path d="M125 147Q113 147 105.0 155.0Q97 163 97 175Q97 187 105.0 195.0Q113 203 125 203H875Q887 203 895.0 195.0Q903 187 903 175Q903 163 895.0 155.0Q887 147 875 147Z"/></symbol><symbol id="i-close" viewBox="0 0 1000 1000"><path d="M705 745Q713 753 725.0 753.0Q737 753 745 745Q753 737 753.0 725.0Q753 713 745 705L295 255Q287 247 275.0 247.0Q263 247 255 255Q247 263 247.0 275.0Q247 287 255 295ZM745 295Q753 287 753.0 275.0Q753 263 745 255Q737 247 725.0 247.0Q713 247 705 255L255 705Q247 713 247.0 725.0Q247 737 255 745Q263 753 275.0 753.0Q287 753 295 745Z"/></symbol><symbol id="i-check" viewBox="0 0 1000 1000"><path d="M869 609Q872 598 867.0 587.5Q862 577 851 573Q840 570 829.5 575.0Q819 580 815 591Q801 634 773.0 675.0Q745 716 704.5 749.0Q664 782 612.5 802.0Q561 822 500 822Q433 822 375.0 797.0Q317 772 272.5 727.5Q228 683 203.0 625.0Q178 567 178 500Q178 433 203.0 375.0Q228 317 272.5 272.5Q317 228 375.0 203.0Q433 178 500 178Q576 178 642.5 208.0Q709 238 753 293Q760 302 772.0 303.0Q784 304 793 297Q802 290 803.0 278.0Q804 266 797 257Q745 193 667.0 157.5Q589 122 500 122Q422 122 353.5 151.5Q285 181 233.0 233.0Q181 285 151.5 353.5Q122 422 122 500Q122 578 151.5 646.5Q181 715 233.0 767.0Q285 819 353.5 848.5Q422 878 500 878Q570 878 630.0 855.5Q690 833 737.5 794.5Q785 756 818.0 708.0Q851 660 869 609ZM847 825Q847 837 855.0 845.0Q863 853 875 853Q887 853 895.0 845.0Q903 837 903 825V575Q903 563 895.0 555.0Q887 547 875 547H625Q613 547 605.0 555.0Q597 563 597 575Q597 587 605.0 595.0Q613 603 625 603H847Z"/></symbol><symbol id="i-search" viewBox="0 0 1000 1000"><path d="M878 500Q878 425 849.5 355.5Q821 286 767 233Q714 179 644.5 150.5Q575 122 500 122Q425 122 355.5 150.5Q286 179 233 233Q179 286 150.5 355.5Q122 425 122 500Q122 575 150.5 644.5Q179 714 233 767Q286 821 355.5 849.5Q425 878 500 878Q575 878 644.5 849.5Q714 821 767 767Q821 714 849.5 644.5Q878 575 878 500ZM822 500Q822 564 797.5 623.0Q773 682 728 728Q682 773 623.0 797.5Q564 822 500 822Q436 822 377.0 797.5Q318 773 272 728Q227 682 202.5 623.0Q178 564 178 500Q178 436 202.5 377.0Q227 318 272 272Q318 227 377.0 202.5Q436 178 500 178Q564 178 623.0 202.5Q682 227 728 272Q773 318 797.5 377.0Q822 436 822 500ZM497 553Q508 554 517.0 546.0Q526 538 526 527Q527 515 519.5 506.5Q512 498 500 497L503 500L500 503L497 500L500 497Q488 498 480.5 506.5Q473 515 474 527Q474 538 483.0 546.0Q492 554 503 553Q524 552 538.5 536.5Q553 521 553 500Q553 478 537.5 462.5Q522 447 500 447Q478 447 462.5 462.5Q447 478 447 500Q447 521 461.5 536.5Q476 552 497 553ZM672 553Q683 554 692.0 546.0Q701 538 701 527Q702 515 694.5 506.5Q687 498 675 497L678 500L675 503L672 500L675 497Q663 498 655.5 506.5Q648 515 649 527Q649 538 658.0 546.0Q667 554 678 553Q699 552 713.5 536.5Q728 521 728 500Q728 478 712.5 462.5Q697 447 675 447Q653 447 637.5 462.5Q622 478 622 500Q622 521 636.5 536.5Q651 552 672 553ZM322 553Q333 554 342.0 546.0Q351 538 351 527Q352 515 344.5 506.5Q337 498 325 497L328 500L325 503L322 500L325 497Q313 498 305.5 506.5Q298 515 299 527Q299 538 308.0 546.0Q317 554 328 553Q349 552 363.5 536.5Q378 521 378 500Q378 478 362.5 462.5Q347 447 325 447Q303 447 287.5 462.5Q272 478 272 500Q272 521 286.5 536.5Q301 552 322 553Z"/></symbol><symbol id="i-dots" viewBox="0 0 1000 1000"><path d="M221 566Q232 566 241.0 558.5Q250 551 251 539Q251 528 243.5 519.0Q236 510 224 509Q221 509 218.5 506.5Q216 504 216 500Q216 496 218.5 493.5Q221 491 225 491Q229 491 231.5 493.5Q234 496 234 500Q234 504 231.5 506.5Q229 509 226 509Q237 509 246.0 516.5Q255 524 256 536L253 498Q252 487 243.5 479.0Q235 471 223 472Q212 473 204.0 481.5Q196 490 197 502L199 539Q200 551 209.0 558.5Q218 566 229 566Q255 564 273.0 545.0Q291 526 291 500Q291 482 282.0 467.0Q273 452 258.0 443.0Q243 434 225 434Q207 434 192.0 443.0Q177 452 168.0 467.0Q159 482 159 500Q159 526 177.0 545.0Q195 564 221 566ZM496 566Q507 566 516.0 558.5Q525 551 526 539Q526 528 518.5 519.0Q511 510 499 509Q496 509 493.5 506.5Q491 504 491 500Q491 496 493.5 493.5Q496 491 500 491Q504 491 506.5 493.5Q509 496 509 500Q509 504 506.5 506.5Q504 509 501 509Q512 509 521.0 516.5Q530 524 531 536L528 498Q527 487 518.5 479.0Q510 471 498 472Q487 473 479.0 481.5Q471 490 472 502L474 539Q475 551 484.0 558.5Q493 566 504 566Q530 564 548.0 545.0Q566 526 566 500Q566 482 557.0 467.0Q548 452 533.0 443.0Q518 434 500 434Q482 434 467.0 443.0Q452 452 443.0 467.0Q434 482 434 500Q434 526 452.0 545.0Q470 564 496 566ZM771 566Q782 566 791.0 558.5Q800 551 801 539Q801 528 793.5 519.0Q786 510 774 509Q771 509 768.5 506.5Q766 504 766 500Q766 496 768.5 493.5Q771 491 775 491Q779 491 781.5 493.5Q784 496 784 500Q784 504 781.5 506.5Q779 509 776 509Q787 509 796.0 516.5Q805 524 806 536L803 498Q802 487 793.5 479.0Q785 471 773 472Q762 473 754.0 481.5Q746 490 747 502L749 539Q750 551 759.0 558.5Q768 566 779 566Q805 564 823.0 545.0Q841 526 841 500Q841 482 832.0 467.0Q823 452 808.0 443.0Q793 434 775 434Q757 434 742.0 443.0Q727 452 718.0 467.0Q709 482 709 500Q709 526 727.0 545.0Q745 564 771 566Z"/></symbol><symbol id="i-arrow-up" viewBox="0 0 1000 1000"><path d="M472 775Q472 787 480.0 795.0Q488 803 500 803Q512 803 520.0 795.0Q528 787 528 775V225Q528 212 520.0 204.5Q512 197 500.5 196.5Q489 196 480 205L230 455Q222 463 222.0 475.0Q222 487 230 495Q238 503 250.0 503.0Q262 503 270 495L472 293ZM730 495Q738 503 750.0 503.0Q762 503 770 495Q778 487 778.0 475.0Q778 463 770 455L520 205L480 245Z"/></symbol><symbol id="i-arrow-right" viewBox="0 0 1000 1000"><path d="M775 528Q787 528 795.0 520.0Q803 512 803 500Q803 488 795.0 480.0Q787 472 775 472H225Q212 472 204.5 480.0Q197 488 196.5 499.5Q196 511 205 520L455 770Q463 778 475.0 778.0Q487 778 495 770Q503 762 503.0 750.0Q503 738 495 730L293 528ZM495 270Q503 262 503.0 250.0Q503 238 495 230Q487 222 475.0 222.0Q463 222 455 230L205 480L245 520Z"/></symbol><symbol id="i-chevron-down" viewBox="0 0 1000 1000"><path d="M845 370Q853 362 853.0 350.0Q853 338 845 330Q837 322 825.0 322.0Q813 322 805 330L500 635L195 330Q187 322 175.0 322.0Q163 322 155 330Q147 338 147.0 350.0Q147 362 155 370L480 695Q488 703 500.0 703.0Q512 703 520 695Z"/></symbol><symbol id="i-chevron-right" viewBox="0 0 1000 1000"><path d="M370 155Q362 147 350.0 147.0Q338 147 330 155Q322 163 322.0 175.0Q322 187 330 195L635 500L330 805Q322 813 322.0 825.0Q322 837 330 845Q338 853 350.0 853.0Q362 853 370 845L695 520Q703 512 703.0 500.0Q703 488 695 480Z"/></symbol><symbol id="i-folder" viewBox="0 0 1000 1000"><path d="M903 625Q903 613 895.0 605.0Q887 597 875 597Q863 597 855.0 605.0Q847 613 847 625V725Q847 734 840.5 740.5Q834 747 825 747H175Q166 747 159.5 740.5Q153 734 153 725V275Q153 266 159.5 259.5Q166 253 175 253H425Q437 253 445.0 245.0Q453 237 453 225Q453 213 445.0 205.0Q437 197 425 197H175Q153 197 135.5 207.5Q118 218 107.5 235.5Q97 253 97 275V725Q97 747 107.5 764.5Q118 782 135.5 792.5Q153 803 175 803H825Q847 803 864.5 792.5Q882 782 892.5 764.5Q903 747 903 725ZM663 191Q659 172 643.0 159.5Q627 147 608 147Q589 147 573.5 158.5Q558 170 553 188L452 530Q446 550 455.0 568.0Q464 586 482.0 595.0Q500 604 520 598L862 497Q880 492 891.5 476.5Q903 461 903 442Q903 423 890.5 407.0Q878 391 859 387L681 348Q699 351 702 369ZM608 204 648 381Q651 399 669 402L846 442H847L846 443L504 544H506V546L607 204L608 203Z"/></symbol><symbol id="i-file" viewBox="0 0 1000 1000"><path d="M350 597Q338 597 330.0 605.0Q322 613 322 625Q322 637 330.0 645.0Q338 653 350 653L358 655L366 660L376 671L384 686Q389 697 399.5 701.0Q410 705 420.5 701.0Q431 697 436 686L444 671L454 660L462 655L470 653L478 655L486 660L496 671L504 686Q509 697 519.5 701.0Q530 705 540.5 701.0Q551 697 556 686L564 671L574 660L582 655L590 653L598 655L606 660L616 671L624 686Q629 697 639.5 701.0Q650 705 661 701Q672 696 676.0 685.5Q680 675 676 664L662 638Q654 627 643.0 617.5Q632 608 619 602Q590 591 561 602Q549 608 537 617L530 624L523 617Q511 608 499 602Q470 591 441 602Q429 608 417 617L410 624L403 617Q391 608 379 602Q365 597 350 597ZM525 153V97H319Q285 97 257.5 113.5Q230 130 213.5 157.5Q197 185 197 219V781Q197 815 213.5 842.5Q230 870 257.5 886.5Q285 903 319 903H725Q747 903 764.5 892.5Q782 882 792.5 864.5Q803 847 803 825V375Q803 353 792.5 335.5Q782 318 764.5 307.5Q747 297 725 297H525V353H725Q734 353 740.5 359.5Q747 366 747 375V825Q747 834 740.5 840.5Q734 847 725 847H319Q291 847 272.0 828.0Q253 809 253 781V219Q253 191 272.0 172.0Q291 153 319 153ZM650 353V297H319Q291 297 272.0 278.0Q253 259 253 231V219Q253 191 272.0 172.0Q291 153 319 153H725Q734 153 740.5 159.5Q747 166 747 175V375H803V175Q803 153 792.5 135.5Q782 118 764.5 107.5Q747 97 725 97H319Q285 97 257.5 113.5Q230 130 213.5 157.5Q197 185 197 219V231Q197 265 213.5 292.5Q230 320 257.5 336.5Q285 353 319 353Z"/></symbol><symbol id="i-code" viewBox="0 0 1000 1000"><path d="M675 747Q663 747 655.0 755.0Q647 763 647 775Q647 787 655.0 795.0Q663 803 675 803H725Q760 803 789.5 786.0Q819 769 836.0 739.5Q853 710 853 675V589Q853 566 867.5 548.5Q882 531 905 528Q916 526 922.0 518.0Q928 510 928.0 500.0Q928 490 922.0 482.0Q916 474 905 472Q882 469 867.5 451.5Q853 434 853 411V325Q853 290 836.0 260.5Q819 231 789.5 214.0Q760 197 725 197H675Q663 197 655.0 205.0Q647 213 647 225Q647 237 655.0 245.0Q663 253 675 253H725Q755 253 776.0 274.0Q797 295 797 325V411Q797 438 807.5 461.0Q818 484 837 500Q818 516 807.5 539.0Q797 562 797 589V675Q797 705 776.0 726.0Q755 747 725 747ZM325 803Q337 803 345.0 795.0Q353 787 353 775Q353 763 345.0 755.0Q337 747 325 747H275Q245 747 224.0 726.0Q203 705 203 675V589Q203 562 192.5 539.0Q182 516 163 500Q182 484 192.5 461.0Q203 438 203 411V325Q203 295 224.0 274.0Q245 253 275 253H325Q337 253 345.0 245.0Q353 237 353 225Q353 213 345.0 205.0Q337 197 325 197H275Q240 197 210.5 214.0Q181 231 164.0 260.5Q147 290 147 325V411Q147 434 132.5 451.5Q118 469 95 472Q84 474 78.0 482.0Q72 490 72.0 500.0Q72 510 78.0 518.0Q84 526 95 528Q118 531 132.5 548.5Q147 566 147 589V675Q147 710 164.0 739.5Q181 769 210.5 786.0Q240 803 275 803Z"/></symbol><symbol id="i-terminal" viewBox="0 0 1000 1000"><path d="M147 825Q147 837 155.0 845.0Q163 853 175 853Q187 853 195.0 845.0Q203 837 203 825V203H825Q837 203 845.0 195.0Q853 187 853 175Q853 163 845.0 155.0Q837 147 825 147H175Q163 147 155.0 155.0Q147 163 147 175ZM194 354 156 396 381 596Q390 603 401.0 603.0Q412 603 420 595L601 414L806 596Q815 604 826.5 603.0Q838 602 846 594Q854 585 853.0 573.5Q852 562 844 554L619 354Q610 347 599.0 347.0Q588 347 580 355L399 536Z"/></symbol><symbol id="i-copy" viewBox="0 0 1000 1000"><path d="M620 432Q628 424 628.0 412.5Q628 401 620 393Q612 384 600.0 384.0Q588 384 580 393L380 593Q372 601 372.0 612.5Q372 624 380 632Q388 641 400.0 641.0Q412 641 420 632ZM580 632Q588 641 600.0 641.0Q612 641 620 632Q628 624 628.0 612.5Q628 601 620 593L420 393Q412 384 400.0 384.0Q388 384 380 393Q372 401 372.0 412.5Q372 424 380 432ZM500 878Q578 878 646.5 848.5Q715 819 767.0 767.0Q819 715 848.5 646.5Q878 578 878 500Q878 422 848.5 357.0Q819 292 767.5 245.0Q716 198 647.0 172.5Q578 147 500 147H150Q137 147 129.5 155.0Q122 163 121.5 174.5Q121 186 130 195L233 297Q224 289 224.0 277.5Q224 266 233 258Q200 291 175.0 326.5Q150 362 136.0 404.0Q122 446 122 500Q122 578 151.5 646.5Q181 715 233.0 767.0Q285 819 353.5 848.5Q422 878 500 878ZM500 822Q433 822 375.0 797.0Q317 772 272.5 727.5Q228 683 203.0 625.0Q178 567 178 500Q178 435 202.5 389.0Q227 343 272 297Q281 289 281.0 277.5Q281 266 272 258L170 155Q179 164 178.5 175.5Q178 187 170.5 195.0Q163 203 150 203H500Q566 203 624.5 224.0Q683 245 727.5 284.5Q772 324 797.0 378.5Q822 433 822 500Q822 567 797.0 625.0Q772 683 727.5 727.5Q683 772 625.0 797.0Q567 822 500 822Z"/></symbol><symbol id="i-trash" viewBox="0 0 1000 1000"><path d="M225 547V603H775V547ZM205 505 245 545 645 145 605 105ZM343 555 382 595 789 189 749 149ZM530 555 570 595 795 370 755 330ZM205 318 245 357 457 145 418 105ZM197 175V825Q197 847 207.5 864.5Q218 882 235.5 892.5Q253 903 275 903H725Q747 903 764.5 892.5Q782 882 792.5 864.5Q803 847 803 825V175Q803 153 792.5 135.5Q782 118 764.5 107.5Q747 97 725 97H275Q253 97 235.5 107.5Q218 118 207.5 135.5Q197 153 197 175ZM253 175Q253 166 259.5 159.5Q266 153 275 153H725Q734 153 740.5 159.5Q747 166 747 175V825Q747 834 740.5 840.5Q734 847 725 847H275Q266 847 259.5 840.5Q253 834 253 825Z"/></symbol><symbol id="i-panel" viewBox="0 0 1000 1000"><path d="M297 825H353V175H297ZM175 853H825Q847 853 864.5 842.5Q882 832 892.5 814.5Q903 797 903 775V225Q903 203 892.5 185.5Q882 168 864.5 157.5Q847 147 825 147H175Q153 147 135.5 157.5Q118 168 107.5 185.5Q97 203 97 225V775Q97 797 107.5 814.5Q118 832 135.5 842.5Q153 853 175 853ZM175 797Q166 797 159.5 790.5Q153 784 153 775V225Q153 216 159.5 209.5Q166 203 175 203H825Q834 203 840.5 209.5Q847 216 847 225V775Q847 784 840.5 790.5Q834 797 825 797Z"/></symbol><symbol id="i-layers" viewBox="0 0 1000 1000"><path d="M175 903H575Q597 903 614.5 892.5Q632 882 642.5 864.5Q653 847 653 825V425Q653 403 642.5 385.5Q632 368 614.5 357.5Q597 347 575 347H175Q153 347 135.5 357.5Q118 368 107.5 385.5Q97 403 97 425V825Q97 847 107.5 864.5Q118 882 135.5 892.5Q153 903 175 903ZM175 847Q166 847 159.5 840.5Q153 834 153 825V425Q153 416 159.5 409.5Q166 403 175 403H575Q584 403 590.5 409.5Q597 416 597 425V825Q597 834 590.5 840.5Q584 847 575 847ZM625 647V703H775Q797 703 814.5 692.5Q832 682 842.5 664.5Q853 647 853 625V225Q853 203 842.5 185.5Q832 168 814.5 157.5Q797 147 775 147H375Q353 147 335.5 157.5Q318 168 307.5 185.5Q297 203 297 225V375H353V225Q353 216 359.5 209.5Q366 203 375 203H775Q784 203 790.5 209.5Q797 216 797 225V625Q797 634 790.5 640.5Q784 647 775 647Z"/></symbol><symbol id="i-grid" viewBox="0 0 1000 1000"><path d="M513 350Q500 343 487 350L62 575Q52 580 48.5 590.0Q45 600 48.5 610.0Q52 620 62 625L487 850Q500 857 513 850L938 625Q948 620 951.5 610.0Q955 600 951.5 590.0Q948 580 938 575ZM487 400 912 625Q902 620 898.5 610.0Q895 600 898.5 590.0Q902 580 912 575L487 800Q500 793 513 800L88 575Q98 580 101.5 590.0Q105 600 101.5 610.0Q98 620 88 625L513 400Q500 407 487 400ZM486 575Q476 581 473.0 592.0Q470 603 475 614Q481 624 492.0 627.0Q503 630 514 625L739 500Q753 492 753 475V125Q753 113 745.0 105.0Q737 97 725 97Q713 97 705.0 105.0Q697 113 697 125V458ZM147 525Q147 537 155.0 545.0Q163 553 175 553Q187 553 195.0 545.0Q203 537 203 525V345Q203 336 208 332Q222 319 249.5 297.5Q277 276 315.5 254.5Q354 233 400.5 218.0Q447 203 500 203Q553 203 599.5 218.0Q646 233 684.5 254.5Q723 276 750.5 297.5Q778 319 792 332Q797 336 797 345V525Q797 537 805.0 545.0Q813 553 825 553Q837 553 845.0 545.0Q853 537 853 525V345Q853 312 830 291H831Q814 275 782.5 251.0Q751 227 708.0 203.0Q665 179 612.5 163.0Q560 147 500 147Q440 147 387.5 163.0Q335 179 292.0 203.0Q249 227 217.5 251.0Q186 275 169 291H170Q147 312 147 345Z"/></symbol><symbol id="i-list" viewBox="0 0 1000 1000"><path d="M475 797Q463 797 455.0 805.0Q447 813 447 825Q447 837 455.0 845.0Q463 853 475 853H875Q887 853 895.0 845.0Q903 837 903 825Q903 813 895.0 805.0Q887 797 875 797ZM475 472Q463 472 455.0 480.0Q447 488 447 500Q447 512 455.0 520.0Q463 528 475 528H875Q887 528 895.0 520.0Q903 512 903 500Q903 488 895.0 480.0Q887 472 875 472ZM475 147Q463 147 455.0 155.0Q447 163 447 175Q447 187 455.0 195.0Q463 203 475 203H875Q887 203 895.0 195.0Q903 187 903 175Q903 163 895.0 155.0Q887 147 875 147ZM305 295Q313 303 325.0 303.0Q337 303 345 295Q353 287 353.0 275.0Q353 263 345 255L245 155Q237 147 225.0 147.0Q213 147 205 155L105 255Q97 263 97.0 275.0Q97 287 105 295Q113 303 125.0 303.0Q137 303 145 295L225 215ZM253 175H197V825H253ZM145 705Q137 697 125.0 697.0Q113 697 105 705Q97 713 97.0 725.0Q97 737 105 745L205 845Q213 853 225.0 853.0Q237 853 245 845L345 745Q353 737 353.0 725.0Q353 713 345 705Q337 697 325.0 697.0Q313 697 305 705L225 785Z"/></symbol><symbol id="i-clock" viewBox="0 0 1000 1000"><path d="M400 547Q388 547 380.0 555.0Q372 563 372 575Q372 587 380.0 595.0Q388 603 400 603H500Q512 603 520.0 595.0Q528 587 528 575V225Q528 213 520.0 205.0Q512 197 500 197H350Q338 197 330.0 205.0Q322 213 322 225Q322 237 330.0 245.0Q338 253 350 253H472V547ZM650 253Q662 253 670.0 245.0Q678 237 678 225Q678 213 670.0 205.0Q662 197 650 197H500V253ZM528 750Q528 728 513 712Q497 697 475.0 697.0Q453 697 437 712Q422 728 422.0 750.0Q422 772 437 788Q453 803 475.0 803.0Q497 803 513 788Q528 772 528 750Z"/></symbol><symbol id="i-info" viewBox="0 0 1000 1000"><path d="M878 500Q878 425 849.5 355.5Q821 286 767 233Q714 179 644.5 150.5Q575 122 500 122Q425 122 355.5 150.5Q286 179 233 233Q179 286 150.5 355.5Q122 425 122 500Q122 575 150.5 644.5Q179 714 233 767Q286 821 355.5 849.5Q425 878 500 878Q575 878 644.5 849.5Q714 821 767 767Q821 714 849.5 644.5Q878 575 878 500ZM822 500Q822 564 797.5 623.0Q773 682 728 728Q682 773 623.0 797.5Q564 822 500 822Q436 822 377.0 797.5Q318 773 272 728Q227 682 202.5 623.0Q178 564 178 500Q178 436 202.5 377.0Q227 318 272 272Q318 227 377.0 202.5Q436 178 500 178Q564 178 623.0 202.5Q682 227 728 272Q773 318 797.5 377.0Q822 436 822 500ZM425 497Q413 497 405.0 505.0Q397 513 397 525Q397 537 405.0 545.0Q413 553 425 553H500Q512 553 520.0 545.0Q528 537 528 525V350Q528 338 520.0 330.0Q512 322 500 322H425Q413 322 405.0 330.0Q397 338 397 350Q397 362 405.0 370.0Q413 378 425 378H472V497ZM575 378Q587 378 595.0 370.0Q603 362 603 350Q603 338 595.0 330.0Q587 322 575 322H500V378ZM538 638Q538 622 527.0 611.0Q516 600 500 600Q484 600 473.5 611.0Q463 622 463 638Q463 653 473.5 664.0Q484 675 500 675Q516 675 527.0 664.0Q538 653 538 638Z"/></symbol><symbol id="i-warning" viewBox="0 0 1000 1000"><path d="M538 154 448 467Q452 452 467 448L154 538Q128 545 112.5 566.0Q97 587 97 613Q97 639 112.0 659.5Q127 680 151 688L804 894Q823 900 842.5 895.0Q862 890 876 876Q890 862 895.0 842.5Q900 823 894 804L688 151Q680 127 659.5 112.0Q639 97 613 97Q587 97 566.0 112.5Q545 128 538 154ZM592 169Q595 159 604.0 155.5Q613 152 622.0 155.0Q631 158 634 168L840 821Q843 830 836 836Q830 843 821 840L168 634Q158 631 155.0 622.0Q152 613 155.5 604.0Q159 595 169 592L483 502Q498 498 502 483Z"/></symbol><symbol id="i-shield" viewBox="0 0 1000 1000"><path d="M678 500Q678 464 664.0 431.5Q650 399 625.5 374.5Q601 350 568.5 336.0Q536 322 500 322Q464 322 431.5 336.0Q399 350 374.5 374.5Q350 399 336.0 431.5Q322 464 322 500Q322 536 336.0 568.5Q350 601 374.5 625.5Q399 650 431.5 664.0Q464 678 500 678Q536 678 568.5 664.0Q601 650 625.5 625.5Q650 601 664.0 568.5Q678 536 678 500ZM622 500Q622 533 605.5 561.0Q589 589 561.0 605.5Q533 622 500 622Q467 622 439.0 605.5Q411 589 394.5 561.0Q378 533 378 500Q378 467 394.5 439.0Q411 411 439.0 394.5Q467 378 500 378Q533 378 561.0 394.5Q589 411 605.5 439.0Q622 467 622 500ZM350 528V472H125Q113 472 105.0 480.0Q97 488 97 500Q97 512 105.0 520.0Q113 528 125 528ZM875 528Q887 528 895.0 520.0Q903 512 903 500Q903 488 895.0 480.0Q887 472 875 472H650V528Z"/></symbol><symbol id="i-lock" viewBox="0 0 1000 1000"><path d="M469 869Q476 863 481.0 856.0Q486 849 490 842L505 811Q511 795 515.0 779.0Q519 763 521 748L527 697L528 675Q528 665 522.0 657.5Q516 650 506 647H493Q460 648 427 654Q412 657 396.0 661.0Q380 665 364 671L333 685Q326 689 319.0 694.5Q312 700 306 706Q283 728 275.5 758.0Q268 788 275.5 817.5Q283 847 306 869Q328 892 358.0 899.5Q388 907 417.5 899.5Q447 892 469 869ZM429 829Q412 847 387.5 847.0Q363 847 346 829Q328 812 328.0 787.5Q328 763 346 746L361 734L384 723Q395 719 408.5 715.5Q422 712 436 710L496 703H499H494Q484 700 478.0 692.5Q472 685 472 675V680L466 739Q463 757 459.0 770.0Q455 783 452 791L442 813ZM531 869Q554 892 583.5 899.5Q613 907 642.5 899.5Q672 892 695 869Q717 847 724.5 817.5Q732 788 724.5 758.0Q717 728 695 706Q689 700 682.0 694.5Q675 689 668 685L637 671Q621 665 605.0 661.0Q589 657 574 654Q541 648 507 647H495Q485 649 478.5 657.0Q472 665 472 675L473 686L479 748Q483 770 487.5 785.5Q492 801 496 811L510 842Q515 849 520.0 856.0Q525 863 531 869ZM571 829 559 813 548 791Q543 777 540.0 763.5Q537 750 535 738L529 693V675Q529 685 522.5 693.0Q516 701 506 703H502H505L564 710Q579 712 592.0 715.5Q605 719 617 723L639 734L655 746Q673 763 673.0 787.5Q673 812 655 829Q638 847 613.5 847.0Q589 847 571 829ZM528 475Q528 463 520.0 455.0Q512 447 500 447Q488 447 480.0 455.0Q472 463 472 475V647H175Q166 647 159.5 640.5Q153 634 153 625V525Q153 516 159.5 509.5Q166 503 175 503H375Q387 503 395.0 495.0Q403 487 403 475Q403 463 395.0 455.0Q387 447 375 447H175Q153 447 135.5 457.5Q118 468 107.5 485.5Q97 503 97 525V625Q97 647 107.5 664.5Q118 682 135.5 692.5Q153 703 175 703H500Q512 703 520.0 695.0Q528 687 528 675ZM625 447Q613 447 605.0 455.0Q597 463 597 475Q597 487 605.0 495.0Q613 503 625 503H825Q834 503 840.5 509.5Q847 516 847 525V625Q847 634 840.5 640.5Q834 647 825 647H500V703H825Q847 703 864.5 692.5Q882 682 892.5 664.5Q903 647 903 625V525Q903 503 892.5 485.5Q882 468 864.5 457.5Q847 447 825 447ZM472 475Q472 487 480.0 495.0Q488 503 500 503Q512 503 520.0 495.0Q528 487 528 475V153H775Q784 153 790.5 159.5Q797 166 797 175V447H625Q613 447 605.0 455.0Q597 463 597 475Q597 487 605.0 495.0Q613 503 625 503H825Q837 503 845.0 495.0Q853 487 853 475V175Q853 153 842.5 135.5Q832 118 814.5 107.5Q797 97 775 97H500Q488 97 480.0 105.0Q472 113 472 125ZM375 503Q387 503 395.0 495.0Q403 487 403 475Q403 463 395.0 455.0Q387 447 375 447H203V175Q203 166 209.5 159.5Q216 153 225 153H500V97H225Q203 97 185.5 107.5Q168 118 157.5 135.5Q147 153 147 175V475Q147 487 155.0 495.0Q163 503 175 503Z"/></symbol><symbol id="i-key" viewBox="0 0 1000 1000"><path d="M258 647Q247 646 238.0 654.0Q229 662 228 673Q228 685 235.5 693.5Q243 702 255 703Q283 705 302.5 725.5Q322 746 322 775Q322 805 301.0 826.0Q280 847 250 847Q220 847 199.0 826.0Q178 805 178 775Q178 746 197.5 725.5Q217 705 245 703Q257 702 264.5 693.5Q272 685 272 673Q271 662 262.0 654.0Q253 646 242 647Q208 649 181.0 666.5Q154 684 138.0 712.5Q122 741 122 775Q122 810 139.0 839.0Q156 868 185.5 885.5Q215 903 250 903Q285 903 314.5 885.5Q344 868 361.0 839.0Q378 810 378 775Q378 741 362.0 712.5Q346 684 319.0 666.5Q292 649 258 647ZM758 647Q747 646 738.0 654.0Q729 662 728 673Q728 685 735.5 693.5Q743 702 755 703Q783 705 802.5 725.5Q822 746 822 775Q822 805 801.0 826.0Q780 847 750 847Q720 847 699.0 826.0Q678 805 678 775Q678 746 697.5 725.5Q717 705 745 703Q757 702 764.5 693.5Q772 685 772 673Q771 662 762.0 654.0Q753 646 742 647Q708 649 681.0 666.5Q654 684 638.0 712.5Q622 741 622 775Q622 810 639.0 839.0Q656 868 685.5 885.5Q715 903 750 903Q785 903 814.5 885.5Q844 868 861.0 839.0Q878 810 878 775Q878 741 862.0 712.5Q846 684 819.0 666.5Q792 649 758 647ZM492 353Q503 354 512.0 346.0Q521 338 522 327Q522 315 514.5 306.5Q507 298 495 297Q467 295 447.5 274.5Q428 254 428 225Q428 195 449.0 174.0Q470 153 500 153Q530 153 551.0 174.0Q572 195 572 225Q572 254 552.5 274.5Q533 295 505 297Q493 298 485.5 306.5Q478 315 478 327Q479 338 488.0 346.0Q497 354 508 353Q542 351 569.0 333.5Q596 316 612.0 287.5Q628 259 628 225Q628 190 611.0 161.0Q594 132 564.5 114.5Q535 97 500 97Q465 97 435.5 114.5Q406 132 389.0 161.0Q372 190 372 225Q372 259 388.0 287.5Q404 316 431.0 333.5Q458 351 492 353ZM222 675Q222 687 230.0 695.0Q238 703 250 703Q262 703 270.0 695.0Q278 687 278 675V575Q278 556 292.0 542.0Q306 528 325 528H675Q694 528 708.0 542.0Q722 556 722 575V675Q722 687 730.0 695.0Q738 703 750 703Q762 703 770.0 695.0Q778 687 778 675V575Q778 547 764.0 523.5Q750 500 726.5 486.0Q703 472 675 472H325Q297 472 273.5 486.0Q250 500 236.0 523.5Q222 547 222 575ZM528 325Q528 313 520.0 305.0Q512 297 500 297Q488 297 480.0 305.0Q472 313 472 325V500H528Z"/></symbol><symbol id="i-eye" viewBox="0 0 1000 1000"><path d="M122 500Q122 578 151.5 646.5Q181 715 233.0 767.0Q285 819 353.5 848.5Q422 878 500 878Q578 878 646.5 848.5Q715 819 767.0 767.0Q819 715 848.5 646.5Q878 578 878 500L875 461Q872 443 866 428Q860 413 851.0 400.5Q842 388 830 379H831Q819 370 806.0 364.0Q793 358 781 355Q768 351 754.5 349.5Q741 348 727 347L605 349L580 346L567 340Q559 334 555 325L548 299L542 206L538 186L530 167L517 149Q501 132 475 127L449 126L419 131Q391 137 365 147Q294 174 239.0 226.5Q184 279 153.0 349.5Q122 420 122 500ZM178 500Q178 431 204.5 371.5Q231 312 278.0 267.0Q325 222 385 199L431 186L452 182L466 183L473 185L480 193L486 214L489 266L492 307L496 328L504 348Q508 357 515.0 367.0Q522 377 533 385L544 392L567 400L602 405L725 403Q736 404 746.5 405.5Q757 407 766 409Q776 412 783.0 415.5Q790 419 795 423Q801 428 805.5 434.0Q810 440 814 449L820 471L822 500Q822 567 797.0 625.0Q772 683 727.5 727.5Q683 772 625.0 797.0Q567 822 500 822Q433 822 375.0 797.0Q317 772 272.5 727.5Q228 683 203.0 625.0Q178 567 178 500ZM547 753Q558 754 567.0 746.0Q576 738 576 727Q577 715 569.5 706.5Q562 698 550 697L553 700L550 703L547 700L550 697Q538 698 530.5 706.5Q523 715 524 727Q524 738 533.0 746.0Q542 754 553 753Q574 752 588.5 736.5Q603 721 603 700Q603 678 587.5 662.5Q572 647 550 647Q528 647 512.5 662.5Q497 678 497 700Q497 721 511.5 736.5Q526 752 547 753ZM697 603Q708 604 717.0 596.0Q726 588 726 577Q727 565 719.5 556.5Q712 548 700 547L703 550L700 553L697 550L700 547Q688 548 680.5 556.5Q673 565 674 577Q674 588 683.0 596.0Q692 604 703 603Q724 602 738.5 586.5Q753 571 753 550Q753 528 737.5 512.5Q722 497 700 497Q678 497 662.5 512.5Q647 528 647 550Q647 571 661.5 586.5Q676 602 697 603ZM347 703Q358 704 367.0 696.0Q376 688 376 677Q377 665 369.5 656.5Q362 648 350 647L353 650L350 653L347 650L350 647Q338 648 330.5 656.5Q323 665 324 677Q324 688 333.0 696.0Q342 704 353 703Q374 702 388.5 686.5Q403 671 403 650Q403 628 387.5 612.5Q372 597 350 597Q328 597 312.5 612.5Q297 628 297 650Q297 671 311.5 686.5Q326 702 347 703ZM297 503Q308 504 317.0 496.0Q326 488 326 477Q327 465 319.5 456.5Q312 448 300 447L303 450L300 453L297 450L300 447Q288 448 280.5 456.5Q273 465 274 477Q274 488 283.0 496.0Q292 504 303 503Q324 502 338.5 486.5Q353 471 353 450Q353 428 337.5 412.5Q322 397 300 397Q278 397 262.5 412.5Q247 428 247 450Q247 471 261.5 486.5Q276 502 297 503Z"/></symbol><symbol id="i-star" viewBox="0 0 1000 1000"><path d="M523 848 614 640 841 619Q853 618 859.5 608.5Q866 599 864 588Q862 580 856 575L684 427L734 206Q737 195 730.0 186.0Q723 177 712 176Q704 175 697 179L500 295L303 179Q293 173 282.0 177.0Q271 181 267 192Q264 198 266 206L316 427L144 575Q136 583 136.0 594.5Q136 606 145 613Q150 618 159 619L386 640L477 848Q482 858 492.5 861.5Q503 865 513 859Q520 855 523 848ZM549 859 639 651Q633 666 616 668L844 647Q860 645 872.0 635.5Q884 626 889.5 611.0Q895 596 891 581L885 566L880 560L702 405Q715 416 711 433L762 213Q765 197 759.5 182.5Q754 168 742.0 158.5Q730 149 714 148L698 149L691 151L486 270Q500 262 514 270L317 155Q303 147 287.5 148.0Q272 149 259.0 157.5Q246 166 241 181L237 196V204L289 433Q285 416 298 405L126 554Q114 564 110.0 579.0Q106 594 110.0 609.0Q114 624 127 635L140 643L148 646L384 668Q367 666 361 651L451 859Q458 873 471.0 881.5Q484 890 499.0 890.5Q514 891 528 883L540 873ZM497 836 498 835H501L503 836L412 628Q405 613 389 612L161 591L163 592L164 594L163 596L334 448Q347 437 343 420L293 200V202L291 204L288 203L486 319Q500 327 514 319L712 203L710 204L707 203V200L657 420Q653 437 666 448L837 596L836 595L837 592L839 591L611 612Q595 613 588 628Z"/></symbol><symbol id="i-sparkle" viewBox="0 0 1000 1000"><path d="M97 227Q97 330 123.0 421.0Q149 512 200 579Q251 649 327.0 688.5Q403 728 500 728Q597 728 673.0 688.5Q749 649 800 579Q851 512 877.0 421.0Q903 330 903 227V175Q903 163 895.0 155.0Q887 147 875 147H125Q113 147 105.0 155.0Q97 163 97 175ZM153 227V175Q153 187 145.0 195.0Q137 203 125 203H875Q863 203 855.0 195.0Q847 187 847 175V227Q847 322 823.5 404.0Q800 486 755 546Q712 604 648.0 638.0Q584 672 500 672Q416 672 352.0 638.0Q288 604 245 546Q200 486 176.5 404.0Q153 322 153 227ZM152 809Q145 818 147.0 829.5Q149 841 159 848Q168 855 179.5 853.0Q191 851 198 841L323 666L277 634ZM802 841Q809 851 820.5 853.0Q832 855 841 848Q851 841 853.0 829.5Q855 818 848 809L723 634L677 666ZM347 503Q358 504 367.0 496.0Q376 488 376 477Q377 465 369.5 456.5Q362 448 350 447L353 450L350 453L347 450L350 447Q338 448 330.5 456.5Q323 465 324 477Q324 488 333.0 496.0Q342 504 353 503Q374 502 388.5 486.5Q403 471 403 450Q403 428 387.5 412.5Q372 397 350 397Q328 397 312.5 412.5Q297 428 297 450Q297 471 311.5 486.5Q326 502 347 503ZM647 503Q658 504 667.0 496.0Q676 488 676 477Q677 465 669.5 456.5Q662 448 650 447L653 450L650 453L647 450L650 447Q638 448 630.5 456.5Q623 465 624 477Q624 488 633.0 496.0Q642 504 653 503Q674 502 688.5 486.5Q703 471 703 450Q703 428 687.5 412.5Q672 397 650 397Q628 397 612.5 412.5Q597 428 597 450Q597 471 611.5 486.5Q626 502 647 503Z"/></symbol><symbol id="i-chart" viewBox="0 0 1000 1000"><path d="M505 870Q513 878 525.0 878.0Q537 878 545 870Q553 862 553.0 850.0Q553 838 545 830L317 603Q300 585 291.5 561.0Q283 537 286 512L297 422Q304 366 268 323L175 215L292 182L346 235Q366 256 394.5 266.0Q423 276 452 272L537 261Q590 255 628 292L855 520Q863 528 875.0 528.0Q887 528 895 520Q903 512 903.0 500.0Q903 488 895 480L667 253Q640 226 604.0 213.5Q568 201 530 205L445 216Q410 220 385 196L320 130Q308 118 292 123L117 173Q107 176 102.0 183.5Q97 191 97.0 201.0Q97 211 104 218L225 360Q246 384 242 415L230 505Q226 543 238.5 579.0Q251 615 278 642ZM380 655Q372 663 372.0 675.0Q372 687 380 695Q388 703 400.0 703.0Q412 703 420 695L720 395Q728 387 728.0 375.0Q728 363 720 355Q712 347 700.0 347.0Q688 347 680 355ZM255 330Q247 338 247.0 350.0Q247 362 255 370Q263 378 275.0 378.0Q287 378 295 370L395 270Q403 262 403.0 250.0Q403 238 395 230Q387 222 375.0 222.0Q363 222 355 230Z"/></symbol><symbol id="i-pulse" viewBox="0 0 1000 1000"><path d="M325 197Q313 197 305.0 205.0Q297 213 297 225V500Q297 512 305.0 520.0Q313 528 325 528H588Q633 528 670.5 505.5Q708 483 730.5 445.5Q753 408 753 363Q753 317 730.5 279.5Q708 242 670.5 219.5Q633 197 588 197ZM325 253H588Q618 253 642.5 268.0Q667 283 682.0 307.5Q697 332 697 363Q697 393 682.0 417.5Q667 442 642.5 457.0Q618 472 588 472H325Q337 472 345.0 480.0Q353 488 353 500V225Q353 237 345.0 245.0Q337 253 325 253ZM325 472Q313 472 305.0 480.0Q297 488 297 500V775Q297 787 305.0 795.0Q313 803 325 803H538Q583 803 620.5 780.5Q658 758 680.5 720.5Q703 683 703 638Q703 592 680.5 554.5Q658 517 620.5 494.5Q583 472 538 472ZM325 528H538Q568 528 592.5 543.0Q617 558 632.0 582.5Q647 607 647 638Q647 668 632.0 692.5Q617 717 592.5 732.0Q568 747 538 747H325Q337 747 345.0 755.0Q353 763 353 775V500Q353 512 345.0 520.0Q337 528 325 528Z"/></symbol><symbol id="i-gear" viewBox="0 0 1000 1000"><path d="M620 805 631 801Q638 798 645.5 798.5Q653 799 659 804Q673 819 692.5 824.0Q712 829 731.5 824.0Q751 819 766 804L804 766Q819 751 824.0 731.5Q829 712 824.0 692.5Q819 673 804 659Q799 653 798.5 645.5Q798 638 801 631L805 620Q808 613 814.0 608.0Q820 603 827 603Q848 603 865.5 593.0Q883 583 893.0 565.5Q903 548 903 527V473Q903 452 893.0 434.5Q883 417 865.5 407.0Q848 397 827 397Q820 397 814.0 392.0Q808 387 805 380L801 369Q798 362 798.5 354.5Q799 347 804 341V342Q819 327 824.0 307.5Q829 288 824.0 268.5Q819 249 804 234L766 196Q751 181 731.5 176.0Q712 171 692.5 176.0Q673 181 658 196H659Q653 201 645.5 201.5Q638 202 631 199L620 195Q613 192 608.0 186.0Q603 180 603 173Q603 152 593.0 134.5Q583 117 565.5 107.0Q548 97 527 97H473Q452 97 434.5 107.0Q417 117 407.0 134.5Q397 152 397 173Q397 180 392.0 186.0Q387 192 380 195L369 199Q362 202 354.5 201.5Q347 201 341 196Q327 181 307.5 176.0Q288 171 268.5 176.0Q249 181 234 196L196 234Q181 249 176.0 268.5Q171 288 176.0 307.5Q181 327 196 341Q201 347 201.5 354.5Q202 362 199 369L195 380Q192 387 186.0 392.0Q180 397 173 397Q152 397 134.5 407.0Q117 417 107.0 434.5Q97 452 97 473V527Q97 548 107.0 565.5Q117 583 134.5 593.0Q152 603 173 603Q180 603 186.0 608.0Q192 613 195 620L199 631Q202 638 201.5 645.5Q201 653 196 659Q181 673 176.0 692.5Q171 712 176.0 731.5Q181 751 196 766L234 804Q249 819 268.5 824.0Q288 829 307.5 824.0Q327 819 341 804Q347 799 354.5 798.5Q362 798 369 801L380 805Q387 808 392.0 814.0Q397 820 397 827Q397 848 407.0 865.5Q417 883 434.5 893.0Q452 903 473 903H527Q548 903 565.5 893.0Q583 883 593.0 865.5Q603 848 603 827Q603 820 608.0 814.0Q613 808 620 805ZM600 753Q576 762 561.5 782.5Q547 803 547 827Q547 836 541.5 841.5Q536 847 527 847H473Q464 847 458.5 841.5Q453 836 453 827Q453 803 438.0 782.5Q423 762 400 753L392 749Q369 739 344.0 743.0Q319 747 302 765Q296 770 288.0 770.0Q280 770 274 765L235 726Q230 720 230.0 712.0Q230 704 235 698Q253 681 257.0 656.0Q261 631 251 608L247 600Q238 577 217.5 562.0Q197 547 173 547Q164 547 158.5 541.5Q153 536 153 527V473Q153 464 158.5 458.5Q164 453 173 453Q197 453 217.5 438.5Q238 424 247 400L251 392Q261 369 257.0 344.0Q253 319 235 302Q230 296 230.0 288.0Q230 280 235 274L274 235Q280 230 288.0 230.0Q296 230 302 235Q319 253 344.0 257.0Q369 261 392 251L400 247Q424 238 438.5 218.0Q453 198 453 173Q453 164 458.5 158.5Q464 153 473 153H527Q536 153 541.5 158.5Q547 164 547 173Q547 198 561.5 218.0Q576 238 600 247L608 251Q631 261 656.0 257.0Q681 253 698 235Q704 230 712.0 230.0Q720 230 726 235L765 274Q770 280 770.0 288.0Q770 296 765 302Q747 319 743.0 344.0Q739 369 750 392L753 400Q762 424 782.5 438.5Q803 453 827 453Q836 453 841.5 458.5Q847 464 847 473V527Q847 536 841.5 541.5Q836 547 827 547Q803 547 782.5 561.5Q762 576 753 600L749 608Q739 631 743.0 656.0Q747 681 765 698Q770 704 770.0 712.0Q770 720 765 726L726 765Q720 770 712.0 770.0Q704 770 698 765Q681 747 656.0 743.0Q631 739 608 749ZM653 500Q653 458 632.0 423.5Q611 389 576.5 368.0Q542 347 500 347Q458 347 423.5 368.0Q389 389 368.0 423.5Q347 458 347 500Q347 542 368.0 576.5Q389 611 423.5 632.0Q458 653 500 653Q542 653 576.5 632.0Q611 611 632.0 576.5Q653 542 653 500ZM597 500Q597 526 583.5 548.0Q570 570 548.0 583.5Q526 597 500 597Q474 597 452.0 583.5Q430 570 416.5 548.0Q403 526 403 500Q403 474 416.5 452.0Q430 430 452.0 416.5Q474 403 500 403Q526 403 548.0 416.5Q570 430 583.5 452.0Q597 474 597 500Z"/></symbol><symbol id="i-sun" viewBox="0 0 1000 1000"><path d="M148 109Q142 100 130.5 97.5Q119 95 109 102Q100 108 97.5 119.5Q95 131 102 141Q114 159 133.5 178.5Q153 198 179 214Q205 231 236.0 242.0Q267 253 300 253Q312 253 320.0 245.0Q328 237 328 225Q328 213 320.0 205.0Q312 197 300 197Q275 197 252.0 188.5Q229 180 209 167Q188 153 172.5 137.5Q157 122 148 109ZM152 116Q148 105 137.5 100.0Q127 95 116 98Q105 102 100.0 112.5Q95 123 98 134Q116 188 154.0 265.0Q192 342 250 422Q289 476 336.5 528.0Q384 580 441.0 624.5Q498 669 563 700Q573 705 584.0 701.5Q595 698 600 687Q605 677 601.5 666.0Q598 655 587 650Q497 606 423.5 535.5Q350 465 296 389Q240 312 204.0 239.0Q168 166 152 116ZM550 903Q568 903 584.0 898.5Q600 894 613.5 886.0Q627 878 637 867L651 851L663 831Q657 843 644.5 846.5Q632 850 621 843Q635 853 660.5 867.5Q686 882 715 892L745 901L776 903L791 902L807 897Q817 894 824.0 889.0Q831 884 836 879Q849 866 854 848L857 832V816L854 800L850 785L837 756Q829 742 820.0 729.5Q811 717 801 706L782 686L764 670Q775 678 775.5 690.5Q776 703 767 713Q776 703 786.0 688.0Q796 673 801 653V654Q803 642 803.0 630.5Q803 619 800 608Q798 603 796.0 597.0Q794 591 790 585L772 563L748 544L721 530Q706 523 691.0 518.5Q676 514 660 511Q630 505 602.0 502.5Q574 500 555 500Q568 500 575.5 508.0Q583 516 583.5 527.5Q584 539 575 548Q589 534 597 516Q600 509 603.0 497.0Q606 485 604.5 468.5Q603 452 594 433Q588 420 580.0 411.5Q572 403 564 398L545 386L525 377L481 366L336 348Q313 344 291.5 338.5Q270 333 251 324Q242 319 232.5 321.5Q223 324 217.0 331.0Q211 338 211 349L212 363Q215 397 220.0 431.0Q225 465 232 499Q240 540 252.0 585.0Q264 630 281.5 673.0Q299 716 323 752Q345 785 372.0 812.5Q399 840 429 860Q459 880 489 891Q521 903 550 903ZM550 847Q531 847 508 839Q485 830 460 813Q435 797 412.0 773.5Q389 750 369 721Q350 691 334.0 651.5Q318 612 306.5 569.5Q295 527 287 488Q281 456 276.0 423.0Q271 390 268 358L267 349Q267 359 260.5 366.5Q254 374 245.0 376.5Q236 379 226 374Q249 386 274.5 392.5Q300 399 327 404L471 421L506 430L520 436Q527 440 533.5 445.0Q540 450 544 458Q548 466 548.5 475.0Q549 484 545 493L535 508Q526 517 526.5 528.0Q527 539 534.5 547.5Q542 556 555 556Q571 556 596.0 558.0Q621 560 649 566Q677 572 699 581L718 592L733 603Q740 610 744.0 620.0Q748 630 746 641Q744 651 738.0 659.5Q732 668 728 673Q718 682 719.0 694.5Q720 707 731 715L758 742Q766 752 773.5 762.5Q781 773 787 783L797 804L801 821L800 832L796 839L787 845L774 847L755 845L733 839Q710 831 688.5 818.5Q667 806 653 797Q642 789 629.5 792.5Q617 796 611 808L609 813L597 827Q590 835 578.5 841.0Q567 847 550 847ZM375 97Q363 97 355.0 105.0Q347 113 347 125Q347 137 355.0 145.0Q363 153 375 153Q396 153 414 170L432 192L449 224Q454 235 464.5 239.0Q475 243 485.5 239.0Q496 235 501 224L518 192L536 170Q553 154 575.0 154.0Q597 154 614 170L632 192L649 224Q654 235 664.5 239.0Q675 243 685.5 239.0Q696 235 701 224L718 192L736 170Q753 154 775.0 154.0Q797 154 814 170L832 192L849 224Q854 234 864.5 238.5Q875 243 886 238Q897 234 901.0 223.0Q905 212 901 201Q891 179 880 161Q867 142 852 128Q830 108 809.5 102.5Q789 97 775 97Q761 97 740.5 102.5Q720 108 698 128L675 154L652 128Q630 108 609.5 102.5Q589 97 575 97Q561 97 540.5 102.5Q520 108 498 128L475 154L452 128Q430 108 409.5 102.5Q389 97 375 97Z"/></symbol><symbol id="i-moon" viewBox="0 0 1000 1000"><path d="M463 876Q475 877 483.0 870.5Q491 864 493.5 853.5Q496 843 490 833Q466 796 453.5 753.0Q441 710 441 663Q441 596 466.0 537.5Q491 479 535.0 435.0Q579 391 637.5 366.0Q696 341 763 341L794 342Q806 343 814.0 336.5Q822 330 824.5 319.5Q827 309 820 299Q787 246 737.5 206.0Q688 166 627.5 144.0Q567 122 500 122Q422 122 353.5 151.5Q285 181 233.0 233.0Q181 285 151.5 353.5Q122 422 122 500Q122 574 148.0 639.0Q174 704 220.5 755.0Q267 806 329.0 837.5Q391 869 463 876ZM469 820Q408 814 355.0 787.0Q302 760 262.5 717.0Q223 674 200.5 618.5Q178 563 178 500Q178 433 203.0 375.0Q228 317 272.5 272.5Q317 228 375.0 203.0Q433 178 500 178Q558 178 609.5 197.0Q661 216 702.5 250.0Q744 284 773 329Q767 319 769.0 309.0Q771 299 779.5 292.0Q788 285 799 286L763 284Q684 284 615.5 313.5Q547 343 495.0 395.0Q443 447 413.5 515.5Q384 584 384 663Q384 718 399.5 769.0Q415 820 442 863Q436 853 438.0 843.0Q440 833 448.5 826.0Q457 819 469 820Z"/></symbol><symbol id="i-refresh" viewBox="0 0 1000 1000"><path d="M775 605Q763 605 754.0 596.0Q745 587 745 575V550Q745 499 726.0 454.5Q707 410 673.5 376.5Q640 343 595.5 324.0Q551 305 500 305Q449 305 404.5 324.0Q360 343 326.5 376.5Q293 410 274.0 454.5Q255 499 255 550V575Q255 587 246.0 596.0Q237 605 225 605Q213 605 204.0 596.0Q195 587 195 575V550Q195 491 216.0 438.5Q237 386 274.5 344.5Q312 303 362.0 277.5Q412 252 470 247V125Q470 113 479.0 104.0Q488 95 500 95Q512 95 521.0 104.0Q530 113 530 125V247Q588 252 638.0 277.5Q688 303 725.5 344.5Q763 386 784.0 438.5Q805 491 805 550V575Q805 587 796.0 596.0Q787 605 775 605ZM500 905Q457 905 422.0 884.0Q387 863 366.0 828.0Q345 793 345 750V550Q345 507 366.0 472.0Q387 437 422.0 416.0Q457 395 500 395Q543 395 578.0 416.0Q613 437 634.0 472.0Q655 507 655 550V750Q655 793 634.0 828.0Q613 863 578.0 884.0Q543 905 500 905Z"/></symbol><symbol id="i-power" viewBox="0 0 1000 1000"><path d="M122 500Q122 512 130.0 520.0Q138 528 150 528Q162 528 170.0 520.0Q178 512 178 500Q178 433 203.0 375.0Q228 317 272.5 272.5Q317 228 375.0 203.0Q433 178 500 178Q567 178 625.0 203.0Q683 228 727.5 272.5Q772 317 797.0 375.0Q822 433 822 500Q822 567 797.0 625.0Q772 683 727.5 727.5Q683 772 625.0 797.0Q567 822 500 822Q440 822 387.0 801.5Q334 781 291.5 745.0Q249 709 221 661L172 689Q205 746 255.0 788.5Q305 831 367.5 854.5Q430 878 500 878Q578 878 646.5 848.5Q715 819 767.0 767.0Q819 715 848.5 646.5Q878 578 878 500Q878 422 848.5 353.5Q819 285 767.0 233.0Q715 181 646.5 151.5Q578 122 500 122Q422 122 353.5 151.5Q285 181 233.0 233.0Q181 285 151.5 353.5Q122 422 122 500ZM313 434Q301 434 292.5 442.5Q284 451 284 463Q284 474 292.5 482.5Q301 491 313 491L325 493L337 501L350 515L362 536Q367 547 377.5 551.0Q388 555 398.0 551.0Q408 547 413 536L425 515L438 501L450 493L463 491L475 493L487 501L500 515L512 536Q517 547 527.5 551.0Q538 555 548.0 551.0Q558 547 563 536L575 515L588 501L600 493L613 491L625 493L637 501L650 515L662 536Q666 547 677.0 551.0Q688 555 699 551Q709 546 713.5 535.5Q718 525 713 514Q707 498 697.0 483.5Q687 469 674 458Q661 447 645.5 440.5Q630 434 613 434Q595 434 579.5 440.5Q564 447 551 458L538 472L524 458Q511 447 495.5 440.5Q480 434 463 434Q445 434 429.5 440.5Q414 447 401 458L388 472L374 458Q361 447 345.5 440.5Q330 434 313 434ZM147 825Q147 837 155.0 845.0Q163 853 175 853Q187 853 195.0 845.0Q203 837 203 825V703H325Q337 703 345.0 695.0Q353 687 353 675Q353 663 345.0 655.0Q337 647 325 647H175Q163 647 155.0 655.0Q147 663 147 675Z"/></symbol><symbol id="i-globe" viewBox="0 0 1000 1000"><path d="M878 500Q878 425 849.5 355.5Q821 286 767 233Q714 179 644.5 150.5Q575 122 500 122Q425 122 355.5 150.5Q286 179 233 233Q179 286 150.5 355.5Q122 425 122 500Q122 575 150.5 644.5Q179 714 233 767Q286 821 355.5 849.5Q425 878 500 878Q575 878 644.5 849.5Q714 821 767 767Q821 714 849.5 644.5Q878 575 878 500ZM822 500Q822 564 797.5 623.0Q773 682 728 728Q682 773 623.0 797.5Q564 822 500 822Q436 822 377.0 797.5Q318 773 272 728Q227 682 202.5 623.0Q178 564 178 500Q178 436 202.5 377.0Q227 318 272 272Q318 227 377.0 202.5Q436 178 500 178Q564 178 623.0 202.5Q682 227 728 272Q773 318 797.5 377.0Q822 436 822 500ZM528 500Q528 488 520.0 480.0Q512 472 500 472Q488 472 480.0 480.0Q472 488 472 500V700Q472 712 480.0 720.0Q488 728 500 728Q512 728 520.0 720.0Q528 712 528 700ZM489 474Q478 479 474.0 489.5Q470 500 474 511Q479 522 489.5 526.0Q500 530 511 526L686 451Q697 446 701.0 435.5Q705 425 701 414Q696 403 685.5 399.0Q675 395 664 399Z"/></symbol><symbol id="i-bolt" viewBox="0 0 1000 1000"><path d="M506 808V807L406 207Q403 189 413.5 174.0Q424 159 443 156Q461 153 476.0 163.5Q491 174 494 193L594 793Q597 811 586.5 826.0Q576 841 557 844Q539 847 524.0 836.5Q509 826 506 808ZM284 710 281 707 106 532Q93 519 93.0 500.0Q93 481 106 468L281 293Q294 280 312.5 280.0Q331 280 344 293Q357 306 357.5 325.0Q358 344 344 357L201 500L344 643Q357 656 357.5 673.0Q358 690 347 703L344 707L341 710Q329 720 313.0 720.0Q297 720 284 710ZM659 710 656 707Q643 694 643.0 675.0Q643 656 656 643L799 500L656 357Q643 344 643.0 325.0Q643 306 656 293Q669 280 687.5 280.0Q706 280 719 293L894 468Q908 481 907.5 500.0Q907 519 894 532L719 707L716 710Q704 720 688.0 720.0Q672 720 659 710Z"/></symbol><symbol id="i-play" viewBox="0 0 1000 1000"><path d="M147 223V777Q147 812 164.0 840.5Q181 869 209.5 886.0Q238 903 273 903Q308 903 338 885L791 616Q820 598 836.5 569.0Q853 540 853 506V494Q853 460 836.5 431.0Q820 402 791 384L338 115Q308 97 273 97Q238 97 209.5 114.0Q181 131 164.0 159.5Q147 188 147 223ZM203 223Q203 194 223.5 173.5Q244 153 273 153Q292 153 309 163L762 433Q797 453 797 494V506Q797 547 762 567L309 837Q292 847 273 847Q244 847 223.5 826.5Q203 806 203 777Z"/></symbol><symbol id="i-pause" viewBox="0 0 1000 1000"><path d="M125 472Q113 472 105.0 480.0Q97 488 97 500Q97 512 105.0 520.0Q113 528 125 528H375Q387 528 395.0 520.0Q403 512 403 500Q403 488 395.0 480.0Q387 472 375 472ZM278 375Q278 363 270.0 355.0Q262 347 250 347Q238 347 230.0 355.0Q222 363 222 375V625Q222 637 230.0 645.0Q238 653 250 653Q262 653 270.0 645.0Q278 637 278 625Z"/></symbol><symbol id="i-stop" viewBox="0 0 1000 1000"><path d="M225 853H775Q797 853 814.5 842.5Q832 832 842.5 814.5Q853 797 853 775V225Q853 203 842.5 185.5Q832 168 814.5 157.5Q797 147 775 147H225Q203 147 185.5 157.5Q168 168 157.5 185.5Q147 203 147 225V775Q147 797 157.5 814.5Q168 832 185.5 842.5Q203 853 225 853ZM225 797Q216 797 209.5 790.5Q203 784 203 775V225Q203 216 209.5 209.5Q216 203 225 203H775Q784 203 790.5 209.5Q797 216 797 225V775Q797 784 790.5 790.5Q784 797 775 797Z"/></symbol></svg>
+<div class="doc">
+  <nav class="toc" id="toc">
+    <div class="toc-brand"><img src="assets/app-icon.png" alt=""><div><b>NeoX Shell</b><span>DESIGN SYSTEM · v1.0</span></div></div>
+    <h6>基础</h6>
+    <a href="#brand"><span class="n">01</span>品牌</a>
+    <a href="#color"><span class="n">02</span>颜色</a>
+    <a href="#type"><span class="n">03</span>字体</a>
+    <a href="#space"><span class="n">04</span>间距与层次</a>
+    <a href="#icons"><span class="n">05</span>图标与插画</a>
+    <h6>页面</h6>
+    <a href="#s-onboard"><span class="n">06</span>首次启动</a>
+    <a href="#s-home"><span class="n">07</span>主页</a>
+    <a href="#s-session"><span class="n">08</span>会话</a>
+    <a href="#s-palette"><span class="n">09</span>命令面板</a>
+    <a href="#s-accounts"><span class="n">10</span>账号</a>
+    <a href="#s-settings"><span class="n">11</span>设置</a>
+    <a href="#s-empty"><span class="n">12</span>空状态</a>
+    <a href="#s-dark"><span class="n">13</span>暗色</a>
+    <h6>规范</h6>
+    <a href="#comp"><span class="n">14</span>组件</a>
+    <a href="#motion"><span class="n">15</span>动效</a>
+    <a href="#audit"><span class="n">16</span>自检清单</a>
+  </nav>
+
+  <main class="body">
+    <header class="cover">
+      <div class="wrap">
+        <div>
+          <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>Design system · v1.0</div>
+          <h1>NeoX Shell</h1>
+          <p>一个为 Claude Code 打造的桌面终端。长相、布局、手感都跟 Claude Code Desktop 一家人：暖纸色、一颗陶土橙、发丝线、衬线标题，连终端也是同一色系定制的纸面。</p>
+          <div class="meta">
+            <div>参考窗口<b>1440 × 900</b></div>
+            <div>三栏<b>264 / auto / 296</b></div>
+            <div>字体<b>Anthropic Serif · Sans · JetBrains Mono</b></div>
+            <div>图标<b>anthropicons · 41 枚已接入</b></div>
+          </div>
+        </div>
+        <div class="art"><img src="assets/hero-welcome.jpg" alt="手绘插画：一只手用钢笔勾出终端窗口，上方升起陶土色火花"></div>
+      </div>
+    </header>
+    <!-- ═════════ 01 品牌 ═════════ -->
+    <section class="sec" id="brand"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>01 · brand</div>
+      <h2>一颗火花，一个提示符</h2>
+      <p class="lede">应用图标 = Claude 的手剪火花 + 右下角一个终端提示符 <code>&gt;_</code>。<b>火花说明它为谁服务，提示符说明它是什么。</b>除此之外不加任何元素：不加字、不加渐变、不加光。</p>
+      <div class="brand-row">
+        <figure class="brand-tile on-cream"><img src="assets/app-icon.png" alt="应用图标"><figcaption>应用图标 · 1024 · Dock / 安装包</figcaption></figure>
+        <figure class="brand-tile on-navy"><img src="assets/claude-spark.png" alt="Claude 火花"><figcaption>火花 · 应用内品牌位 · 欢迎语前</figcaption></figure>
+        <div class="brand-tile lockups">
+          <div class="lockup"><img src="assets/app-icon.png" alt=""><span>NeoX <em>Shell</em></span></div>
+          <div class="lockup sm"><img src="assets/app-icon.png" alt=""><span>NeoX <em>Shell</em></span></div>
+          <div class="lockup dark"><img src="assets/app-icon.png" alt=""><span>NeoX <em>Shell</em></span></div>
+          <p class="cap">字标：Anthropic Serif 500，“Shell” 降一级墨色。图标与字标间距 = 图标宽 × 0.35。</p>
+        </div>
+      </div>
+      <div class="grid2 sub">
+        <div class="do"><div class="lbl ok">✓ 这样用</div><ul><li>图标四周留出 ≥ 图标宽 1/4 的空白</li><li>小于 24px 时只用火花，不用整枚图标</li><li>火花只出现在品牌位与问候语前，一屏一次</li></ul></div>
+        <div class="dont"><div class="lbl no">× 别这样</div><ul><li>给图标加描边、投影、发光</li><li>把火花改色（除陶土 / 奶油 / 墨三色）</li><li>拿火花当加载动画或列表符号</li></ul></div>
+      </div>
+    </div></section>
+
+    <!-- ═════════ 02 颜色 ═════════ -->
+    <section class="sec" id="color"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>02 · color</div>
+      <h2>五个暖面，一个电压</h2>
+      <p class="lede">层次靠<b>暖度差</b>而不是深浅对比：相邻两层只差半档。<b>陶土橙一屏只亮一次</b>，它是这一屏唯一要你按的东西。</p>
+      <h3>浅色面</h3>
+      <div class="sw-row">
+        <div class="sw"><i style="background:#FAF9F5"></i><b>cream</b><code>#FAF9F5</code><span>主区、文档底</span></div>
+        <div class="sw"><i style="background:#F3F1EA"></i><b>side</b><code>#F3F1EA</code><span>侧栏</span></div>
+        <div class="sw"><i style="background:#FFFFFF"></i><b>paper</b><code>#FFFFFF</code><span>输入框、浮起卡片</span></div>
+        <div class="sw"><i style="background:#EFE9DE"></i><b>tile</b><code>#EFE9DE</code><span>分段控件底、代码底</span></div>
+        <div class="sw"><i style="background:#E8E0D1"></i><b>tile-strong</b><code>#E8E0D1</code><span>选中行</span></div>
+      </div>
+      <h3 class="sub" style="margin-top:32px">暗面 · 电压</h3>
+      <div class="sw-row">
+        <div class="sw"><i style="background:#FFFEFB"></i><b>term</b><code>#FFFEFB</code><span>浅色终端底（标题条 #F6F3EC）</span></div>
+        <div class="sw"><i style="background:#24221F"></i><b>term-dark</b><code>#24221F</code><span>暗色终端底（标题条 #1F1D1A）</span></div>
+        <div class="sw"><i style="background:#1A1917"></i><b>navy-side</b><code>#1A1917</code><span>暗色侧栏</span></div>
+        <div class="sw"><i style="background:#1F1E1B"></i><b>navy-soft</b><code>#1F1E1B</code><span>暗色主区</span></div>
+        <div class="sw"><i style="background:#262420"></i><b>navy-elev</b><code>#262420</code><span>暗色卡片</span></div>
+        <div class="sw"><i style="background:#CC785C"></i><b>coral</b><code>#CC785C</code><span>唯一电压</span></div>
+      </div>
+      <h3 class="sub" style="margin-top:32px">墨 · 状态 · 语法</h3>
+      <div class="sw-row">
+        <div class="sw"><i style="background:#141413"></i><b>ink</b><code>#141413</code><span>正文</span></div>
+        <div class="sw"><i style="background:#3D3B36"></i><b>ink-2</b><code>#3D3B36</code><span>次要</span></div>
+        <div class="sw"><i style="background:#6B6862"></i><b>ink-3</b><code>#6B6862</code><span>说明</span></div>
+        <div class="sw"><i style="background:#9A968C"></i><b>ink-4</b><code>#9A968C</code><span>占位、禁用</span></div>
+        <div class="sw"><i style="background:#4E9F63"></i><b>success</b><code>#4E9F63</code><span>正常</span></div>
+        <div class="sw"><i style="background:#E8A55A"></i><b>amber</b><code>#E8A55A</code><span>偏快 · 数字</span></div>
+        <div class="sw"><i style="background:#C64545"></i><b>danger</b><code>#C64545</code><span>过快 · 删除</span></div>
+        <div class="sw"><i style="background:#5DB8A6"></i><b>teal</b><code>#5DB8A6</code><span>路径 · 字符串</span></div>
+      </div>
+    </div></section>
+
+    <!-- ═════════ 03 字体 ═════════ -->
+    <section class="sec" id="type"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>03 · typography</div>
+      <h2>衬线说话，无衬线做事，等宽记账</h2>
+      <p class="lede">跟 Claude Desktop 同一套字：<b>Anthropic Serif</b> 只给问候语、标题和大数字；<b>Anthropic Sans</b> 管所有界面文字；<b>JetBrains Mono</b> 只管终端、路径、单位、快捷键。三者绝不混在同一个词里。</p>
+      <div class="ramp">
+        <div class="tr"><div class="spec"><b>Serif 400</b>40 / 1.1 · −0.025em<br>问候语</div><div class="d" style="font-family:var(--serif);font-size:40px;line-height:1.1;letter-spacing:-.025em">晚上好，Alex</div></div>
+        <div class="tr"><div class="spec"><b>Serif 400</b>28 / 1.15 · −0.02em<br>页面标题</div><div class="d" style="font-family:var(--serif);font-size:28px;letter-spacing:-.02em">每个账号是一个独立环境</div></div>
+        <div class="tr"><div class="spec"><b>Serif 400</b>36 / 1<br>英雄数字</div><div class="d"><span class="fig">1,168</span><span class="unit">次请求</span></div></div>
+        <div class="tr"><div class="spec"><b>Sans 500</b>14 / 1.5<br>行标题、按钮</div><div class="d" style="font-weight:500">节奏看护</div></div>
+        <div class="tr"><div class="spec"><b>Sans 400</b>14 / 1.6<br>正文</div><div class="d" style="color:var(--ink-2)">Token、对话记录、file-history 都落在各自的配置目录里，账号之间不共享任何本地状态。</div></div>
+        <div class="tr"><div class="spec"><b>Sans 400</b>12 / 1.5<br>说明、时间</div><div class="d" style="font-size:12px;color:var(--ink-3)">2 分钟前 · ~/work/api-server</div></div>
+        <div class="tr"><div class="spec"><b>Mono 400</b>13 / 1.7<br>终端</div><div class="d" style="font-family:var(--mono);font-size:13px"><span style="color:var(--coral)">❯</span> claude --resume <span style="color:var(--teal)">api-server</span></div></div>
+        <div class="tr"><div class="spec"><b>Mono 400</b>10.5 · +0.16em<br>眉标</div><div class="d kicker" style="color:var(--ink-3)">本机隔离 · .claude-main</div></div>
+      </div>
+      <div class="sub">
+        <h3>数字锁合</h3>
+        <p class="lede" style="margin-bottom:18px">数字用衬线、单位用等宽，永远不让两者同字体 —— 衬线有呼吸，等宽有刻度，并排才有对比。</p>
+        <div class="lockrow"><div><span class="fig">6</span><span class="unit">次 / 分钟</span></div><div><span class="fig">6.7</span><span class="unit">秒 · 间隔中位数</span></div><div><span class="fig">14</span><span class="unit">个会话</span></div></div>
+      </div>
+    </div></section>
+
+    <!-- ═════════ 04 间距与层次 ═════════ -->
+    <section class="sec" id="space"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>04 · space &amp; depth</div>
+      <h2>发丝线抬升，不靠阴影</h2>
+      <p class="lede">层次只有三种手段，按优先级：<b>暖度差 → 1px 发丝线（10%）→ 极淡阴影</b>。阴影只给真正浮在上面的东西：输入框、弹层、命令面板。</p>
+      <div class="grid3">
+        <div class="depth d0"><div class="lbl">L0 · 面</div><p>cream 上放 side，靠半档暖度分区，不画线。</p></div>
+        <div class="depth d1"><div class="lbl">L1 · 线</div><p>paper + 1px ink@10%。卡片、列表容器。</p></div>
+        <div class="depth d2"><div class="lbl">L2 · 浮</div><p>paper + 线 + 柔影。输入框、弹层、面板。</p></div>
+      </div>
+      <table class="spec-table sub">
+        <thead><tr><th>Token</th><th>值</th><th>用在</th></tr></thead>
+        <tbody>
+          <tr><td>间距阶</td><td class="m">4 · 8 · 12 · 16 · 20 · 24 · 32 · 48</td><td>只用这八档，别出现 10、14、18</td></tr>
+          <tr><td>圆角</td><td class="m">6 · 8 · 12 · 16 · 999</td><td>小控件 · 行/按钮 · 卡片/终端 · 输入框/面板 · 胶囊</td></tr>
+          <tr><td>行高</td><td class="m">32</td><td>侧栏行、菜单项；行间不画线</td></tr>
+          <tr><td>标题栏 / 状态栏</td><td class="m">44 / 26</td><td>标题栏可拖动窗口；状态栏只放等宽小字</td></tr>
+          <tr><td>栏宽</td><td class="m">264（220–380） / auto / 296</td><td>侧栏可拖，右栏 ⌘B 收起，宽度持久化</td></tr>
+          <tr><td>阴影 · 浮</td><td class="m">0 1 2 ink@5%, 0 4 14 ink@4%</td><td>输入框、卡片悬停</td></tr>
+          <tr><td>阴影 · 弹</td><td class="m">0 12 40 ink@12%, 0 2 6 ink@6%</td><td>命令面板、菜单、对话框</td></tr>
+        </tbody>
+      </table>
+    </div></section>
+
+    <!-- ═════════ 05 图标与插画 ═════════ -->
+    <section class="sec" id="icons"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>05 · icons &amp; illustration</div>
+      <h2>官方字形 + 手绘插画</h2>
+      <p class="lede">图标全部用 Claude Desktop 的 <b>anthropicons</b> 描边字形（15px、1px 视觉线宽、圆头），不自绘。插画全部由 <b>gpt-image-2.5</b> 按同一份风格提示出：墨线手绘、陶土 + 沙色平涂、大量留白、不带字。</p>
+      <div class="icon-grid" id="iconGrid"></div>
+      <div class="illus sub">
+        <figure><img src="assets/hero-welcome.jpg" alt=""><figcaption><b>hero-welcome</b> · 首次启动、封面</figcaption></figure>
+        <figure><img src="assets/isolation.jpg" alt=""><figcaption><b>isolation</b> · 账号页说明条</figcaption></figure>
+        <figure><img src="assets/empty-sessions.jpg" alt=""><figcaption><b>empty-sessions</b> · 没有会话</figcaption></figure>
+        <figure><img src="assets/rhythm.jpg" alt=""><figcaption><b>rhythm</b> · 节奏看护说明</figcaption></figure>
+      </div>
+      <details class="prompt"><summary>插画风格提示词（复用时原样带上）</summary><pre>Anthropic Claude brand editorial illustration style: loose hand-drawn black ink line art
+with slightly wobbly organic strokes, flat terracotta coral (#CC785C) and warm sand (#EFE9DE)
+color fills, warm cream paper background (#FAF9F5), generous negative space, no gradients,
+no text, no letters, minimal and calm.  Scene: …</pre></details>
+    </div></section>
+    <!-- ═════════ 06 首次启动 ═════════ -->
+    <section class="sec" id="s-onboard"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>06 · first run</div>
+      <div class="shot-head"><div><h2>首次启动</h2><p class="lede">没有侧栏、没有终端，只讲一件事：三步就能开第一个会话。插画占左半，右半是唯一的陶土按钮。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w nosd">
+        <div class="wm ob">
+          <div class="lights" style="position:absolute;left:18px;top:16px"><i></i><i></i><i></i></div>
+          <div class="ob-art"><img src="assets/hero-welcome.jpg" alt=""></div>
+          <div class="ob-copy">
+            <img class="ob-icon" src="assets/app-icon.png" alt="">
+            <h1>欢迎使用 NeoX Shell</h1>
+            <p>给 Claude Code 一个安静的家。每个账号一个独立配置目录，每个项目一个干净的终端。</p>
+            <ol class="steps">
+              <li><span>1</span><div><b>选一个项目目录</b><small>终端会在这里启动 <code>claude</code></small></div></li>
+              <li><span>2</span><div><b>绑定账号</b><small>自动建 <code>~/.claude-&lt;名字&gt;</code>，互不串号</small></div></li>
+              <li><span>3</span><div><b>开始会话</b><small>节奏看护默认开启，请求太密会提醒你</small></div></li>
+            </ol>
+            <div class="ob-acts"><span class="btn pri"><svg class="i"><use href="#i-folder"/></svg>选择第一个目录</span><span class="btn ghost">稍后再说</span></div>
+            <div class="ob-foot"><span class="kbd">⌘</span><span class="kbd">O</span> 也可以直接拖一个文件夹进来</div>
+          </div>
+        </div>
+      </div></div>
+      <div class="notes"><div class="note"><b>只有一个陶土按钮</b>“选择第一个目录”。“稍后”是幽灵按钮，不跟它抢。</div><div class="note"><b>步骤不用卡片</b>编号圆 + 两行字，靠留白分开，不画框。</div><div class="note"><b>插画不装框</b>左半插画不加卡片，边缘羽化进 cream，像书的扉页。</div></div>
+    </div></section>
+
+    <!-- ═════════ 07 主页 ═════════ -->
+    <section class="sec" id="s-home"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>07 · home</div>
+      <div class="shot-head"><div><h2>主页 · 新建会话</h2><p class="lede">跟 Claude Desktop 的首页一个结构：火花 + 衬线问候语 + 一个大输入框。区别只在输入框底部 —— 这里选的是<b>目录、账号、权限模式</b>，回车就在那个目录里起一个 Claude Code。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w">
+        <aside class="ws" data-side="home"></aside>
+        <div class="wm">
+          <div class="wh"><span class="acts"><span class="ib"><svg class="i"><use href="#i-search"/></svg></span><span class="ib"><svg class="i"><use href="#i-panel"/></svg></span></span></div>
+          <div class="home">
+            <div class="greet"><img src="assets/claude-spark.png" alt=""><h1>晚上好，Alex</h1></div>
+            <div class="composer">
+              <div class="ph">要在哪个目录里启动 Claude Code？也可以直接写第一句话…</div>
+              <div class="row">
+                <span class="chip"><svg class="i"><use href="#i-folder"/></svg><span class="mono">~/work/api-server</span><svg class="i" style="width:11px"><use href="#i-chevron-down"/></svg></span>
+                <span class="chip"><svg class="i"><use href="#i-key"/></svg><span class="mono">.claude-main</span><svg class="i" style="width:11px"><use href="#i-chevron-down"/></svg></span>
+                <span class="chip"><svg class="i"><use href="#i-shield"/></svg>自动接受编辑</span>
+                <span class="send"><svg class="i"><use href="#i-arrow-up"/></svg></span>
+              </div>
+            </div>
+            <div class="sugg"><span class="chip"><svg class="i"><use href="#i-refresh"/></svg>继续 api-server</span><span class="chip"><svg class="i"><use href="#i-terminal"/></svg>空白终端</span><span class="chip"><svg class="i"><use href="#i-layers"/></svg>从 Git 克隆</span></div>
+            <div class="recent">
+              <div class="gl" style="padding:0 2px 10px"><span>最近</span><span>全部 →</span></div>
+              <div class="rc-grid">
+                <div class="rc"><div class="rc-t"><b>api-server</b><span class="pill p-ok">运行中</span></div><code>~/work/api-server</code><p>● Editing src/routes.ts +8 −0</p><small>2 分钟前 · .claude-main</small></div>
+                <div class="rc"><div class="rc-t"><b>migrate-db</b><span class="pill p-idle">已结束</span></div><code>~/work/migrate-db</code><p>⎿ 12 个迁移全部通过</p><small>1 小时前 · .claude-main</small></div>
+                <div class="rc"><div class="rc-t"><b>neox-shell</b><span class="pill p-idle">已结束</span></div><code>~/AI/neox-shell</code><p>⎿ 设计规范已写入 DESIGN.md</p><small>昨天 · .claude-work</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="notes"><div class="note"><b>问候语是唯一的衬线大字</b>40px Anthropic Serif，前面一颗 28px 火花；不加副标题。</div><div class="note"><b>陶土只给发送键</b>输入框里三个选择器都是 paper 底发丝线小件。</div><div class="note"><b>最近会话用卡片</b>主页是唯一用卡片列会话的地方；侧栏永远是行，不是卡。</div></div>
+    </div></section>
+    <template id="tpl-session">
+      <aside class="ws" data-side="session"></aside>
+      <div class="wm">
+        <div class="sh">
+          <div class="sh-l"><span class="sh-t">api-server</span><span class="sh-br">⎇ main</span><span class="sh-dot"></span><span class="sh-st">运行中 · 26 分</span></div>
+          <div class="sh-r"><div class="seg sm"><span class="on"><svg class="i"><use href="#i-terminal"/></svg>终端</span><span><svg class="i"><use href="#i-code"/></svg>改动 <em>2</em></span></div><span class="ib on"><svg class="i"><use href="#i-panel"/></svg></span></div>
+        </div>
+        <div class="tw">
+          <div class="tw-bar">
+            <span class="tw-tab on"><i></i>claude</span><span class="tw-tab">zsh</span><span class="tw-add"><svg class="i"><use href="#i-plus"/></svg></span>
+            <span class="tw-meta">opus · .claude-main · ~/work/api-server</span>
+          </div>
+          <div class="term">
+<div class="box"><span class="c">✻</span> <span class="wt">Welcome to Claude Code!</span><br><span class="m">/help for help · /status for your current setup</span><br><span class="m">cwd: /Users/mk/work/api-server</span></div>
+<div class="u"><span class="m">&gt;</span> add a /health endpoint that reports db status</div>
+<div class="ln"><span class="g">●</span> <span class="wt">Read</span>(<span class="t">src/routes.ts</span>) <span class="m">⎿ 84 lines</span></div>
+<div class="ln"><span class="g">●</span> <span class="wt">Update</span>(<span class="t">src/routes.ts</span>) <span class="m">⎿ 8 additions</span></div>
+<div class="df"><div><b>41</b>+ router.get('/health', async (_req, res) =&gt; {</div><div><b>42</b>+   const db = await pool.query('select 1').then(() =&gt; 'ok', () =&gt; 'down')</div><div><b>43</b>+   res.json({ db, uptime: process.uptime() })</div></div>
+<div class="ln"><span class="g">●</span> <span class="wt">Bash</span>(<span class="a">npm test -- health</span>) <span class="m">⎿</span> <span class="g">✓ 3 passed</span> <span class="m">412ms</span></div>
+<div class="ln"><span class="wt">●</span> Done. <span class="t">/health</span> returns <span class="a">{ db: "ok", uptime }</span>.</div>
+<div class="u"><span class="m">&gt;</span> also add a readiness probe for k8s</div>
+<div class="ln think"><span class="c sp-rot">✻</span> <span class="c">Pondering…</span> <span class="m">(12s · ↑ 1.2k tokens · esc to interrupt)</span></div>
+<div class="todo"><div class="dn"><span>☒</span>Find where the app boots and opens the db pool</div><div class="cur-t"><span>☐</span>Add /ready that checks db + pending migrations</div><div><span>☐</span>Wire readinessProbe into k8s/deployment.yaml</div><div><span>☐</span>Test /ready returns 503 while migrating</div></div>
+<div class="inbox"><span class="m">&gt;</span> <span class="cur"></span><span class="ph">Try "write a test for /ready"</span></div>
+<div class="tail"><span class="m">? for shortcuts</span><span class="c">⏵⏵ auto-accept edits on <span class="m">(shift+tab)</span></span></div>
+          </div>
+        </div>
+      </div>
+      <aside class="wr insp">
+        <div class="in-h"><span>本次会话</span><span class="ib"><svg class="i"><use href="#i-close"/></svg></span></div>
+        <section class="in-s">
+          <div class="in-k"><span>节奏看护</span><span class="pill p-ok">正常</span></div>
+          <div class="in-fig"><span class="fig">6</span><span class="unit">次 / 分钟</span></div>
+          <div class="spark" data-spark="3 5 4 6 7 5 4 6 8 6 5 7 9 6 5 4 6 7 6 5 6 8 7 6"><i class="th" style="bottom:66%"><b>12</b></i></div>
+          <div class="in-cap">间隔中位数 <b>6.7s</b> · 本小时 <b>214</b> 次</div>
+        </section>
+        <section class="in-s">
+          <div class="in-k"><span>上下文</span><b class="mono">38%</b></div>
+          <div class="ctx"><i style="width:38%"></i></div>
+          <div class="in-cap"><b>76k</b> / 200k tokens · 约 <b>2 小时</b>后建议 /compact</div>
+        </section>
+        <section class="in-s">
+          <div class="in-k"><span>本次改动</span><span class="mono">2 个文件</span></div>
+          <div class="chg"><svg class="i"><use href="#i-file"/></svg><span class="p"><em>src/</em>routes.ts</span><span class="ds"><i></i><i></i><i class="o"></i><i class="o"></i><i class="o"></i></span><span class="ad">+8</span></div>
+          <div class="chg"><svg class="i"><use href="#i-file"/></svg><span class="p"><em>tests/</em>health.test.ts</span><span class="ds"><i></i><i></i><i></i><i></i><i class="o"></i></span><span class="ad">+24</span></div>
+          <div class="in-btn"><svg class="i"><use href="#i-code"/></svg>查看全部改动<span class="kbd">⌘D</span></div>
+        </section>
+        <section class="in-s in-meta">
+          <div><span>配置目录</span><b class="mono">.claude-main<svg class="i"><use href="#i-copy"/></svg></b></div>
+          <div><span>模型</span><b class="mono">opus</b></div>
+          <div><span>启动于</span><b class="mono">21:04</b></div>
+        </section>
+      </aside>
+    </template>
+
+    <!-- ═════════ 08 会话 ═════════ -->
+    <section class="sec" id="s-session"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>08 · session</div>
+      <div class="shot-head"><div><h2>会话 · 主工作台</h2><p class="lede">95% 的时间都在这一屏。<b>终端不再是一块黑板</b>，而是跟应用同一色系定制的纸面：比主区亮半档、靠发丝线和软影浮起来，语法色按纸面重调。右栏是检查器：节奏、上下文、本次改动。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w r3" data-tpl="tpl-session"></div></div>
+      <div class="notes"><div class="note"><b>中栏就是终端，不再单独悬浮</b>整栏一块同色纸面，标签条只用一条发丝线和下划线选中态；没有第二道边框、没有投影，不会套框。</div><div class="note"><b>右栏是检查器，不是仪表盘</b>不堆白卡片；四段用发丝线分开，每段一个等宽眉标。节奏用 24 根分钟柱 + 阈值虚线，比进度条多说一倍。</div><div class="note"><b>标题行用衬线</b>项目名 19px 衬线，分支、状态都退成小字；右上“终端 / 改动”切视图，不再堆一排无名图标。</div></div>
+    </div></section>
+
+    <!-- ═════════ 09 命令面板 ═════════ -->
+    <section class="sec" id="s-palette"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>09 · command palette</div>
+      <div class="shot-head"><div><h2>命令面板 <span class="kbd" style="font-size:13px;vertical-align:6px">⌘K</span></h2><p class="lede">所有操作的键盘入口。底下的界面只压一层 18% 的墨，不模糊 —— 你要看得见自己在哪个会话里。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w r3" data-tpl="tpl-session" data-overlay="palette"></div></div>
+      <div class="notes"><div class="note"><b>命中字加粗，不变色</b>匹配的字符用 600 字重标出来，颜色保持墨色。</div><div class="note"><b>快捷键靠右对齐</b>每行右端放 kbd 小件，用户看一次就记住了。</div><div class="note"><b>遮罩盖整扇窗，面板一整块</b>宽 620、距顶 112；内部只在输入框下画一条线，提示行和结果同底色，不再拼出第二个色块。</div></div>
+    </div></section>
+    <!-- ═════════ 10 账号 ═════════ -->
+    <section class="sec" id="s-accounts"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>10 · accounts</div>
+      <div class="shot-head"><div><h2>账号 · 本机隔离</h2><p class="lede">NeoX Shell 的核心能力：每个账号一个独立的 <code>~/.claude-*</code> 配置目录。这一页要让人<b>一眼看清哪个账号在用、各自有几个会话、节奏是否健康</b>。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w">
+        <aside class="ws" data-side="accounts"></aside>
+        <div class="wm">
+          <div class="wh"><span class="acts"><span class="ib"><svg class="i"><use href="#i-search"/></svg></span></span></div>
+          <div class="pg">
+            <div class="pg-h"><div><h1>账号</h1><p>3 个账号 · 14 个会话 · 全部本机存储</p></div><span class="btn pri"><svg class="i"><use href="#i-plus"/></svg>添加账号</span></div>
+            <div class="banner"><div><b>每个账号一间屋子</b><p>Token、对话记录、file-history 全落在各自的配置目录里。切账号就是换一间屋子，不会串号，也不用反复登录。</p></div><img src="assets/isolation.jpg" alt=""></div>
+            <div class="acc">
+              <div class="ar on"><span class="av">个</span><div class="an"><b>个人</b><small>mk@personal.dev</small></div><code>~/.claude-main</code><span class="as">9 个会话</span><span class="pill p-ok">正常</span><span class="al">当前</span><span class="ib"><svg class="i"><use href="#i-dots"/></svg></span></div>
+              <div class="ar"><span class="av" style="background:var(--ink-3)">工</span><div class="an"><b>工作</b><small>mk@company.com</small></div><code>~/.claude-work</code><span class="as">4 个会话</span><span class="pill p-idle">空闲</span><span class="al">昨天</span><span class="ib"><svg class="i"><use href="#i-dots"/></svg></span></div>
+              <div class="ar"><span class="av" style="background:var(--ink-4)">实</span><div class="an"><b>实验</b><small>lab@sandbox.dev</small></div><code>~/.claude-lab</code><span class="as">1 个会话</span><span class="pill p-warn">偏快</span><span class="al">3 分钟前</span><span class="ib"><svg class="i"><use href="#i-dots"/></svg></span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="notes"><div class="note"><b>当前账号不靠颜色标</b>选中行用 tile-strong 底 + 右侧“当前”文字，陶土留给“添加账号”。</div><div class="note"><b>说明条带插画</b>账号页是唯一放说明条的页面，用一次就够，可关闭且记住。</div><div class="note"><b>配置目录永远等宽</b>路径是用户要复制的东西，等宽字 + 可点击复制。</div></div>
+    </div></section>
+
+    <!-- ═════════ 11 设置 ═════════ -->
+    <section class="sec" id="s-settings"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>11 · settings</div>
+      <div class="shot-head"><div><h2>设置</h2><p class="lede">左边分类、右边一行一项：<b>名称和说明在左，控件在右</b>，跟 Claude Desktop 的设置页同构。开关打开是墨色，不是陶土色。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w">
+        <aside class="ws" data-side="settings"></aside>
+        <div class="wm">
+          <div class="wh"><span class="acts"><span class="ib"><svg class="i"><use href="#i-close"/></svg></span></span></div>
+          <div class="st">
+            <nav class="st-nav"><a>通用</a><a class="on">外观</a><a>终端</a><a>账号</a><a>节奏看护</a><a>快捷键</a><a>关于</a></nav>
+            <div class="st-body">
+              <h1>外观</h1>
+              <div class="sg">
+                <div class="sr"><div><b>主题</b><small>终端跟着主题换成同色系纸面 / 暖炭</small></div><div class="seg"><span class="on">浅色</span><span>深色</span><span>跟随系统</span></div></div>
+                <div class="sr"><div><b>界面字号</b><small>只影响侧栏和面板，不影响终端</small></div><div class="seg"><span>小</span><span class="on">中</span><span>大</span></div></div>
+              </div>
+              <h2>终端</h2>
+              <div class="sg">
+                <div class="sr"><div><b>字体</b><small>等宽字体，含中文回退</small></div><span class="chip"><span class="mono">JetBrains Mono · 13</span><svg class="i" style="width:11px"><use href="#i-chevron-down"/></svg></span></div>
+                <div class="sr"><div><b>光标样式</b></div><div class="seg"><span class="on">方块</span><span>竖线</span><span>下划线</span></div></div>
+                <div class="sr"><div><b>光标闪烁</b></div><span class="tg on"></span></div>
+                <div class="sr"><div><b>选中即复制</b><small>跟 iTerm2 的习惯一致</small></div><span class="tg"></span></div>
+              </div>
+              <div class="tip"><img src="assets/rhythm.jpg" alt=""><div><b>节奏看护在“节奏看护”分类里</b><p>请求太密时在状态栏提醒你，默认阈值 12 次/分。</p></div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="notes"><div class="note"><b>行间不画线，组间画一条</b>同一组的设置靠 56px 行高分开；组之间用一条发丝线 + 衬线小标题。</div><div class="note"><b>开关打开 = 墨色</b>设置页本身没有主操作，陶土色这一屏不出现。</div><div class="note"><b>说明文字写后果</b>“只影响侧栏和面板，不影响终端”—— 告诉用户改了会怎样，而不是复述名称。</div></div>
+    </div></section>
+
+    <!-- ═════════ 12 空状态 ═════════ -->
+    <section class="sec" id="s-empty"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>12 · empty</div>
+      <div class="shot-head"><div><h2>空状态</h2><p class="lede">空不是错误。一张小插画、一句衬线标题、一句说明、一个陶土按钮 —— 告诉用户下一步，而不是告诉他“这里什么都没有”。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w">
+        <aside class="ws" data-side="empty"></aside>
+        <div class="wm">
+          <div class="wh"><span class="acts"><span class="ib"><svg class="i"><use href="#i-panel"/></svg></span></span></div>
+          <div class="empty"><img src="assets/empty-sessions.jpg" alt=""><h1>还没有会话</h1><p>选一个项目目录，NeoX Shell 会在那里启动 Claude Code，并把这次会话收进左边的列表。</p><div class="ob-acts" style="justify-content:center"><span class="btn pri"><svg class="i"><use href="#i-plus"/></svg>新建会话</span><span class="btn ghost"><svg class="i"><use href="#i-folder"/></svg>打开文件夹</span></div><div class="ob-foot" style="justify-content:center"><span class="kbd">⌘</span><span class="kbd">N</span></div></div>
+        </div>
+      </div></div>
+    </div></section>
+
+    <!-- ═════════ 13 暗色 ═════════ -->
+    <section class="sec" id="s-dark"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>13 · dark</div>
+      <div class="shot-head"><div><h2>暗色不是反相</h2><p class="lede">暗色是另一套暖黑：侧栏 <code>#1A1917</code>、主区 <code>#1F1E1B</code>、卡片 <code>#262420</code>，线条换成 cream@10%。<b>终端是比主区抬半档的暖炭</b> <code>#24221F</code>，标题条反而压暗到 <code>#1F1D1A</code> —— 像一台机器的机身和屏幕。</p></div></div>
+      <div class="screen" data-w="1280" data-h="800"><div class="w r3 dark" data-tpl="tpl-session"></div></div>
+    </div></section>
+    <!-- ═════════ 14 组件 ═════════ -->
+    <section class="sec" id="comp"><div class="wrap kit">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>14 · components</div>
+      <h2>组件</h2>
+      <p class="lede">上面每一屏都只用这些零件拼出来。每个零件只做一件事，数值全部来自 token。</p>
+      <div class="kit-grid">
+        <div class="kc"><div class="lbl">button · 36</div><div class="kr"><span class="btn pri"><svg class="i"><use href="#i-plus"/></svg>新建会话</span><span class="btn">取消</span><span class="btn ghost">稍后</span></div><p class="cap">陶土主按钮一屏一个；次按钮 paper + 线；幽灵按钮无底无线。</p></div>
+        <div class="kc"><div class="lbl">composer · 18 圆角</div><div class="composer" style="padding:12px 12px 10px"><div class="ph" style="min-height:30px;font-size:14px">写第一句话…</div><div class="row"><span class="chip"><svg class="i"><use href="#i-folder"/></svg><span class="mono">~/work</span></span><span class="send"><svg class="i"><use href="#i-arrow-up"/></svg></span></div></div></div>
+        <div class="kc"><div class="lbl">sidebar row · 32</div><div style="background:var(--side);border-radius:12px;padding:6px"><div class="rw on"><span class="dt live"></span><span class="nm">api-server</span><span class="tm">2 分</span></div><div class="rw"><span class="dt"></span><span class="nm">migrate-db</span><span class="tm">1 时</span></div><div class="rw"><span class="dt"></span><span class="nm">neox-shell</span><span class="tm">昨天</span></div></div><p class="cap">绿点 + 3px 光圈 = 正在运行。行间不画线。</p></div>
+        <div class="kc"><div class="lbl">segmented · toggle</div><div class="kr"><div class="seg"><span class="on">浅色</span><span>深色</span><span>系统</span></div></div><div class="kr" style="margin-top:14px"><span class="tg on"></span><span class="tg"></span><span style="font-size:12px;color:var(--ink-3)">打开 = 墨色</span></div></div>
+        <div class="kc"><div class="lbl">status pill</div><div class="kr"><span class="pill p-idle">空闲</span><span class="pill p-ok">正常</span><span class="pill p-warn">偏快</span><span class="pill p-bad">过快</span></div><p class="cap">底色 = 语义色 12–18%，字 = 语义色本身；永远带一个 5px 点。</p></div>
+        <div class="kc"><div class="lbl">chip · kbd</div><div class="kr"><span class="chip"><svg class="i"><use href="#i-key"/></svg><span class="mono">.claude-main</span></span><span class="kbd">⌘</span><span class="kbd">K</span></div></div>
+        <div class="kc"><div class="lbl">menu · 弹层</div><div class="menu"><div class="pi on"><svg class="i"><use href="#i-copy"/></svg>复制配置目录路径</div><div class="pi"><svg class="i"><use href="#i-refresh"/></svg>重启会话<span class="k"><span class="kbd">⌘</span><span class="kbd">R</span></span></div><div class="sep"></div><div class="pi" style="color:var(--danger)"><svg class="i"><use href="#i-trash"/></svg>删除会话</div></div></div>
+        <div class="kc"><div class="lbl">toast · 节奏提醒</div><div class="toast"><span class="pill p-warn">偏快</span><div><b>过去一分钟 14 次请求</b><small>超过你设的 12 次/分</small></div><span class="ib"><svg class="i"><use href="#i-close"/></svg></span></div><p class="cap">从右下角滑入，8 秒自动收起；不打断终端输入。</p></div>
+        <div class="kc"><div class="lbl">tooltip</div><div class="kr" style="padding-top:34px;position:relative"><span class="tip-pop">折叠右栏 <span class="kbd" style="background:none;color:#B8B3A8;border-color:rgba(250,249,245,.25)">⌘B</span></span><span class="ib on"><svg class="i"><use href="#i-panel"/></svg></span></div><p class="cap">墨底 cream 字，6px 圆角，延迟 500ms 出现。</p></div>
+      </div>
+    </div></section>
+
+    <!-- ═════════ 15 动效与质感 ═════════ -->
+    <section class="sec" id="motion"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>15 · motion &amp; material</div>
+      <h2>快、准、按压有分量</h2>
+      <p class="lede">参数全部实测自 Claude Desktop 的 <code>MainWindowPage.css</code>（251 KB，1021 个 <code>--cds-*</code> 变量）。结论先说：质感不来自特效，来自<strong>时长极短</strong>、<strong>曲线手调</strong>、<strong>按压有回弹</strong>这三件事。</p>
+
+      <h3 class="sub">时长：五档，不是一档</h3>
+      <p>以前全站写 120ms，那是"一档走天下"，结果微交互发飘、面板发急。CDS 分了五档，每档对应一类动作：</p>
+      <table class="spec-table">
+        <thead><tr><th>档位</th><th>值</th><th>用在哪</th><th>为什么是这个数</th></tr></thead>
+        <tbody>
+          <tr><td class="m">--dur-fast</td><td class="m">60ms</td><td>按下、图标换色</td><td>压手感必须 &lt;100ms，否则像"慢慢地缩"</td></tr>
+          <tr><td class="m">--dur-snap</td><td class="m">120ms</td><td>底色 / 边框 / 文字色</td><td>主力档。超过 150ms 就有延迟感</td></tr>
+          <tr><td class="m">--dur-base</td><td class="m">200ms</td><td>入场、展开、淡入</td><td>要看清"东西从哪来"</td></tr>
+          <tr><td class="m">--dur-sheet</td><td class="m">300ms</td><td>抽屉、右栏开合</td><td>大面板移动距离长，需要更多时间</td></tr>
+          <tr><td class="m">--dur-slow</td><td class="m">450ms</td><td><strong>只给弹簧复位</strong></td><td>这段长，是因为回弹要看得见</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">曲线：三条手调 + 一条真弹簧</h3>
+      <p>用 <code>ease</code> / <code>ease-in-out</code> 关键字是廉价的直接原因——那是浏览器默认观感，一眼能认出"这是个网页"。</p>
+      <table class="spec-table">
+        <thead><tr><th>曲线</th><th>值</th><th>性格</th></tr></thead>
+        <tbody>
+          <tr><td class="m">--ease-out</td><td class="m">cubic-bezier(0,0,.2,1)</td><td>进：快出发、慢落定。绝大多数情况用它</td></tr>
+          <tr><td class="m">--ease</td><td class="m">cubic-bezier(.32,.72,0,1)</td><td>主力：出得急、收得稳</td></tr>
+          <tr><td class="m">--ease-overshoot</td><td class="m">cubic-bezier(.34,1.3,.64,1)</td><td>轻微过冲，给胶囊、角标、徽标</td></tr>
+          <tr><td class="m">--spring</td><td class="m">linear(0,.2459,.6526,.9468,<b>1.0764</b>,<b>1.0915</b>,1.0585,.9993,.9914,.9921,.9957,.9988,1)</td><td><strong>真弹簧</strong>：14 个采样点，峰值 1.0915（过冲 9.15%）后回落收敛</td></tr>
+        </tbody>
+      </table>
+      <div class="note">
+        <b>弹簧跟 cubic-bezier 的回弹不是一回事。</b>cubic-bezier 只能让<em>速度</em>先冲过头；
+        <code>linear()</code> 让<em>位移本身</em>超过 1 再回来。这就是"按下有分量"和"按下去抖了一下"的区别。
+        这也是老版本设计稿里「禁止弹簧回弹」那句要改掉的原因——CDS 本身就在用弹簧，只是用得极克制。
+      </div>
+
+      <h3 class="sub">按压：一长一短，才叫手感</h3>
+      <p>CDS 的按压原子 <code>.cds-btn-squish</code> 只有两条声明，但方向是反的，不能合并：</p>
+      <div class="demo-pair">
+        <div class="demo"><div class="demo-lbl">按住不动 · 60ms 硬收敛</div><div class="press-demo p-fast">按下</div><div class="demo-code">transition: transform 60ms ease-out;<br>transform: scale(.975)</div></div>
+        <div class="demo"><div class="demo-lbl">松手 · 450ms 弹簧复位</div><div class="press-demo p-spring">松开</div><div class="demo-code">transition: transform 450ms var(--spring);<br>transform: scale(1)</div></div>
+      </div>
+      <p class="cap">常态挂长弹簧（为了松手那一下过冲），按下换 60ms ease-out（为了手指一压立刻陷进去）。两段都换成弹簧、或都换成 ease-out，这个手感就没了。</p>
+      <table class="spec-table">
+        <thead><tr><th>元素</th><th>缩到</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>按钮 / 行 / 输入 chip</td><td class="m">.975</td><td>面积小，缩 2.5% 才看得见</td></tr>
+          <tr><td>卡片</td><td class="m">.99</td><td>面积大，1% 就够；再多会像"陷进去"</td></tr>
+          <tr><td>圆形发送键</td><td class="m">.94</td><td>圆的缩放最明显，单独收一档</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">入场：位移不超过 4px</h3>
+      <table class="spec-table">
+        <thead><tr><th>场景</th><th>做法</th><th>时长</th></tr></thead>
+        <tbody>
+          <tr><td>主区内容分层入场</td><td>透明度 0→1 + 上移 4px，问候 / 输入框 / 建议 / 最近 依次错开 40ms</td><td class="m">200ms</td></tr>
+          <tr><td>最近卡片逐个跟上</td><td>同上，每张再错 30ms</td><td class="m">200ms</td></tr>
+          <tr><td>弹层 / 菜单 / 命令面板</td><td><code>translateY(4px)</code> + 淡入；面板可 <code>scale(.98→1)</code></td><td class="m">200ms</td></tr>
+          <tr><td>侧栏新会话行</td><td>高度 <code>0fr→1fr</code> 展开（不用 max-height 猜数字）</td><td class="m">200ms</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">执行态：三点脉冲，暗态留残影</h3>
+      <p>CDS 的 <code>.cds-dot</code> 是 1.8s linear 无限循环，三颗各差 0.2s，且<strong>暗态是 <code>.2857</code> 而不是 0</strong>。留残影，三个点才像"一队在跑"；归零就变成"一灭一亮"，像坏掉的指示灯。本应用只有单点指示，做单点呼吸，光圈从 3px 涨到 5px、透明度同步降。</p>
+
+      <h3 class="sub">滚动边缘渐隐</h3>
+      <p>内容被边缘截断时用渐变柔化，不让字被窗口硬切。CDS 走 <code>animation-timeline: scroll()</code>，零 JS、跑在合成线程、滚动时不掉帧。本应用同样实现，且<strong>起点不淡顶部、终点不淡底部</strong>——两个边缘宽度抽成可插值变量（需 <code>@property</code> 注册成 <code>&lt;length&gt;</code>），由滚动位置插值。</p>
+      <div class="note warn">
+        <b>已实测确认不支持的一条：</b>设计稿早前还抄了 CDS 的 <code>grad</code> 字重轴（<code>font-variation-settings:"grad" 180</code>）。实测本机打包的 Anthropic Sans <strong>只有 <code>wght</code> 轴、没有 <code>grad</code> 轴</strong>（写入后渲染宽度完全不变），已从实现里删掉，不留死代码。字重仍然用 CDS 的 580/600。
+      </div>
+
+      <h3 class="sub">发丝线：边框按屏幕倍率收敛到物理 1px</h3>
+      <p>「边框看着细腻」的真正来源不是颜色浅，而是<strong>物理宽度</strong>。CSS 的 1px 在 2x 屏上占 2 个物理像素，视觉上比设计稿粗一倍——这是网页感很重的一处细节。</p>
+      <p>CDS 的做法是按屏幕倍率把线宽压到物理 1px：</p>
+      <table class="spec-table">
+        <thead><tr><th>屏幕</th><th>--hair</th><th>物理占位</th></tr></thead>
+        <tbody>
+          <tr><td>1x</td><td class="m">1px</td><td>1 像素（不变）</td></tr>
+          <tr><td>2x（Mac 全系）</td><td class="m">0.5px</td><td>1 像素</td></tr>
+          <tr><td>3x</td><td class="m">calc(1px / 3)</td><td>1 像素</td></tr>
+          <tr><td>4x</td><td class="m">calc(1px / 4)</td><td>1 像素</td></tr>
+        </tbody>
+      </table>
+      <p class="cap">所以所有 1px 边框都写 <code>var(--hair)</code>，不要硬写 1px。用了之后，同一个界面在普通屏和 Retina 上看起来是<strong>一样细</strong>的。</p>
+
+      <h3 class="sub">焦点环与 hover：两套反馈不叠加</h3>
+      <p>CDS 的 hover 选择器一律带 <code>:not(:focus-visible)</code>——键盘聚焦时不该再叠一层鼠标悬停的底色，否则会出现"焦点环 + 悬停底色"两层同时亮，看着像控件卡住了。本应用同样处理。</p>
+
+      <h3 class="sub">字重：580 而不是 600</h3>
+      <p>这是最容易被忽略、但对"质感"影响最大的一条。CDS 的四档是 <code>400 / 500 / <b>580</b> / <b>600</b></code>——semibold 是 580，bold 是 600。可变字体上写 600/700 会让字明显发胖发闷，屏幕上一排"胖字"是廉价感的头号来源。</p>
+
+      <h3 class="sub">焦点环：四段叠加，不是一圈硬描</h3>
+      <p><code>outline: 2px solid</code> 是浏览器默认观感。CDS 的 <code>--cds-focus-shadow</code> 叠四层：</p>
+      <div class="demo-code" style="max-width:none">inset 0 0 0 1px var(--cream),   /* 先用底色把控件自身边缘隔开 */<br>0 0 0 1px var(--coral),        /* 再描一圈品牌色 */<br>0 0 6px 1px rgba(204,120,92,.28) /* 外面补一层柔光 */</div>
+      <p class="cap">内描边用页面底色，是为了让焦点环跟控件之间有"缝"，不然环会像贴纸一样糊在边上。</p>
+
+      <h3 class="sub">禁止清单（已按实测修正）</h3>
+      <table class="spec-table">
+        <thead><tr><th>项</th><th>结论</th><th>依据</th></tr></thead>
+        <tbody>
+          <tr><td>弹簧回弹</td><td><span style="color:var(--success)">允许，但只给按压</span></td><td>CDS 有 <code>--cds-btn-spring</code>；滥用才是问题</td></tr>
+          <tr><td>骨架屏呼吸</td><td><span style="color:var(--success)">允许</span></td><td>CDS 有 <code>skeleton-breathe</code>；扫光（sweep/shimmer）暗色下刺眼，仍不用</td></tr>
+          <tr><td>旋转加载火花</td><td><span style="color:var(--danger)">禁止</span></td><td>指旋转品牌火花/logo。普通环形 spinner（登录等待用）是允许的</td></tr>
+          <tr><td>位移 &gt; 6px 的入场</td><td><span style="color:var(--danger)">禁止</span></td><td>超过就抢戏，变成动画演示</td></tr>
+          <tr><td>为动效而动效</td><td><span style="color:var(--danger)">禁止</span></td><td>动效只说明"东西从哪来"</td></tr>
+        </tbody>
+      </table>
+    </div></section>
+
+    <!-- ═════════ 16 自检 ═════════ -->
+    <section class="sec" id="audit"><div class="wrap">
+      <div class="kicker"><svg class="i sp"><use href="#i-sparkle"/></svg>16 · audit</div>
+      <h2>上线前自检</h2>
+      <p class="lede">每一屏实现完，逐条核对。违反任何一条就改，不讨论。</p>
+      <div class="audit">
+        <label><input type="checkbox">陶土色在这一屏只出现一次</label>
+        <label><input type="checkbox">终端底跟主区同色系：浅 #FFFEFB / 暗 #24221F</label>
+        <label><input type="checkbox">没有冷灰；所有灰都偏暖</label>
+        <label><input type="checkbox">没有纯黑 #000、没有纯白大面</label>
+        <label><input type="checkbox">衬线只出现在问候语、标题、大数字</label>
+        <label><input type="checkbox">路径、单位、快捷键全部等宽</label>
+        <label><input type="checkbox">数字锁合 = 衬线数字 + 等宽单位</label>
+        <label><input type="checkbox">边框都是 1px，不透明度 ≤ 16%</label>
+        <label><input type="checkbox">列表行之间没有分隔线</label>
+        <label><input type="checkbox">圆角只用 6 / 8 / 12 / 16 / 999</label>
+        <label><input type="checkbox">间距只用 4 的八档</label>
+        <label><input type="checkbox">图标都来自 anthropicons，15px</label>
+        <label><input type="checkbox">插画都按同一份提示词出，不带字</label>
+        <label><input type="checkbox">开关打开是墨色，不是陶土色</label>
+        <label><input type="checkbox">边框用 var(--hair)，没有硬写的 1px</label>
+        <label><input type="checkbox">字重只用 400 / 500 / 580 / 600，没有 700</label>
+        <label><input type="checkbox">所有过渡都走五档时长，没有裸写的毫秒数</label>
+        <label><input type="checkbox">所有曲线都是 cubic-bezier，没有 ease / ease-in-out</label>
+        <label><input type="checkbox">可点的东西都有按压反馈，且按下快、回弹慢</label>
+        <label><input type="checkbox">入场位移 ≤ 4px</label>
+        <label><input type="checkbox">焦点环是四段叠加，不是 2px 硬描边</label>
+        <label><input type="checkbox">输入区不描焦点环</label>
+        <label><input type="checkbox">没有旋转加载火花</label>
+        <label><input type="checkbox">所有动效都写了 prefers-reduced-motion 出口</label>
+        <label><input type="checkbox">所有数字都是真读出来的</label>
+      </div>
+    </div></section>
+  </main>
+</div>
+<script>
+(() => {
+  const ic = (id, s) => `<svg class="i"${s ? ` style="width:${s}px;height:${s}px"` : ''}><use href="#i-${id}"/></svg>`;
+  /* 侧栏: 各屏共用一份, 只换选中项 */
+  const recent = [['api-server', '2 分', 'live'], ['migrate-db', '1 时'], ['neox-shell', '昨天'], ['pocket-weather', '周一'], ['docs-site', '10-17']];
+  const side = (kind) => {
+    const nav = [['terminal', '会话', 'session', '14'], ['key', '账号', 'accounts', '3'], ['gear', '设置', 'settings', '']]
+      .map(([i, t, k, c]) => `<div class="nv${kind === k ? ' on' : ''}">${ic(i)}${t}<span class="c">${c}</span></div>`).join('');
+    const rows = kind === 'empty' ? '<div class="rw" style="color:var(--t4)">还没有会话</div>'
+      : recent.map(([n, t, l], i) => `<div class="rw${kind === 'session' && i === 0 ? ' on' : ''}"><span class="dt${l ? ' live' : ''}"></span><span class="nm">${n}</span><span class="tm">${t}</span></div>`).join('');
+    return `<div class="lights"><i></i><i></i><i></i><span class="sp">${ic('panel')}</span></div>
+      <div class="new">${ic('plus')}新建会话<span class="kbd">⌘N</span></div>${nav}
+      <div class="gl"><span>最近</span><span>${kind === 'empty' ? '' : recent.length}</span></div>${rows}
+      <div class="me"><span class="av">M</span><div class="who">Alex<small>.claude-main · Max</small></div><span class="g">${ic('gear')}</span></div>`;
+  };
+  document.querySelectorAll('[data-tpl]').forEach((w) => {
+    w.append(document.getElementById(w.dataset.tpl).content.cloneNode(true));
+    if (w.dataset.overlay === 'palette') {
+      w.insertAdjacentHTML('beforeend', `<div class="ov"></div><div class="pal">
+        <div class="pal-in">${ic('search', 17)}<span class="q">health</span><span class="kbd">esc</span></div>
+        <div class="pal-g"><div class="gl"><span>会话</span></div>
+          <div class="pi on">${ic('terminal')}<span>api-server · add a /<em>health</em> endpoint</span><small style="margin-left:auto">2 分钟前</small></div>
+          <div class="pi">${ic('file')}<span>tests/<em>health</em>.test.ts</span><small style="margin-left:auto">本次改动</small></div>
+          <div class="gl"><span>操作</span></div>
+          <div class="pi">${ic('plus')}新建会话<span class="k"><span class="kbd">⌘</span><span class="kbd">N</span></span></div>
+          <div class="pi">${ic('key')}切换账号<span class="k"><span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">A</span></span></div>
+          <div class="pi">${ic('panel')}折叠右栏<span class="k"><span class="kbd">⌘</span><span class="kbd">B</span></span></div></div>
+        <div class="pal-f"><span><span class="kbd">↑</span><span class="kbd">↓</span>选择</span><span><span class="kbd">↵</span>打开</span><span><span class="kbd">⌘</span><span class="kbd">↵</span>在新窗口打开</span></div></div>`);
+    }
+  });
+  document.querySelectorAll('.ws[data-side]').forEach((el) => { el.innerHTML = side(el.dataset.side); });
+  /* 节奏柱状: 每根 = 1 分钟请求数, 满格 18, 虚线是阈值 12 */
+  document.querySelectorAll('.spark[data-spark]').forEach((el) => {
+    el.insertAdjacentHTML('afterbegin', el.dataset.spark.split(' ').map((v) => `<span style="height:${(v / 18) * 100}%"></span>`).join(''));
+  });
+
+  /* 样机按容器宽度等比缩放 */
+  const fit = () => document.querySelectorAll('.screen').forEach((s) => {
+    const w = +s.dataset.w, h = +s.dataset.h, k = Math.min(1, s.clientWidth / w);
+    s.style.height = `${h * k}px`;
+    s.firstElementChild.style.transform = `scale(${k})`;
+  });
+  new ResizeObserver(fit).observe(document.body);
+  fit();
+
+  /* 图标表: 直接读 sprite, 新增字形自动出现 */
+  document.getElementById('iconGrid').innerHTML = [...document.querySelectorAll('symbol[id^="i-"]')]
+    .map((s) => `<div class="ic">${ic(s.id.slice(2))}<span>${s.id.slice(2)}</span></div>`).join('');
+
+  /* 目录高亮 */
+  const links = [...document.querySelectorAll('.toc a')];
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    links.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === `#${e.target.id}`));
+  }), { rootMargin: '-30% 0px -60% 0px' });
+  document.querySelectorAll('section[id]').forEach((s) => io.observe(s));
+})();
+</script>
+</body>
+</html>

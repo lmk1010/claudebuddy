@@ -1,0 +1,324 @@
+/** 主进程 ↔ 渲染层的类型契约。实现见 electron/preload.cjs。 */
+
+import type { Account, AuthState, GitInfo, RecentProject } from "./model";
+
+export interface AppInfo {
+  platform: string;
+  home: string;
+  username: string;
+  version: string;
+  ptyAvailable: boolean;
+  darkMode: boolean;
+  forcedTheme: "light" | "dark" | null;
+}
+
+export interface SpawnOpts {
+  id: string;
+  account: string;
+  cwd: string;
+  cols: number;
+  rows: number;
+  command?: string;
+}
+
+export interface AccountStatus {
+  exists: boolean;
+  auth: AuthState;
+  configDir: string;
+  email: string | null;
+  accountUuid: string | null;
+  orgUuid: string | null;
+  tier: string | null;
+  identity: { userID: string | null; machineID: string | null };
+  profile?: {
+    platform: string;
+    arch: string;
+    osRelease: string;
+    shell: string;
+    terminal: string;
+    capturedAt: number;
+  };
+}
+
+export interface LoginHandle {
+  ok: boolean;
+  termId?: string;
+}
+
+export interface ExitCheck {
+  ok: boolean;
+  ip: string | null;
+  reason?: string;
+  source?: string;
+  at?: number;
+}
+
+export interface RotateResult {
+  ok: boolean;
+  reason?: string;
+  userID?: string;
+  machineID?: string;
+}
+
+export interface TraceItem {
+  key: string;
+  label: string;
+  path: string;
+  critical: boolean;
+  exists: boolean;
+  size: number;
+  count: number;
+}
+
+export interface ClearResult {
+  ok: boolean;
+  removed: string[];
+  failed: { key: string; reason: string }[];
+  reason?: string;
+}
+
+export interface KeychainEntry {
+  service: string;
+  account: string | null;
+}
+
+export interface ScannedDir {
+  configDir: string;
+  sessions: number;
+  lastActive: number;
+  sizeBytes: number;
+  email: string | null;
+  tier: string | null;
+  hasIdentity: boolean;
+}
+
+/** 一个环境里的一次历史会话 */
+export interface SessionSummary {
+  id: string;
+  /** 编码过的项目目录名 */
+  project: string;
+  /** 还原出来的工作目录 */
+  cwd: string;
+  /** 首条用户消息，当标题 */
+  title: string;
+  lastActive: number;
+  sizeBytes: number;
+}
+
+/* ── 环境自检 ── */
+
+export type CheckStatus = "ok" | "warn" | "fail";
+
+export interface CheckItem {
+  key: string;
+  label: string;
+  status: CheckStatus;
+  /** 一句话结论，例如「已安装 2.1.309」「没装」 */
+  title: string;
+  detail: string;
+  /** 怎么修 */
+  fix: string | null;
+  /** 需要界面给什么按钮 */
+  action: "install" | null;
+}
+
+export interface CheckupResult {
+  /** 没有 fail 项才为 true */
+  ok: boolean;
+  items: CheckItem[];
+  claudePath: string | null;
+  blocking: string[];
+}
+
+/* ── 连通性归因 ── */
+
+/**
+ * 一次归因的结论。
+ *
+ * 四层各自独立判定，`blocker` 只指向最该先处理的那一层 ——
+ * 其余层即使有问题也先放着，否则会同时改好几样，测不出是哪样起的作用。
+ */
+export interface DiagnoseLayer {
+  id: "network" | "challenge" | "account" | "quota";
+  label: string;
+  status: "ok" | "warn" | "fail" | "unknown";
+  /** 实测到的原样数据 */
+  detail: string;
+  /** 这一层意味着什么、该做什么 */
+  note: string;
+}
+
+export interface DiagnoseResult {
+  ok: boolean;
+  checkedAt: string;
+  exitIp: { ip: string; asn: string; isp: string; city: string; hosting: boolean } | null;
+  layers: DiagnoseLayer[];
+  blocker: DiagnoseLayer["id"] | null;
+  /** UA 对照实验：同一请求换 UA 结果是否不同 */
+  uaVerdict: {
+    tested: boolean;
+    uaDecidesResult: boolean;
+    browser: number | null;
+    cli: number | null;
+    summary: string;
+  };
+  headline: string;
+  /** 没有测到的东西，避免把推断当结论 */
+  unverified: string[];
+}
+
+/* ── 账号体检与清理 ── */
+
+export interface CleanupAccount {
+  id: string;
+  kind: "default" | "claude-dir" | "codex-profile";
+  name: string;
+  path: string;
+  keychainService: string;
+  hasKeychain: boolean;
+  hasCredentials: boolean;
+  email: string | null;
+  tier: string | null;
+  sizeBytes: number;
+  lastActive: number;
+  sessions: number;
+  /**
+   * ok 正常 · signed-out 掉了登录但目录里有东西（重登可救回）
+   * · empty 真正的空壳（没凭据、没对话记录）
+   */
+  state: "ok" | "signed-out" | "empty";
+}
+
+export interface CleanupSurvey {
+  ok: boolean;
+  checkedAt: string;
+  accounts: CleanupAccount[];
+  orphans: { service: string; reason: string }[];
+  suggested: { accountIds: string[]; services: string[]; reason: string };
+}
+
+export interface CleanupResult {
+  ok: boolean;
+  moved: { id: string; dest: string }[];
+  keychainDeleted: string[];
+  unregistered: string[];
+  failed: { id?: string; service?: string; reason: string }[];
+  trashRoot: string;
+}
+
+/* ── 代理探测 ── */
+
+export interface ProxyCandidate {
+  host: string;
+  port: number;
+  protocol: "http" | "socks5";
+  label: string;
+  /** system = 系统代理，scan = 端口扫描，current = 已配置的 */
+  from: "system" | "scan" | "current";
+  ok: boolean;
+  /** 实测出口 IP */
+  ip: string | null;
+  reason: string | null;
+}
+
+export interface ProxyDiscovery {
+  list: ProxyCandidate[];
+  directIp: string | null;
+}
+
+export interface ActivityRow {
+  id: string;
+  sessionSeconds: number;
+  lastHour: number;
+  idleSeconds: number;
+  buckets: number[];
+}
+
+export interface SessionUsage {
+  input: number;
+  output: number;
+  at: string | null;
+  model: string | null;
+}
+
+export interface ClaudeBuddyBridge {
+  info(): Promise<AppInfo>;
+  loadState(): Promise<unknown>;
+  saveState(state: unknown): Promise<boolean>;
+
+  spawnTerm(opts: SpawnOpts): Promise<{ ok: boolean; error?: string; pid?: number }>;
+  writeTerm(id: string, data: string): void;
+  resizeTerm(id: string, cols: number, rows: number): void;
+  killTerm(id: string): void;
+  onTermData(cb: (p: { id: string; data: string }) => void): () => void;
+  onTermExit(cb: (p: { id: string; exitCode: number }) => void): () => void;
+
+  activity(): Promise<ActivityRow[]>;
+
+  accountStatus(id: string): Promise<AccountStatus>;
+
+  /* 环境自检 */
+  checkupRun(): Promise<CheckupResult>;
+  checkupInstall(): Promise<{ ok: boolean; code: number; error?: string }>;
+  checkupRecheck(): Promise<CheckupResult>;
+  onCheckupLog(cb: (text: string) => void): () => void;
+
+  /** 连通性归因：403 是哪一层挡的 */
+  diagnoseRun(): Promise<DiagnoseResult>;
+
+  /** 账号体检：列出所有账号并标出可清理项 */
+  cleanupSurvey(): Promise<CleanupSurvey>;
+  /** 执行清理：移到回收站 + 删 Keychain 条目 */
+  cleanupPurge(payload: {
+    accountIds?: string[];
+    services?: string[];
+    allowMainKeychain?: boolean;
+  }): Promise<CleanupResult>;
+
+  /* 代理探测 */
+  proxyDiscover(id?: string): Promise<ProxyDiscovery>;
+  proxyTest(proxy: {
+    host: string;
+    port: number;
+    protocol: "http" | "socks5";
+  }): Promise<{ ok: boolean; ip: string | null; reason: string | null }>;
+  accountLogin(id: string): Promise<LoginHandle>;
+  accountCloseLogin(id: string, termId?: string): Promise<boolean>;
+  accountLogout(id: string): Promise<{ ok: boolean; output: string }>;
+  accountCheckExit(id: string): Promise<ExitCheck>;
+  accountRotateIdentity(id: string): Promise<RotateResult>;
+  accountTraces(id: string): Promise<TraceItem[]>;
+  accountClearTraces(
+    id: string,
+    keys: string[],
+    includeCredentials?: boolean,
+  ): Promise<ClearResult>;
+  accountKeychain(): Promise<KeychainEntry[]>;
+  accountScan(): Promise<ScannedDir[]>;
+  /** 移除环境记录；purge 为 true 时连磁盘目录一起删（主进程会二次校验路径） */
+  accountSessions(id: string): Promise<SessionSummary[]>;
+  accountSessions(id: string): Promise<SessionSummary[]>;
+  accountRemove(
+    id: string,
+    purge?: boolean,
+  ): Promise<{ ok: boolean; purged?: boolean; configDir?: string; reason?: string }>;
+  onLoginExit(cb: (p: { id: string; exitCode: number }) => void): () => void;
+
+  pickFolder(): Promise<string | null>;
+  /** 在系统浏览器里打开链接（登录授权用） */
+  openExternal(url: string): Promise<boolean>;
+  gitInfo(cwd: string): Promise<GitInfo>;
+  recentProjects(id?: string): Promise<RecentProject[]>;
+  sessionUsage(opts: { configDir: string; cwd: string }): Promise<SessionUsage | null>;
+
+  onSystemTheme(cb: (dark: boolean) => void): () => void;
+}
+
+declare global {
+  interface Window {
+    claudeBuddy: ClaudeBuddyBridge;
+  }
+}
+
+/** 供组件取账号快照用的辅助类型 */
+export type AccountSnapshot = Account;

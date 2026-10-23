@@ -1,0 +1,598 @@
+/**
+ * ClaudeBuddy 的数据模型 —— 整个应用对"隔离"的定义都在这里。
+ *
+ * 隔离不是一句口号，拆成四层，每层对应一组真实可改的开关：
+ *
+ *   1. **配置隔离** — 一份独立的 CLAUDE_CONFIG_DIR。
+ *      token、projects、file-history、telemetry、stats 全在目录里。
+ *      这是最硬的一层，只要目录不同就不可能串号。
+ *
+ *   2. **网络隔离** — 一组出口代理环境变量。
+ *      Claude Code 明确读 HTTPS_PROXY / HTTP_PROXY，遥测里还会上报
+ *      https_proxy 字段；出口 IP 是风控里最实在的关联线之一，
+ *      所以"一个账号固定一个出口"比什么都重要。
+ *
+ *   3. **身份隔离** — ~/.claude.json 里的 userID / machineID。
+ *      这两个就是遥测上报的 device_id（实证 331/331 相等），
+ *      可以再生，但换什么值都比不上"换一个账号"来得彻底。
+ *
+ *   4. **环境画像** — uname / 终端 / shell / 包管理器组合。
+ *      报告里说得很清楚：这是换不掉的一条线。客户端能做的只是
+ *      "别让它跟另一个账号的画像完全重合"，所以我们记录它、展示它，
+ *      不假装能改掉它。
+ *
+ * 还有一条**谁都改不了**的：账号 UUID。它是风控真正的支点，
+ * account_on_hold 在 API 请求 / OAuth 回调 / Token 刷新三个环节都判定。
+ * 界面上必须诚实地告诉用户这一点，而不是给一个"已完全隔离"的假象。
+ */
+
+/** 主题 */
+export type ThemeMode = "light" | "dark" | "system";
+
+/** 顶层视图 */
+export type View = "home" | "session" | "accounts" | "settings";
+
+/** 权限模式 —— 对应 claude --permission-mode */
+export type PermissionMode =
+  | "default"
+  | "acceptEdits"
+  | "plan"
+  | "manual"
+  | "auto"
+  | "dontAsk"
+  | "bypassPermissions";
+
+export const PERMISSION_LABEL: Record<PermissionMode, string> = {
+  default: "逐次确认",
+  acceptEdits: "自动接受编辑",
+  plan: "计划模式",
+  manual: "每步都问",
+  auto: "自动判定",
+  dontAsk: "不问不做",
+  bypassPermissions: "全部放行",
+};
+
+/** 只给引导页挑三个常用的，其余在设置里 */
+export const PERMISSION_COMMON: PermissionMode[] = ["default", "acceptEdits", "plan"];
+
+// ─────────────────────────────────────────── 账号
+
+/** 账号的登录状态 —— 由 claude auth status 读回，不是猜的 */
+export type AuthState =
+  | "signedOut" // 目录存在但没有凭据
+  | "signedIn" // 有凭据且能读到账号
+  | "expired" // 有凭据但已失效
+  | "suspended" // 账号被挂起（account_on_hold）
+  | "unknown"; // 读不到（CLI 未安装 / 超时）
+
+/** 出口代理配置 */
+export interface ProxyConfig {
+  /** http | socks5 | none */
+  protocol: "http" | "socks5" | "none";
+  host: string;
+  port: number;
+  /** 可选账号密码，多数本地代理不需要 */
+  username?: string;
+  password?: string;
+  /** 不走代理的地址，默认 localhost */
+  noProxy?: string;
+}
+
+/** 身份（~/.claude.json 里的两个 64 位 hex） */
+export interface Identity {
+  userID: string | null;
+  machineID: string | null;
+  /** 下一次会话是否要轮换成新的 */
+  rotateOnNextLaunch: boolean;
+  /** 上次轮换时间 */
+  rotatedAt?: number;
+}
+
+/** 环境画像：只读快照，用来发现两个账号是否长得太像 */
+export interface EnvironmentProfile {
+  platform: string;
+  arch: string;
+  osRelease: string;
+  shell: string;
+  terminal: string;
+  /** 该账号下出现过的 git remote 哈希前缀（跨设备关联线之一） */
+  repoHashes: string[];
+  capturedAt: number;
+}
+
+/** 终端画像：这些会进 Claude Code 的 env 上报，能拉开环境差异 */
+export interface TerminalProfile {
+  /** TERM —— 终端类型，影响 env.terminal 上报 */
+  term: string;
+  /** LANG —— 语言/编码 */
+  lang: string;
+  /** TZ —— 时区 */
+  tz: string;
+}
+
+export const TERM_OPTIONS = [
+  "xterm-256color",
+  "screen-256color",
+  "tmux-256color",
+  "xterm",
+  "vt100",
+] as const;
+
+export const LANG_OPTIONS = [
+  "en_US.UTF-8",
+  "zh_CN.UTF-8",
+  "ja_JP.UTF-8",
+  "ko_KR.UTF-8",
+  "en_GB.UTF-8",
+] as const;
+
+export const TZ_OPTIONS = [
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Asia/Singapore",
+  "America/Los_Angeles",
+  "America/New_York",
+  "Europe/London",
+  "Europe/Berlin",
+] as const;
+
+export const DEFAULT_TERMINAL: TerminalProfile = {
+  term: "xterm-256color",
+  lang: "en_US.UTF-8",
+  tz: "Asia/Shanghai",
+};
+
+/** 一个账号 = 一间屋子 */
+export interface Account {
+  id: string;
+  /** 显示名，例如 主力 / 工作 / 备用 */
+  label: string;
+  /** 相对 ~/ 的配置目录，必须以 .claude 开头 */
+  configDir: string;
+  /** 头像底色 */
+  tint: string;
+
+  /** 登录态（由主进程读回） */
+  auth: AuthState;
+  email?: string;
+  accountUuid?: string;
+  organizationUuid?: string;
+  tier?: string;
+
+  /** 网络出口 */
+  proxy: ProxyConfig;
+  /** 上次测到的出口 IP，用于发现 IP 跳变 */
+  lastExitIp?: string;
+  lastExitCheckedAt?: number;
+
+  /** 身份 */
+  identity: Identity;
+  /** 环境画像 */
+  profile?: EnvironmentProfile;
+  /** 终端画像 —— 每个环境可以不同，用来拉开 env 上报的差异 */
+  terminal: TerminalProfile;
+
+  /** 风险偏好：这个账号允许的权限上限 */
+  maxPermission: PermissionMode;
+  createdAt: number;
+  lastUsedAt: number;
+  /** 用户备注 */
+  note?: string;
+}
+
+// ─────────────────────────────────────────── 会话
+
+export interface ShellWindow {
+  id: string;
+  title: string;
+  accountId: string;
+  cwd: string;
+  runsClaude: boolean;
+  startedAt: number;
+  lastActivityAt: number;
+  branch?: string | null;
+  /** 本窗口实际生效的出口（账号级或缺省直连） */
+  exitIp?: string;
+}
+
+// ─────────────────────────────────────────── 全局状态
+
+export interface BuddyState {
+  accounts: Account[];
+  windows: ShellWindow[];
+  activeWindowId: string | null;
+  activeAccountId: string | null;
+  view: View;
+  theme: ThemeMode;
+  uiScale: number;
+  onboarded: boolean;
+  lastCwd: string | null;
+  permission: PermissionMode;
+
+  /** 节奏看护 */
+  rhythmGuard: boolean;
+  rhythmThreshold: number;
+
+  /** 终端外观 */
+  cursorStyle: "block" | "bar" | "underline";
+  cursorBlink: boolean;
+  copyOnSelect: boolean;
+  terminalFontSize: number;
+  terminalFontFamily: string;
+  /** 启动时把上次没关的会话重新拉起来 */
+  restoreSessions: boolean;
+  /** 侧栏是否展开 */
+  sidebarOpen: boolean;
+
+  bannerDismissed: boolean;
+  /** 引导完成到第几步（1 环境 / 2 登录 / 3 网络 / 4 完成） */
+  onboardingStep: number;
+}
+
+// ─────────────────────────────────────────── 运行期数据
+
+/**
+ * 账号的实时快照 —— 来自主进程 accountStatus()，不是本地缓存。
+ * 界面上的"已登录 / 已挂起"必须用这个，否则就是在骗人。
+ */
+export interface AccountStatusSnapshot {
+  exists: boolean;
+  auth: AuthState;
+  configDir: string;
+  email: string | null;
+  accountUuid: string | null;
+  orgUuid: string | null;
+  tier: string | null;
+  identity: { userID: string | null; machineID: string | null };
+  profile?: EnvironmentProfile;
+}
+
+export interface RhythmStats {
+  lastHour: number;
+  perMinute: number;
+  medianGap: number;
+  sessionTotal: number;
+  sessionSeconds: number;
+  buckets: number[];
+}
+
+export type RiskLevel = "calm" | "watch" | "hot" | "critical";
+
+export const RISK_LABEL: Record<RiskLevel, string> = {
+  calm: "空闲",
+  watch: "正常",
+  hot: "偏快",
+  critical: "过快",
+};
+
+export const RISK_PILL: Record<RiskLevel, string> = {
+  calm: "p-idle",
+  watch: "p-ok",
+  hot: "p-warn",
+  critical: "p-bad",
+};
+
+/** 阈值来自对真实封号案例的逆向：112 次/小时、间隔中位数 6.7s、最短 0.5s */
+export const RHYTHM_THRESHOLDS = {
+  perMinuteWatch: 6,
+  perMinuteHot: 12,
+  gapHot: 10,
+} as const;
+
+/** hot = 用户在设置里调的阈值；watch 取它的一半 */
+export function riskOf(stats: RhythmStats, hot: number = RHYTHM_THRESHOLDS.perMinuteHot): RiskLevel {
+  if (stats.perMinute >= hot) return "critical";
+  if (stats.perMinute >= Math.ceil(hot / 2)) return "hot";
+  if (stats.perMinute > 0) return "watch";
+  return "calm";
+}
+
+export interface RecentProject {
+  cwd: string;
+  name: string;
+  accountId: string;
+  configDir: string;
+  lastActive: number;
+  sessions: number;
+}
+
+export interface GitChange {
+  path: string;
+  add: number;
+  del: number;
+}
+
+export interface GitInfo {
+  branch: string | null;
+  changes: GitChange[];
+  totalAdd: number;
+  totalDel: number;
+  /** git remote 的 SHA-256 前 16 位 —— 跨设备关联线，界面要能看见 */
+  remoteHash?: string | null;
+}
+
+// ─────────────────────────────────────────── 默认值与工厂
+
+export const ACCOUNT_TINTS = ["#141413", "#3d3b36", "#6b6862", "#9a968c"] as const;
+
+export const DIRECT_PROXY: ProxyConfig = { protocol: "none", host: "", port: 0 };
+
+export function newId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** 目录名从 label 生成，只保留小写字母数字，避免任何路径歧义 */
+export function configDirFor(label: string, taken: string[]): string {
+  const base = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  let dir = `.claude-${base || "acc"}`;
+  let n = 2;
+  while (taken.includes(dir)) {
+    dir = `.claude-${base || "acc"}-${n++}`;
+  }
+  return dir;
+}
+
+export function createAccount(label: string, taken: string[], tint: string): Account {
+  const now = Date.now();
+  return {
+    id: newId("acc"),
+    label,
+    configDir: configDirFor(label, taken),
+    tint,
+    auth: "signedOut",
+    proxy: { ...DIRECT_PROXY },
+    identity: { userID: null, machineID: null, rotateOnNextLaunch: false },
+    terminal: { ...DEFAULT_TERMINAL },
+    maxPermission: "acceptEdits",
+    createdAt: now,
+    lastUsedAt: now,
+  };
+}
+
+/** 默认账号：接管用户已有的 ~/.claude，不新建目录 */
+export function defaultAccount(): Account {
+  const now = Date.now();
+  return {
+    id: "default",
+    label: "默认",
+    configDir: ".claude",
+    tint: "#141413",
+    auth: "unknown",
+    proxy: { ...DIRECT_PROXY },
+    identity: { userID: null, machineID: null, rotateOnNextLaunch: false },
+    terminal: { ...DEFAULT_TERMINAL },
+    maxPermission: "acceptEdits",
+    createdAt: now,
+    lastUsedAt: now,
+    note: "接管已有的 ~/.claude",
+  };
+}
+
+export const AUTH_LABEL: Record<AuthState, string> = {
+  signedOut: "未登录",
+  signedIn: "已登录",
+  expired: "凭据失效",
+  suspended: "已挂起",
+  unknown: "未知",
+};
+
+export const AUTH_PILL: Record<AuthState, string> = {
+  signedOut: "p-idle",
+  signedIn: "p-ok",
+  expired: "p-warn",
+  suspended: "p-bad",
+  unknown: "p-idle",
+};
+
+// ─────────────────────────────────────────── 代理
+
+/** 把配置拼成 URL —— Claude Code 与 curl 都认这种形式 */
+export function proxyUrl(p: ProxyConfig): string | null {
+  if (p.protocol === "none" || !p.host || !p.port) return null;
+  const auth = p.username
+    ? `${encodeURIComponent(p.username)}:${encodeURIComponent(p.password ?? "")}@`
+    : "";
+  return `${p.protocol}://${auth}${p.host}:${p.port}`;
+}
+
+/** 界面上显示的短形式：socks5://127.0.0.1:1080 */
+export function proxyLabel(p: ProxyConfig): string {
+  const url = proxyUrl(p);
+  return url ?? "直连";
+}
+
+// ─────────────────────────────────────────── 格式化
+
+export function prettyName(p: string): string {
+  const parts = p.split("/").filter(Boolean);
+  return parts[parts.length - 1] || "~";
+}
+
+export function shortenHome(p: string): string {
+  const m = p.match(/^\/Users\/[^/]+(\/.*)?$/);
+  return m ? `~${m[1] ?? ""}` : p;
+}
+
+export function relTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小时前`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return "昨天";
+  if (day < 7) return `${day} 天前`;
+  const d = new Date(ts);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function shortTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 时`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return "昨天";
+  if (day < 7) return `${day} 天`;
+  const d = new Date(ts);
+  return `${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+export function fmtDuration(sec: number): string {
+  if (sec < 60) return `${Math.max(0, Math.round(sec))} 秒`;
+  const m = Math.floor(sec / 60);
+  if (m < 60) return `${m} 分`;
+  return `${Math.floor(m / 60)} 时 ${String(m % 60).padStart(2, "0")} 分`;
+}
+
+export function greeting(now = new Date()): string {
+  const h = now.getHours();
+  if (h < 5) return "夜深了";
+  if (h < 11) return "早上好";
+  if (h < 13) return "中午好";
+  if (h < 18) return "下午好";
+  return "晚上好";
+}
+
+/* ─────────────────────────── 环境相似度 ─────────────────────────── */
+
+/**
+ * 一条关联线：名字、两边各自的值、能不能拉开。
+ *
+ * 分两类非常重要：
+ *   · fixed  = 内核/架构/主机名，同一台机器上永远相同，改不掉
+ *   · movable = 设备码/出口 IP/终端画像，这些是软件真正能拉开的
+ *
+ * 如果把 fixed 也算进"相似度"，任何两个环境的相似度都接近 100%，
+ * 用户会被一个没有信息量的数字吓到或误导。
+ */
+export interface SimilarityAxis {
+  key: string;
+  label: string;
+  a: string;
+  b: string;
+  /** true = 这一项换不掉 */
+  fixed: boolean;
+  /** 两边是否不同 */
+  differs: boolean;
+}
+
+export interface SimilarityReport {
+  axes: SimilarityAxis[];
+  /** 能拉开的项里，真正拉开了几项 */
+  movableTotal: number;
+  movableDiffered: number;
+  /** 有效隔离度 0-100：能拉开的部分实际拉开了多少 */
+  isolationScore: number;
+}
+
+export function compareEnvironments(
+  a: Account,
+  b: Account,
+  ipOf: (id: string) => string | null | undefined,
+): SimilarityReport {
+  const short = (v?: string | null) => (v && v.length > 10 ? `${v.slice(0, 10)}…` : v || "—");
+
+  const axes: SimilarityAxis[] = [
+    // ── 换不掉：同一台机器上必然相同 ──
+    {
+      key: "platform",
+      label: "系统内核",
+      a: "同机",
+      b: "同机",
+      fixed: true,
+      differs: false,
+    },
+    {
+      key: "arch",
+      label: "CPU 架构",
+      a: "同机",
+      b: "同机",
+      fixed: true,
+      differs: false,
+    },
+    {
+      key: "account",
+      label: "账号 UUID",
+      a: short(a.accountUuid),
+      b: short(b.accountUuid),
+      fixed: true,
+      differs: Boolean(a.accountUuid && b.accountUuid && a.accountUuid !== b.accountUuid),
+    },
+    // ── 能拉开 ──
+    {
+      key: "device",
+      label: "设备码",
+      a: short(a.identity.userID),
+      b: short(b.identity.userID),
+      fixed: false,
+      differs: Boolean(a.identity.userID && b.identity.userID && a.identity.userID !== b.identity.userID),
+    },
+    {
+      key: "ip",
+      label: "出口 IP",
+      a: ipOf(a.id) ?? a.lastExitIp ?? "—",
+      b: ipOf(b.id) ?? b.lastExitIp ?? "—",
+      fixed: false,
+      differs: Boolean(
+        (ipOf(a.id) ?? a.lastExitIp) &&
+          (ipOf(b.id) ?? b.lastExitIp) &&
+          (ipOf(a.id) ?? a.lastExitIp) !== (ipOf(b.id) ?? b.lastExitIp),
+      ),
+    },
+    {
+      key: "term",
+      label: "终端类型",
+      a: a.terminal?.term ?? "—",
+      b: b.terminal?.term ?? "—",
+      fixed: false,
+      differs: (a.terminal?.term ?? "") !== (b.terminal?.term ?? ""),
+    },
+    {
+      key: "lang",
+      label: "语言环境",
+      a: a.terminal?.lang ?? "—",
+      b: b.terminal?.lang ?? "—",
+      fixed: false,
+      differs: (a.terminal?.lang ?? "") !== (b.terminal?.lang ?? ""),
+    },
+    {
+      key: "tz",
+      label: "时区",
+      a: a.terminal?.tz ?? "—",
+      b: b.terminal?.tz ?? "—",
+      fixed: false,
+      differs: (a.terminal?.tz ?? "") !== (b.terminal?.tz ?? ""),
+    },
+  ];
+
+  const movable = axes.filter((x) => !x.fixed);
+  const differed = movable.filter((x) => x.differs).length;
+  return {
+    axes,
+    movableTotal: movable.length,
+    movableDiffered: differed,
+    isolationScore: movable.length ? Math.round((differed / movable.length) * 100) : 0,
+  };
+}
+
+/** 一键把 B 的可移动项改成和 A 不同（避免用户手动配） */
+export function suggestDistinctTerminal(a: Account, used: TerminalProfile[]): TerminalProfile {
+  const pick = <T extends string>(opts: readonly T[], current: T, taken: T[]): T => {
+    const free = opts.filter((o) => o !== current && !taken.includes(o));
+    return free[0] ?? opts.find((o) => o !== current) ?? current;
+  };
+  const base = a.terminal ?? DEFAULT_TERMINAL;
+  return {
+    term: pick(TERM_OPTIONS, base.term, used.map((u) => u.term as (typeof TERM_OPTIONS)[number])),
+    lang: pick(LANG_OPTIONS, base.lang, used.map((u) => u.lang as (typeof LANG_OPTIONS)[number])),
+    tz: pick(TZ_OPTIONS, base.tz, used.map((u) => u.tz as (typeof TZ_OPTIONS)[number])),
+  };
+}

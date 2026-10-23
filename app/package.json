@@ -1,0 +1,63 @@
+{
+  "name": "claude-buddy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "给 Claude Code 一个安全、隔离、不用反复配置的家 —— 每个账号一个独立环境、独立 IP、独立身份",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "app": "CLAUDE_BUDDY_DEV_URL=http://localhost:5320 electron .",
+    "start": "electron .",
+    "dmg": "npm run build && electron-builder --mac dmg --arm64"
+  },
+  "dependencies": {
+    "@lydell/node-pty": "^1.2.0-beta.15",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^40.10.6",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  },
+  "build": {
+    "appId": "cloud.claudebuddy.app",
+    "productName": "ClaudeBuddy",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg"
+      ]
+    }
+  },
+  "author": {
+    "name": "mingkang liu",
+    "url": "https://github.com/lmk1010"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lmk1010/claudebuddy.git"
+  },
+  "homepage": "https://github.com/lmk1010/claudebuddy"
+}

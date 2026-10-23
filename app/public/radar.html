@@ -1,0 +1,36 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>图标雷达</title>
+<style>
+  html,body{margin:0;background:#151412;color:#e8e5db;
+    font:13px -apple-system,"PingFang SC",sans-serif}
+  .page{padding:14px}
+  h2{font-size:12px;color:#8b8778;margin:0 0 10px;font-weight:600;letter-spacing:.06em}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:9px 3px;border-radius:7px;background:#201f1c}
+  .cell svg{width:34px;height:34px;stroke:#e8e5db;fill:none;
+    stroke-width:62;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  .cell b{font:600 13px/1 ui-monospace,monospace;color:#e0b56a}
+  .cell span{font-size:9px;color:#6f6c60;max-width:100%;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+</style>
+<div class="page">
+  <h2>点开控制台看每个格子的 data-name，或直接读下面这张表</h2>
+  <div class="grid" id="g"></div>
+</div>
+<script>
+  // 由 build-icons.mjs 注入
+  window.ICONS = __ICONS__;
+</script>
+<script>
+  const g = document.getElementById('g');
+  for (const [n, ic] of Object.entries(window.ICONS)) {
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.dataset.name = ic.name || '';
+    d.innerHTML = `<svg viewBox="0 0 1000 1000"><path d="${ic.d}"/></svg>
+      <b>${n}</b><span>${ic.name || ''}</span>`;
+    g.appendChild(d);
+  }
+</script>

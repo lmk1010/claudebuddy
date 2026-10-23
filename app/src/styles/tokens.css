@@ -1,0 +1,238 @@
+/* NeoX Shell · Design Tokens
+ *
+ * 唯一来源：docs/design-system.html（v1.0）。任何数值都必须能在设计稿里
+ * 找到对应项，不要在这里临时发明颜色。
+ *
+ * 两条硬约束（违反即算设计缺陷）：
+ *   1. coral 一屏只出现一次 —— 它是电压，不是填充色。
+ *   2. 所有灰都偏暖；没有纯黑 #000，没有大面积纯白。
+ */
+
+/* ─────────────── 字体 ─────────────── */
+
+@font-face {
+  font-family: "Anthropic Sans";
+  src: url("/assets/fonts/AnthropicSans-Variable.woff2") format("woff2");
+  font-weight: 300 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Anthropic Serif";
+  src: url("/assets/fonts/AnthropicSerif-Variable.woff2") format("woff2");
+  font-weight: 300 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* ─────────────── 不随主题变化的原子 ─────────────── */
+
+:root {
+  /* 墨 */
+  --ink: #141413;
+  --ink-2: #3d3b36;
+  --ink-3: #6b6862;
+  --ink-4: #9a968c;
+
+  /* 暖面 */
+  --cream: #faf9f5;
+  --paper: #ffffff;
+  --side: #f3f1ea;
+  --tile: #efe9de;
+  --tile-strong: #e8e0d1;
+
+  /* 唯一电压 */
+  --coral: #cc785c;
+  --coral-ink: #b5603f;
+  --coral-soft: #f5e4dd;
+
+  /* 暗 */
+  --navy: #181715;
+  --navy-soft: #1f1e1b;
+  --navy-elev: #262420;
+  --navy-side: #1a1917;
+
+  /* 语法 / 状态 */
+  --teal: #5db8a6;
+  --amber: #e8a55a;
+  --success: #4e9f63;
+  --danger: #c64545;
+
+  /* 线 / 影 —— 阴影按主题分两套：浅色用墨影，暗色用黑影（墨影在暗底上不可见） */
+  --line: rgba(20, 20, 19, 0.1);
+  --line-strong: rgba(20, 20, 19, 0.16);
+  --line-dark: rgba(250, 249, 245, 0.1);
+
+  /* ─────────────── 发丝线（Retina 自适应） ───────────────
+   *
+   * 这是「边框看着细腻」的真正来源：1px 在 2x 屏上物理占 2 个像素，
+   * 看着比设计稿粗一倍。CDS 按屏幕倍率把线宽压到物理 1px：
+   *   1x → 1px，2x → 0.5px，3x → 1/3px，4x → 1/4px
+   *
+   * 所有 1px 边框都该用 --hair 而不是硬写 1px。用了之后，同一个界面
+   * 在普通屏和 Retina 上看起来「一样细」，而不是 Retina 上更粗。
+   */
+  --hair: 1px;
+  --shadow: 0 1px 2px rgba(20, 20, 19, 0.05), 0 4px 14px rgba(20, 20, 19, 0.04);
+  --pop: 0 12px 40px rgba(20, 20, 19, 0.12), 0 2px 6px rgba(20, 20, 19, 0.06);
+  /* 命令面板：样机 311 —— 1px 描边 + 主影 + 贴地影 */
+  --pal-shadow: 0 0 0 1px var(--line-strong), 0 24px 64px -12px rgba(20, 20, 19, 0.28),
+    0 4px 12px rgba(20, 20, 19, 0.06);
+
+  /* ─────────────── 动效标尺（CDS 五档 + 三条手调曲线） ───────────────
+   *
+   * 来源：Claude Desktop MainWindowPage.css 的 --cds-dur-* / --cds-ease-*。
+   * 五档不是随便给的：微交互必须 60ms 级才「跟手」，超过 120ms 就成动画片。
+   * 曲线一律手调，不用 ease / ease-in-out 关键字 —— 那是浏览器默认观感，
+   * 一眼能看出「这是个网页」。
+   */
+  --dur-fast: 60ms; /* 按压、hover 里最轻的那一下 */
+  --dur-snap: 120ms; /* 底色、边框、图标色切换 —— 主力档 */
+  --dur-base: 200ms; /* 入场、展开、淡入 */
+  --dur-sheet: 300ms; /* 面板、抽屉 */
+  --dur-slow: 450ms; /* 只给弹簧复位用，别的场景别碰 */
+
+  --ease-out: cubic-bezier(0, 0, 0.2, 1); /* 进：快出发、慢落定 */
+  --ease-snap: cubic-bezier(0.32, 0.72, 0, 1); /* 主力：出得急、收得稳 */
+  --ease-overshoot: cubic-bezier(0.34, 1.3, 0.64, 1); /* 轻微过冲，给胶囊/角标 */
+  /* 真实弹簧：14 个采样点，峰值 1.0915（过冲 9.15%）后回落收敛。
+     跟 cubic-bezier 的回弹不同，它是位移量本身过冲，观感是「按下有分量」。 */
+  --spring: linear(
+    0,
+    0.2459,
+    0.6526,
+    0.9468,
+    1.0764,
+    1.0915,
+    1.0585,
+    1.0219,
+    0.9993,
+    0.9914,
+    0.9921,
+    0.9957,
+    0.9988,
+    1.0004,
+    1
+  );
+
+  /* 按压缩放：按钮按下缩到 97.5%，卡片 99%。差值小才有「实体感」，
+     缩太多像被戳了个洞。 */
+  --press-btn: 0.975;
+  --press-card: 0.99;
+
+  /* 执行态：三点脉冲的暗态与亮态（CDS 用 0.2857 而不是 0，留一点残影） */
+  --pulse-dim: 0.2857;
+
+  /* 滚动边缘渐隐：内容被边缘截断时柔化，不让字被硬切 */
+  --scroll-fade: 28px;
+
+  /* 图标基准 15px。其余档位（11 / 13 / 17）由组件传 size 决定，
+     组件内部用内联 style 写入宽度 —— 写在 width 属性上会被 svg.i 的
+     CSS 覆盖掉，那样所有图标就都是 15px（之前确实是这样）。 */
+  --icon: 15px;
+
+  /* ─────────────── 字重（CDS 的四档，不是 400/500/600/700） ───────────────
+   *
+   * 关键差异：semibold 是 **580** 而不是 600，bold 是 **600** 而不是 700。
+   * 可变字体上 600 会明显发胖发闷 —— 这是 UI 显廉价的头号原因。
+   * 再配 grad 轴（视觉重量微调）：semibold 180 / bold 200。
+   * 字重管笔画粗，grad 管墨色浓淡；两者一起调，字才「挺」而不「重」。
+   *
+   * 只有字体支持 wght/grad 轴时 grad 才生效，不支持会静默忽略 —— 安全。
+   */
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 580;
+  --w-bold: 600;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --serif: "Anthropic Serif", "EB Garamond", Georgia, "Songti SC", serif;
+  --sans: "Anthropic Sans", Inter, -apple-system, "PingFang SC", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  /* 布局 */
+  --sidebar-w: 264px;
+  --panel-w: 296px;
+  --header-h: 48px;
+}
+
+/* ─────────────── 主题面（浅色默认） ─────────────── */
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: var(--cream);
+  --sd: var(--side);
+  --pp: var(--paper);
+  --t1: var(--ink);
+  --t2: var(--ink-2);
+  --t3: var(--ink-3);
+  --t4: var(--ink-4);
+  --ln: var(--line);
+  --ln2: var(--line-strong);
+  --sel: var(--tile-strong);
+  --tl: var(--tile);
+  --hv: rgba(20, 20, 19, 0.05);
+  /* 焦点光晕（CDS --cds-focus-shadow 的四段式移植）：
+     内描边用页面底色先把控件自身边缘「隔开」，再描一圈品牌色，外面补 6px 柔光。
+     单描一个 2px 实心环是浏览器默认观感，四段叠起来才是 App 的手感。 */
+  --focus-ring: inset 0 0 0 1px var(--bg), 0 0 0 1px var(--coral),
+    0 0 6px 1px rgba(204, 120, 92, 0.28);
+}
+
+/* 暗色是另一套暖黑，不是反相 */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: var(--navy-soft);
+  --sd: var(--navy-side);
+  --pp: var(--navy-elev);
+  --t1: #faf9f5;
+  --t2: #d6d2c8;
+  --t3: #9a968c;
+  --t4: #6b6862;
+  --ln: var(--line-dark);
+  --ln2: rgba(250, 249, 245, 0.16);
+  --sel: #2e2b27;
+  --tl: #2a2824;
+  --hv: rgba(250, 249, 245, 0.05);
+  --line: var(--line-dark);
+  --line-strong: rgba(250, 249, 245, 0.16);
+  /* 暗色阴影：墨影在暗底上消失，换成纯黑深影（参照样机 362 行 .w.dark .tw 的 .6 黑影） */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(0, 0, 0, 0.22);
+  --pop: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.32);
+  --pal-shadow: 0 0 0 1px var(--ln2), 0 24px 64px -12px rgba(0, 0, 0, 0.68),
+    0 4px 12px rgba(0, 0, 0, 0.36);
+  /* 暗底上陶土色更飘，光晕要收敛一档 */
+  --focus-ring: inset 0 0 0 1px var(--bg), 0 0 0 1px var(--coral),
+    0 0 6px 1px rgba(204, 120, 92, 0.36);
+}
+
+/* ── 发丝线按屏幕倍率收敛到物理 1px ──
+   1x 屏保持 1px（已经就是 1 个物理像素）；2x 起每档再除。
+   Mac 全是 2x，所以这条几乎等于「全站 0.5px」，肉眼看到的是
+   CDS 那种极细的线，而不是网页常见的那圈粗灰边。 */
+@media (resolution >= 2x) {
+  :root {
+    --hair: 0.5px;
+  }
+}
+@media (resolution >= 3x) {
+  :root {
+    --hair: calc(1px / 3);
+  }
+}
+@media (resolution >= 4x) {
+  :root {
+    --hair: calc(1px / 4);
+  }
+}

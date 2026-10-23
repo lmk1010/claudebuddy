@@ -1,0 +1,154 @@
+/* NeoX Shell · 基础重置
+ *
+ * 只做重置和全局排版；所有数值来自 tokens.css。
+ * 桌面应用不该有网页那种文本选中行为，只在 .selectable 上放开。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--t1);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* 可变字体按字号自动调光学尺寸：14px 和 40px 用的是同一支字，
+     但笔画粗细应该不同 —— 这是 CDS 让大小字都「对」的关键一条 */
+  font-optical-sizing: auto;
+  /* 关掉连字：代码路径、表格、快捷键里 fi/fl 一旦连起来就难认 */
+  font-feature-settings: "liga" 0, "dlig" 0;
+  user-select: none;
+  cursor: default;
+}
+
+.selectable {
+  user-select: text;
+  cursor: auto;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: default;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+textarea {
+  display: block;
+  resize: none;
+  appearance: none;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--tl);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--t2);
+}
+
+b {
+  /* CDS 的 semibold 是 580 而不是 700：粗一档就够醒目，粗两档字会糊成一团墨。 */
+  font-weight: var(--w-semibold);
+}
+
+/* 设计稿的图标是**填充路径**（solid glyph），不是描边线条。
+   之前这里写成 fill:none + stroke，导致所有图标都被描边重绘：
+   细线图标看着还行，带圆形的（选中、完成）就变成一个空圈 */
+svg.i {
+  width: var(--icon);
+  height: var(--icon);
+  fill: currentColor;
+  stroke: none;
+  flex: none;
+  /* 图标跟着文字换色时要跟手，60ms 就够；再慢就成「变色动画」 */
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+/* 滚动条：默认隐，hover 才出现细一条。
+   9px 里 3px 是透明边，实际只有 3px 宽的可见拇指 ——
+   比系统默认的 15px 细得多，不会把对话内容挤出一截。 */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 6px;
+  border: 4px solid transparent;
+  background-clip: content-box;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  background-clip: content-box;
+}
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-4);
+  background-clip: content-box;
+}
+
+/* 焦点环只在键盘导航时出现；命令面板/输入区自己有意设计，不让它描框。
+   四段式光晕而不是 2px 硬环 —— 见 tokens.css 里 --focus-ring 的说明。 */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* 焦点环只在键盘导航时出现；命令面板/输入区自己有意设计，不让它描框。
+   注意必须连 box-shadow 一起清 —— 焦点环现在是 box-shadow，
+   只清 outline 会漏出一圈矩形描边在输入框里（见 composer）。
+   只清这三处；其它输入框保留焦点环，键盘用户需要看见自己在哪。 */
+.pal-in input:focus,
+.pal-in input:focus-visible,
+.pop-form input:focus,
+.pop-form input:focus-visible,
+.composer .ph:focus,
+.composer .ph:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
