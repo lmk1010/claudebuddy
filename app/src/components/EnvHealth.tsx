@@ -3,50 +3,63 @@ import type { Account, AccountStatusSnapshot, AuthState } from "../lib/model";
 import { healthOf } from "../lib/model";
 import type { DesktopProbe, LeakReport, TraceItem } from "../lib/bridge";
 import { tr } from "../lib/i18n";
-import { IconCheck } from "./iconAliases";
+import { IconCheck, IconWarning } from "./iconAliases";
 
 /**
  * 环境抽屉里的「健康评分」。
  *
- * 它不是一个总览页，而是「这个环境现在怎么样」的就地体检：
- * 先把分和扣分项摆出来，然后每条能自己修的直接带按钮 —— 不把人甩到
- * 另一个菜单去自己找。
+ * 一行一条检查项，绿勾代表这一项没问题。只有真出问题的才标出来并给按钮 ——
+ * 不写大段解释，不把正常的事说成风险。
  *
- *   · 痕迹 / 遥测还在        → 就地清掉
- *   · 设备码没生成或跟人撞了 → 就地换一个
- *   · 出口没测过             → 就地测一次
- *   · 没登录 / 没配出口      → 跳过去（这两件必须你输入，替不了）
- *   · Desktop / STUN         → 不归我们管，说清楚就行，不装作能修
+ * 几条容易搞错的判断：
+ *   · 设备码从 status 里读。account.identity 是配置文件里那份旧快照，
+ *     第一次启动前是空的，从它读会把已经有设备码的环境报成没有。
+ *   · 出口 IP 有记录就直接显示。上次测过的值一直留着，不用再让人测一遍。
+ *   · 痕迹是这个号自己产生的，本来就正常 —— 它不算风险，只给一个清理入口。
  */
 
-/** 健康页里的一条：一句问题、一句原因、一个能按的按钮 */
-export function HealthItem({
-  level,
-  title,
-  why,
-  detail,
+type State = "ok" | "warn" | "bad" | "info";
+
+const DOT: Record<State, string> = { ok: "ok", warn: "mid", bad: "bad", info: "info" };
+
+/** 一行检查项：状态点 · 名称 · 值 · 可选动作 */
+function Row({
+  state,
+  label,
+  value,
+  note,
   action,
 }: {
-  level: "danger" | "warn" | "info";
-  title: string;
-  why?: string;
-  detail?: string;
+  state: State;
+  label: string;
+  value: string;
+  /** 只有出问题时才写一句，正常项留空 */
+  note?: string;
   action?: { label: string; run: () => void; disabled?: boolean };
 }) {
   return (
-    <div className={`rk-i lv-${level}`}>
-      <div className="rk-t">
-        <b>{title}</b>
-      </div>
-      {why && <p>{why}</p>}
-      {detail && <p className="rk-d">{detail}</p>}
-      {action && (
-        <button className="btn" onClick={action.run} disabled={action.disabled}>
+    <div className={`hs-row st-${state}`}>
+      <span className={`hs-dot ${DOT[state]}`}>
+        {state === "ok" ? <IconCheck size={11} /> : state === "info" ? null : <IconWarning size={11} />}
+      </span>
+      <span className="hs-k">{label}</span>
+      <span className="hs-v">
+        <b className="mono">{value}</b>
+        {note && <small>{note}</small>}
+      </span>
+      {action ? (
+        <button className="btn hs-act" onClick={action.run} disabled={action.disabled}>
           {action.label}
         </button>
+      ) : (
+        <span />
       )}
     </div>
   );
+}
+
+function kb(n: number) {
+  return n >= 1048576 ? `${(n / 1048576).toFixed(1)} GB` : `${Math.round(n / 1024)} KB`;
 }
 
 export default function HealthSection({
@@ -84,7 +97,6 @@ export default function HealthSection({
 }) {
   useEffect(() => {
     onLoadTraces();
-    // 只在打开这一页时扫一次，后面交给用户主动点刷新
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -95,205 +107,152 @@ export default function HealthSection({
 
   const h = healthOf(account, status, exitIp, peers, { stunDetected, desktopRunning });
 
-  const dirty = (traces ?? []).filter((t) => t.exists && !t.machineWide && t.size > 0);
-  const machineDirty = (traces ?? []).filter((t) => t.exists && t.machineWide && t.size > 0);
+  // 设备码：只认 status 里那份
+  const uid = status?.identity?.userID ?? account.identity?.userID ?? null;
+  const sharedUid = uid ? others.filter((a) => a.identity?.userID === uid) : [];
 
   const proxied = Boolean(account.proxy && account.proxy.protocol !== "none" && account.proxy.host);
   const sharedIp = ip ? others.filter((a) => a.lastExitIp === ip) : [];
-  const uid = account.identity?.userID;
-  const sharedUid = uid ? others.filter((a) => a.identity?.userID === uid) : [];
 
-  const problems = h.reasons.length;
+  const traceItems = (traces ?? []).filter((t) => t.exists && t.size > 0);
+  const localTraces = traceItems.filter((t) => !t.machineWide);
+  const machineTraces = traceItems.filter((t) => t.machineWide);
+  const localSize = localTraces.reduce((s, t) => s + t.size, 0);
+
+  /** 登录行的三种状态 */
+  const loginRow = (() => {
+    if (auth === "suspended")
+      return {
+        state: "bad" as State,
+        value: tr("暂时风控", "Temporarily restricted"),
+        note: tr("账号级状态，换本机凭据绕不过去；等它解除", "Account-level; local credentials will not get around it"),
+        action: undefined,
+      };
+    if (auth === "expired")
+      return {
+        state: "bad" as State,
+        value: status?.email ?? tr("凭据失效", "Expired"),
+        note: tr("重新授权一次就好", "Authorize once to restore"),
+        action: { label: tr("重新登录", "Sign in again"), run: () => onLogin() },
+      };
+    if (auth === "signedIn")
+      return { state: "ok" as State, value: status?.email ?? tr("已登录", "Signed in"), note: undefined, action: undefined };
+    if (auth === "signedOut")
+      return {
+        state: "warn" as State,
+        value: tr("未登录", "Signed out"),
+        note: tr("没登录开不了会话", "Sessions cannot start"),
+        action: { label: tr("登录", "Sign in"), run: () => onLogin() },
+      };
+    return {
+      state: "info" as State,
+      value: tr("未确认", "Not checked"),
+      note: undefined,
+      action: { label: tr("去刷新", "Refresh"), run: () => onGo("general") },
+    };
+  })();
+
+  /** 出口行 */
+  const exitRow = (() => {
+    if (sharedIp.length > 0)
+      return {
+        state: "bad" as State,
+        value: ip!,
+        note: tr(`和「${sharedIp.map((a) => a.label).join("、")}」同一个出口`, `Same exit as ${sharedIp.map((a) => a.label).join(", ")}`),
+        action: { label: tr("换", "Change"), run: () => onGo("network") },
+      };
+    if (!proxied)
+      return {
+        state: "warn" as State,
+        value: tr("直连", "Direct"),
+        note: ip ? tr(`出口 ${ip}，和本机一样`, `Exit ${ip}, same as this Mac`) : tr("还没测过", "Not measured"),
+        action: { label: tr("配出口", "Set exit"), run: () => onGo("network") },
+      };
+    if (!ip)
+      return {
+        state: "warn" as State,
+        value: `${account.proxy.protocol.toUpperCase()} ${account.proxy.host}:${account.proxy.port}`,
+        note: tr("还没测过出口", "Exit not measured"),
+        action: { label: tr("测", "Measure"), run: onCheckExit, disabled: busy },
+      };
+    return {
+      state: "ok" as State,
+      value: ip,
+      note: `${account.proxy.protocol.toUpperCase()} ${account.proxy.host}:${account.proxy.port}`,
+      action: { label: tr("重测", "Re-measure"), run: onCheckExit, disabled: busy },
+    };
+  })();
+
+  /** 设备码行 */
+  const deviceRow = (() => {
+    if (sharedUid.length > 0)
+      return {
+        state: "bad" as State,
+        value: `${uid!.slice(0, 8)}…`,
+        note: tr(`和「${sharedUid.map((a) => a.label).join("、")}」相同`, `Same as ${sharedUid.map((a) => a.label).join(", ")}`),
+        action: { label: tr("换", "Rotate"), run: onRotate, disabled: busy },
+      };
+    if (!uid)
+      return {
+        state: "warn" as State,
+        value: tr("没有", "None"),
+        note: tr("首次启动后由 CLI 生成", "Generated by the CLI on first launch"),
+        action: { label: tr("生成", "Generate"), run: onRotate, disabled: busy },
+      };
+    return { state: "ok" as State, value: `${uid.slice(0, 8)}…`, note: tr("本机独有", "Unique to this Mac"), action: undefined };
+  })();
 
   return (
     <>
-      {/* 小节标题和说明由抽屉统一渲染，这里不再重复一遍 */}
       <div className={`hs-score lv-${h.level}`}>
         <span className="hs-num">{h.score}</span>
         <span className="hs-meta">
           <b>
             {h.level === "blocked" ? tr("被风控", "Restricted") : h.level === "risk" ? tr("有风险", "At risk") : tr("就绪", "Ready")}
           </b>
-          <small>
-            {problems ? tr(`${problems} 项待处理`, `${problems} to resolve`) : tr("没有发现问题", "Nothing wrong")}
-          </small>
+          <small>{h.reasons[0] ?? tr("没有发现问题", "Nothing wrong")}</small>
         </span>
-        <span className="rk-sp" />
-        <button
-          className="btn"
-          onClick={onCheckExit}
-          disabled={busy || !proxied}
-          title={proxied ? undefined : tr("先配出口", "Set an exit first")}
-        >
-          {tr("重测出口", "Re-measure exit")}
-        </button>
       </div>
 
-      <div className="rk-list hs-list">
-        {auth === "suspended" && (
-          <HealthItem
-            level="danger"
-            title={tr("账号处于暂时风控", "Account is temporarily restricted")}
-            why={tr(
-              "这是账号级状态，换本机凭据绕不过去。先用别的环境，等它解除；要看原因去 claude.ai/restricted。",
-              "Account-level state; local credentials will not get around it. Use another environment while it clears.",
-            )}
-          />
-        )}
-        {auth === "expired" && (
-          <HealthItem
-            level="danger"
-            title={tr("登录凭据已失效", "Sign-in expired")}
-            why={
-              status?.email
-                ? tr(`上次是 ${status.email}，重新授权一次就好`, `Last signed in as ${status.email}; authorize once to restore`)
-                : undefined
-            }
-            action={{ label: tr("重新登录", "Sign in again"), run: () => onLogin() }}
-          />
-        )}
-        {auth === "signedOut" && (
-          <HealthItem
-            level="warn"
-            title={tr("这个环境还没登录", "Not signed in")}
-            why={tr("没登录就开不了会话", "Sessions cannot start without signing in")}
-            action={{ label: tr("现在登录", "Sign in now"), run: () => onLogin() }}
-          />
-        )}
-        {auth === "unknown" && (
-          <HealthItem
-            level="info"
-            title={tr("登录态还没确认", "Sign-in state not confirmed")}
-            why={tr("还没问过 CLI。去通用页点一下刷新", "The CLI has not been asked yet")}
-            action={{ label: tr("去刷新", "Refresh"), run: () => onGo("general") }}
+      <div className="hs-rows">
+        <Row state={loginRow.state} label={tr("登录", "Sign-in")} value={loginRow.value} note={loginRow.note} action={loginRow.action} />
+        <Row state={exitRow.state} label={tr("出口", "Exit")} value={exitRow.value} note={exitRow.note} action={exitRow.action} />
+        <Row state={deviceRow.state} label={tr("设备码", "Device ID")} value={deviceRow.value} note={deviceRow.note} action={deviceRow.action} />
+
+        {/* 痕迹是这个号自己产生的，本来就正常 —— 只给入口，不当风险 */}
+        <Row
+          state="ok"
+          label={tr("痕迹", "Traces")}
+          value={localTraces.length ? tr(`${localTraces.length} 项 · ${kb(localSize)}`, `${localTraces.length} · ${kb(localSize)}`) : tr("无", "None")}
+          note={localTraces.length ? tr("属于这个环境自己", "This environment's own") : undefined}
+          action={
+            localTraces.length
+              ? { label: busy ? "…" : tr("清", "Clear"), run: () => onClearTraces(localTraces.map((t) => t.key)), disabled: busy }
+              : undefined
+          }
+        />
+        {machineTraces.length > 0 && (
+          <Row
+            state="info"
+            label={tr("整机日志", "Machine logs")}
+            value={kb(machineTraces.reduce((s, t) => s + t.size, 0))}
+            note={tr("所有环境共用", "Shared by all environments")}
+            action={{ label: busy ? "…" : tr("清", "Clear"), run: () => onClearTraces(machineTraces.map((t) => t.key)), disabled: busy }}
           />
         )}
 
-        {!proxied && (
-          <HealthItem
-            level="warn"
-            title={tr("走的是直连", "Direct connection")}
-            why={tr(
-              "直连就是本机那条宽带。几个环境共用同一个出口 IP，是最容易被连起来的一条线",
-              "Direct means this Mac's connection; several environments sharing one exit IP is the easiest link to spot",
-            )}
-            action={{ label: tr("去配出口", "Set the exit"), run: () => onGo("network") }}
-          />
-        )}
-        {proxied && !ip && (
-          <HealthItem
-            level="info"
-            title={tr("出口还没测过", "Exit not measured")}
-            why={tr("没测过就不知道实际从哪个 IP 出去", "Without measuring you do not know which IP you exit from")}
-            action={{ label: tr("测一下", "Measure"), run: onCheckExit, disabled: busy }}
-          />
-        )}
-        {sharedIp.length > 0 && (
-          <HealthItem
-            level="danger"
-            title={tr(
-              `出口 IP 和「${sharedIp.map((a) => a.label).join("、")}」相同`,
-              `Exit IP matches ${sharedIp.map((a) => a.label).join(", ")}`,
-            )}
-            why={tr(
-              "两个环境走同一个出口，等于把两个身份钉在同一台机器上",
-              "Two environments on one exit pin two identities to one machine",
-            )}
-            action={{ label: tr("换个出口", "Change exit"), run: () => onGo("network") }}
-          />
-        )}
-
-        {!uid && (
-          <HealthItem
-            level="warn"
-            title={tr("还没生成设备码", "No device ID yet")}
-            why={tr(
-              "deviceId 和 accountUuid 出现在同一条遥测里。没轮换过，就是同一台设备",
-              "deviceId ships alongside accountUuid in telemetry; unrotated, it reads as one device",
-            )}
-            action={{ label: tr("生成一个", "Generate"), run: onRotate, disabled: busy }}
-          />
-        )}
-        {sharedUid.length > 0 && (
-          <HealthItem
-            level="danger"
-            title={tr(
-              `设备码和「${sharedUid.map((a) => a.label).join("、")}」相同`,
-              `Device ID matches ${sharedUid.map((a) => a.label).join(", ")}`,
-            )}
-            why={tr(
-              "设备码一样，服务端不需要看别的就知道这几个号在同一台机器上",
-              "Identical device IDs tell the server outright that these accounts share a machine",
-            )}
-            action={{ label: tr("换一个", "Rotate"), run: onRotate, disabled: busy }}
-          />
-        )}
-
-        {dirty.length > 0 && (
-          <HealthItem
-            level="warn"
-            title={tr(`${dirty.length} 项痕迹还在这个环境里`, `${dirty.length} traces still in this environment`)}
-            why={tr(
-              "对话记录、跑过的命令、文件路径 —— 跨环境关联时最先被翻的就是这些",
-              "History, commands and file paths are the first thing lined up when linking environments",
-            )}
-            detail={dirty.map((t) => `${t.label} ${Math.round(t.size / 1024)}KB`).join("；")}
-            action={{
-              label: busy ? tr("清理中…", "Cleaning…") : tr("就地清掉", "Clean now"),
-              run: () => onClearTraces(dirty.map((t) => t.key)),
-              disabled: busy,
-            }}
-          />
-        )}
-        {machineDirty.length > 0 && (
-          <HealthItem
-            level="info"
-            title={tr("整机还有日志（所有环境共用）", "Machine-wide logs remain (shared by all environments)")}
-            why={tr(
-              "MCP 日志和客户端日志不按环境分，清任意一个环境时会一起清掉",
-              "MCP and client logs are not per-environment; cleaning any environment clears them",
-            )}
-            detail={machineDirty.map((t) => `${t.label} ${Math.round(t.size / 1024)}KB`).join("；")}
-            action={{
-              label: busy ? tr("清理中…", "Cleaning…") : tr("一起清掉", "Clean too"),
-              run: () => onClearTraces(machineDirty.map((t) => t.key)),
-              disabled: busy,
-            }}
-          />
-        )}
-
-        {stunDetected && (
-          <HealthItem
-            level="danger"
-            title={tr("有程序在发 STUN，真实公网 IP 已暴露", "Something is sending STUN; the real public IP is exposed")}
-            why={tr(
-              "STUN 走 UDP，代理盖不住。本应用已经堵死，能发的是 Claude Desktop 这类不属于我们的进程",
-              "STUN uses UDP, which proxies do not cover. This app is sealed; senders are processes we do not own, such as Claude Desktop",
-            )}
-          />
-        )}
-        {desktopRunning && (
-          <HealthItem
-            level="warn"
-            title={tr("Claude Desktop 正开着", "Claude Desktop is running")}
-            why={tr(
-              "它不归环境管，Cookies 和 Safe Storage 都是整机一份。做隔离测试前先在它里面退出登录",
-              "It sits outside environments; cookies and Safe Storage are machine-wide. Sign out there before testing isolation",
-            )}
-          />
-        )}
-
-        {problems === 0 && (
-          <div className="hs-ok">
-            <IconCheck size={14} />
-            <span>
-              {tr(
-                "这个环境干净：登录着、有自己的出口和设备码，也没有残留痕迹。",
-                "This environment is clean: signed in, its own exit and device ID, no leftover traces.",
-              )}
-            </span>
-          </div>
-        )}
+        <Row
+          state={desktopRunning ? "warn" : "ok"}
+          label={tr("桌面端", "Desktop")}
+          value={desktopRunning ? tr("运行中", "Running") : tr("没在运行", "Not running")}
+          note={desktopRunning ? tr("它和所有环境共用整机身份，测试前先退出", "It shares this Mac's identity with every environment; quit it before testing") : undefined}
+        />
+        <Row
+          state={stunDetected ? "bad" : "ok"}
+          label={tr("UDP / STUN", "UDP / STUN")}
+          value={stunDetected ? tr("检测到 STUN", "STUN detected") : tr("没有外发", "None")}
+          note={stunDetected ? tr("STUN 走 UDP，代理盖不住；本应用已堵死", "STUN uses UDP, which proxies miss; this app is sealed") : undefined}
+        />
       </div>
     </>
   );

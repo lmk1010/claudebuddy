@@ -3658,6 +3658,73 @@
   color: #3f7f52;
 }
 
+.hs-rows {
+  border-top: var(--hair) solid var(--ln);
+}
+.hs-row {
+  display: grid;
+  grid-template-columns: 18px 68px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: var(--hair) solid var(--ln);
+}
+.hs-row:last-child {
+  border-bottom: 0;
+}
+.hs-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+}
+.hs-dot.ok {
+  background: #4e9f63;
+}
+.hs-dot.mid {
+  background: #b48228;
+}
+.hs-dot.bad {
+  background: #c64545;
+}
+.hs-dot.info {
+  background: var(--ln2, #d8d5cc);
+}
+.hs-k {
+  font-size: 12.5px;
+  color: var(--t2);
+}
+.hs-v {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hs-v b {
+  font-size: 12.5px;
+  font-weight: var(--w-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hs-v small {
+  font-size: 11.5px;
+  color: var(--t3);
+  line-height: 1.5;
+}
+.hs-row.st-warn .hs-v b {
+  color: #a8792a;
+}
+.hs-row.st-bad .hs-v b {
+  color: #c64545;
+}
+.hs-act {
+  padding: 2px 10px;
+  font-size: 11.5px;
+}
+
 /* ── 健康检查页 ── */
 .hc-note {
   display: flex;

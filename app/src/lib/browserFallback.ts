@@ -185,10 +185,11 @@ export function installBrowserFallback(): void {
       auth: "signedIn",
       configDir: `~/.claude-${id}`,
       email: "mk@personal.dev",
-      accountUuid: "u-preview",
+      accountUuid: `u-${id}`,
       orgUuid: null,
       tier: "Max",
-      identity: { userID: "u-preview", machineID: "m-preview" },
+      // 设备码必须按环境区分，否则预览里每个环境都会“和别的环境相同”
+      identity: { userID: `u-${id}`, machineID: `m-${id}` },
     }),
     accountLogin: async () => ({ ok: false, termId: undefined }),
     browsersList: async () => [

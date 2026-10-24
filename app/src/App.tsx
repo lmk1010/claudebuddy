@@ -1436,7 +1436,10 @@ export default function App() {
             onLogout={() => logout(drawerAccount.id)}
             onRotate={() => rotate(drawerAccount.id)}
             onCheckExit={() => void checkExit(drawerAccount.id)}
-            peers={state.accounts}
+            peers={state.accounts.map((a) => ({
+              ...a,
+              identity: { ...a.identity, ...status[a.id]?.identity },
+            }))}
             desktop={desktop}
             leak={leak}
             onLoadTraces={() => loadTraces(drawerAccount.id)}

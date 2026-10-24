@@ -512,7 +512,14 @@ export function healthOf(
     reasons.push(tr("出口还没测过", "Exit has not been measured"));
   }
 
-  const uid = account.identity?.userID;
+  /*
+   * 设备码只能从 status 里读。
+   *
+   * account.identity 是配置文件里那份快照，第一次启动前是 null ——
+   * 从它读会把“已经有设备码”的环境报成“还没生成”。
+   */
+  const ident = status?.identity ?? account.identity;
+  const uid = ident?.userID ?? null;
   if (!uid) {
     score -= 10;
     reasons.push(tr("还没生成设备码", "No device ID yet"));
