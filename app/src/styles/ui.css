@@ -3808,6 +3808,27 @@
   color: var(--t3);
 }
 
+/* ── 关于页：更新一块 ── */
+.ab-upd {
+  margin: 10px 0 2px;
+  display: flex;
+  justify-content: center;
+}
+.ab-upd-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--t2);
+}
+.ab-upd-t b {
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.ab-upd-bad {
+  color: #c64545;
+}
+
 /* ── 健康检查页 ── */
 .hc-note {
   display: flex;

@@ -126,6 +126,20 @@ export interface LeakReport {
 }
 
 /**
+ * 自动更新状态。
+ *
+ * enabled=false 表示这个包没配发布源（开发态 / 内测包），界面不显示入口。
+ */
+export interface UpdateState {
+  state: "idle" | "checking" | "available" | "latest" | "downloading" | "ready" | "error";
+  current: string;
+  latest: string | null;
+  percent: number;
+  error: string | null;
+  enabled: boolean;
+}
+
+/**
  * 风控陷阱清单的一条。
  *
  * status 决定界面怎么画，不能混：
@@ -448,6 +462,13 @@ export interface ClaudeBuddyBridge {
   attachTerm(id: string): Promise<{ alive: boolean; buffer: string }>;
   /** 现在活着的终端 id —— 侧栏圆点用它判“在跑 / 不在线” */
   liveTerms(): Promise<string[]>;
+
+  /* ── 自动更新 ── */
+  updateState(): Promise<UpdateState>;
+  updateCheck(): Promise<{ ok: boolean; reason?: string }>;
+  updateDownload(): Promise<{ ok: boolean; reason?: string }>;
+  updateInstall(): Promise<boolean>;
+  onUpdateState(cb: (s: UpdateState) => void): () => void;
   onTermData(cb: (p: { id: string; data: string }) => void): () => void;
   onTermExit(cb: (p: { id: string; exitCode: number }) => void): () => void;
 

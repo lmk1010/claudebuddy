@@ -108,6 +108,17 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   recentProjects: (id) => ipcRenderer.invoke("projects:recent", { id }),
   sessionUsage: (opts) => ipcRenderer.invoke("session:usage", opts),
 
+  /* ── 自动更新 ── */
+  updateState: () => ipcRenderer.invoke("update:state"),
+  updateCheck: () => ipcRenderer.invoke("update:check"),
+  updateDownload: () => ipcRenderer.invoke("update:download"),
+  updateInstall: () => ipcRenderer.invoke("update:install"),
+  onUpdateState: (cb) => {
+    const h = (_e, s) => cb(s);
+    ipcRenderer.on("update:state", h);
+    return () => ipcRenderer.off("update:state", h);
+  },
+
   /* ── 系统主题 ── */
   onSystemTheme: (cb) => {
     const h = (_e, dark) => cb(dark);

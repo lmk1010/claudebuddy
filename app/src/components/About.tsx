@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AppInfo, CheckItem } from "../lib/bridge";
+import type { AppInfo, CheckItem, UpdateState } from "../lib/bridge";
 import { IconCopy, IconFolder } from "./iconAliases";
 import { tr } from "../lib/i18n";
 
@@ -26,6 +26,7 @@ export default function About() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [claude, setClaude] = useState<CheckItem | null | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+  const [upd, setUpd] = useState<UpdateState | null>(null);
 
   useEffect(() => {
     void window.claudeBuddy.info().then(setInfo);
@@ -33,9 +34,59 @@ export default function About() {
       .checkupRun()
       .then((r) => setClaude(r.items.find((i) => i.key === "claude") ?? null))
       .catch(() => setClaude(null));
+    void window.claudeBuddy.updateState().then(setUpd);
+    return window.claudeBuddy.onUpdateState(setUpd);
   }, []);
 
   const open = (url: string) => void window.claudeBuddy.openExternal(url);
+
+  /**
+   * 更新那一块。
+   *
+   * 只在包里有发布源时才画（upd.enabled）—— 开发态和内测包没有 app-update.yml，
+   * 显示一个点了没反应的按钮比不显示更糟。
+   */
+  const updBlock = (() => {
+    if (!upd?.enabled) return null;
+    const st = upd.state;
+    const act = () => void window.claudeBuddy.updateCheck();
+    if (st === "checking") return { node: <span className="ab-upd-t"><i className="spinner" />{tr("正在检查…", "Checking…")}</span> };
+    if (st === "available")
+      return {
+        node: (
+          <span className="ab-upd-t">
+            <b>{tr(`有新版 ${upd.latest}`, `${upd.latest} is available`)}</b>
+            <button className="btn pri" onClick={() => void window.claudeBuddy.updateDownload()}>
+              {tr(`下载（${upd.current} → ${upd.latest}）`, `Download (${upd.current} → ${upd.latest})`)}
+            </button>
+          </span>
+        ),
+      };
+    if (st === "downloading")
+      return { node: <span className="ab-upd-t"><i className="spinner" />{tr(`下载中 ${upd.percent}%`, `Downloading ${upd.percent}%`)}</span> };
+    if (st === "ready")
+      return {
+        node: (
+          <span className="ab-upd-t">
+            <b>{tr(`${upd.latest} 已下载`, `${upd.latest} downloaded`)}</b>
+            <button className="btn pri" onClick={() => void window.claudeBuddy.updateInstall()}>
+              {tr("重启并安装", "Restart and install")}
+            </button>
+          </span>
+        ),
+      };
+    if (st === "latest") return { node: <span className="ab-upd-t">{tr("已是最新版本", "Up to date")}<button className="ab-ic" onClick={act} title={tr("再看一眼", "Check again")}>{tr("重查", "Recheck")}</button></span> };
+    if (st === "error")
+      return {
+        node: (
+          <span className="ab-upd-t">
+            <b className="ab-upd-bad">{tr("检查失败", "Check failed")}</b>
+            <button className="ab-ic" onClick={act}>{tr("重试", "Retry")}</button>
+          </span>
+        ),
+      };
+    return { node: <button className="btn" onClick={act}>{tr("检查更新", "Check for updates")}</button> };
+  })();
   const claudeVer =
     claude === undefined
       ? tr("检测中…", "Checking…")
@@ -71,6 +122,7 @@ export default function About() {
         <img src="./assets/app-icon.png" alt="" />
         <h1>ClaudeBuddy</h1>
         <p className="ab-ver">{tr("版本", "Version")} {info?.version ?? "—"}</p>
+        {updBlock && <div className="ab-upd">{updBlock.node}</div>}
         <p className="ab-line">{tr("给 Claude Code 一个安静的家 —— 多账号、多线路、互不打扰。", "A quiet home for Claude Code: multiple accounts, multiple routes, no interference.")}</p>
         <nav className="ab-links">
           {LINKS.map(([label, url]) => (
