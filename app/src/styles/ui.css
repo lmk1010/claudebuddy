@@ -3647,10 +3647,18 @@
 
 .hs-rows {
   border-top: var(--hair) solid var(--ln);
+  /*
+   * 标签列宽度写在容器上，所有行共用。
+   *
+   * 每一行是各自独立的 grid，所以给某一行的列写 auto 只会让那一行变宽 ——
+   * 标签起点就参差不齐、值列也对不齐了。固定一个够宽的常量、并且禁止
+   * 折行，才能保证首列整齐、值列对齐。
+   */
+  --hs-k: 80px;
 }
 .hs-row {
   display: grid;
-  grid-template-columns: 18px 68px minmax(0, 1fr) auto;
+  grid-template-columns: 18px var(--hs-k) minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 10px 0;
@@ -3683,6 +3691,8 @@
 .hs-k {
   font-size: 12.5px;
   color: var(--t2);
+  /* 标签一律单行：折行会把行高撑成两行，整列节奏就乱了 */
+  white-space: nowrap;
 }
 .hs-v {
   display: flex;
