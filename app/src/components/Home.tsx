@@ -16,6 +16,8 @@ import {
   IconTerminal,
 } from "./iconAliases";
 import Help, { Steps } from "./Help";
+import { useContextMenu, type MenuItem } from "./ContextMenu";
+import { NetScore } from "./NetReport";
 
 interface Props {
   username: string;
@@ -32,6 +34,9 @@ interface Props {
   onCreateAccount: () => void;
   onLogin: (id: string) => void;
   onPickFolder: () => void;
+  onSetCwd: (cwd: string) => void;
+  /** 打开这个环境的「网络出口」 */
+  onEditNetwork: (id: string) => void;
   onPickPermission: (anchor: HTMLElement) => void;
   /** 在当前环境里开一个会话；text 非空就作为第一句送进去 */
   onStart: (text: string) => void;
@@ -69,7 +74,28 @@ export default function Home(p: Props) {
     if (el) setInd({ left: el.offsetLeft, width: el.offsetWidth });
   }, [acc?.id, p.accounts]);
 
-  const blocked = !signedIn ? `「${acc?.label ?? "这个环境"}」还没登录` : null;
+  const menu = useContextMenu();
+  const openDirMenu = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    // 最近用过的目录（去重，当前的排第一），最多 6 个
+    const seen = new Set<string>();
+    const dirs = [p.cwd, ...p.recent.map((x) => x.cwd)].filter((d): d is string => {
+      if (!d || seen.has(d)) return false;
+      seen.add(d);
+      return true;
+    });
+    const items: MenuItem[] = dirs.slice(0, 6).map((d) => ({
+      label: shortenHome(d),
+      icon: <IconFolder size={14} />,
+      hint: d === p.cwd ? "✓" : undefined,
+      run: () => p.onSetCwd(d),
+    }));
+    if (items.length) items.push("sep");
+    items.push({ label: "选择其他文件夹…", icon: <IconPlus size={14} />, run: p.onPickFolder });
+    menu.open({ clientX: r.left, clientY: r.bottom + 6, preventDefault: () => {}, stopPropagation: () => {} }, items, "在哪个目录里启动");
+  };
+
+  const blocked = !signedIn ?`「${acc?.label ?? "这个环境"}」还没登录` : null;
   const submit = () => {
     if (blocked) return;
     p.onStart(text.trim());
@@ -173,7 +199,13 @@ export default function Home(p: Props) {
                 }}
               />
               <div className="row">
-                <button className="chip" onClick={p.onPickFolder} title="选择项目目录">
+                {/* 目录：下拉里先给最近用过的，再给「选择其他文件夹」—— 之前点一下直接弹系统对话框，
+                    取消了就像没点过 */}
+                <button
+                  className="chip"
+                  onClick={(e) => openDirMenu(e.currentTarget)}
+                  title="在哪个目录里启动"
+                >
                   <IconFolder />
                   <span className="mono">{p.cwd ? shortenHome(p.cwd) : "选择目录…"}</span>
                   <IconChevronDown size={11} />
@@ -183,10 +215,16 @@ export default function Home(p: Props) {
                   {PERMISSION_LABEL[p.permission]}
                   <IconChevronDown size={11} />
                 </button>
-                <span className="chip chip-static" title="这个环境固定的网络出口">
+                {/* 出口：显示线路 + 信任分，点开去这个环境的「网络出口」 */}
+                <button
+                  className="chip"
+                  onClick={() => acc && p.onEditNetwork(acc.id)}
+                  title="这个环境的网络出口 · 点开查看体检、换线路"
+                >
                   <IconGlobe size={13} />
                   <span className="mono">{acc ? proxyLabel(acc.proxy) : "直连"}</span>
-                </span>
+                  {acc && <NetScore accountId={acc.id} proxyKey={proxyLabel(acc.proxy)} />}
+                </button>
                 <button className="send" onClick={submit} disabled={Boolean(blocked)} title={blocked ?? "新建会话 ↵"}>
                   <IconArrowUp />
                 </button>
@@ -221,6 +259,7 @@ export default function Home(p: Props) {
           </div>
         </div>
       </div>
+      {menu.node}
     </>
   );
 }

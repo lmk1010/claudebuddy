@@ -4,11 +4,13 @@ import { IconEdit } from "./Rename";
 import type { Account, GitInfo, ShellWindow } from "../lib/model";
 import { fmtDuration, proxyLabel } from "../lib/model";
 import TerminalView from "./TerminalView";
+import { NetScore } from "./NetReport";
 import {
   IconClose,
   IconCode,
   IconCopy,
   IconFolder,
+  IconGlobe,
   IconPanel,
   IconPlus,
   IconTerminal,
@@ -36,6 +38,8 @@ interface Props {
   /** 关掉除它以外的所有会话（同样走二次确认） */
   onRequestCloseOthers: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  /** 打开某个环境的「网络出口」 */
+  onEditNetwork: (id: string) => void;
   showDiff: boolean;
   onToggleDiff: () => void;
   /** ⌘T：在当前账号下再开一个窗口 */
@@ -65,6 +69,7 @@ export default function SessionMain({
   onRequestClose,
   onRequestCloseOthers,
   onRename,
+  onEditNetwork,
   onToggleConsole,
   showDiff,
   onToggleDiff,
@@ -92,6 +97,18 @@ export default function SessionMain({
               </span>
               {accountById.get(active.accountId)!.label}
             </span>
+          )}
+          {/* 当前环境的出口和信任分：会话里最该一眼看到的就是「我现在从哪出去、干不干净」 */}
+          {active && accountById.get(active.accountId) && (
+            <button
+              className="sh-net"
+              onClick={() => onEditNetwork(active.accountId)}
+              title="这个环境的网络出口 · 点开看体检"
+            >
+              <IconGlobe size={12} />
+              <span className="mono">{proxyLabel(accountById.get(active.accountId)!.proxy)}</span>
+              <NetScore accountId={active.accountId} proxyKey={proxyLabel(accountById.get(active.accountId)!.proxy)} />
+            </button>
           )}
           {active?.branch ? <span className="sh-br">branch {active.branch}</span> : null}
           <span className="sh-dot" />
@@ -195,9 +212,6 @@ export default function SessionMain({
           <span className="tw-meta">
             {active?.branch ? `${active.branch} · ` : ""}
             {active ? accountById.get(active.accountId)?.configDir : ""}
-            {active
-              ? ` · ${proxyLabel(accountById.get(active.accountId)?.proxy ?? { protocol: "none", host: "", port: 0 })}`
-              : ""}
             {active ? ` · ${shorten(active.cwd)}` : ""}
           </span>
         </div>

@@ -3,10 +3,9 @@ import type {
   CleanupAccount,
   CleanupResult,
   CleanupSurvey,
-  DiagnoseLayer,
   DiagnoseResult,
 } from "../lib/bridge";
-import { IconPulse } from "./iconAliases";
+import { IconCheck, IconRefresh, IconWarning } from "./iconAliases";
 
 /**
  * 体检 —— 一进来就查，不用点。
@@ -25,12 +24,6 @@ const STATE_LABEL: Record<CleanupAccount["state"], { text: string; tone: string 
   empty: { text: "空壳", tone: "p-bad" },
 };
 
-const LAYER_TONE: Record<DiagnoseLayer["status"], string> = {
-  ok: "p-ok",
-  warn: "p-warn",
-  fail: "p-bad",
-  unknown: "p-idle",
-};
 
 function bytes(n: number) {
   if (n >= 1024 * 1024 * 1024) return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`;
@@ -268,49 +261,77 @@ export default function Diagnose({ part }: { part: "clean" | "net" }) {
       )}
 
       {/* ── 连通 ── */}
-      {part === "net" && !diag && busy && <p className="diag-cap">正在逐层探测：DNS → TCP → TLS → claude.ai → API…</p>}
-      {part === "net" && diag && (
-        <>
-          <p className="diag-cap">用这台电脑当前的网络（不走任何环境的代理）逐层探测，看 403 / 连不上卡在哪一层。各环境自己的出口在「环境 → 网络出口」里看。</p>
-          <div className="diag-head">
-            <IconPulse size={15} />
-            <span>{diag.headline}</span>
-          </div>
-          {diag.exitIp && (
-            <p className="diag-cap">
-              出口 <b>{diag.exitIp.ip}</b> · {diag.exitIp.asn}
-              {diag.exitIp.hosting ? " · 机房 IP" : ""}
-            </p>
-          )}
-          <div className="diag-list">
-            {diag.layers.map((l) => (
-              <div key={l.id} className={`diag-row s-${l.status}`}>
-                <div className="diag-k">
-                  <span>{l.label}</span>
-                  <span className={`pill ${LAYER_TONE[l.status]}`}>{l.status === "ok" ? "通" : l.status === "warn" ? "注意" : l.status === "fail" ? "不通" : "未测"}</span>
-                </div>
-                <div className="diag-d">{l.detail}</div>
-                <div className="diag-n">{l.note}</div>
-              </div>
-            ))}
-          </div>
-          {diag.uaVerdict.tested && diag.uaVerdict.uaDecidesResult && (
-            <div className="diag-ua">
-              <b>UA 对照</b>
-              <span>
-                浏览器 UA <code>{diag.uaVerdict.browser}</code> · CLI UA <code>{diag.uaVerdict.cli}</code>
-              </span>
-              <small>{diag.uaVerdict.summary}</small>
-            </div>
-          )}
-        </>
-      )}
-
       {part === "net" && (
-        <button className="btn diag-refresh" disabled={busy} onClick={() => void load()}>
-          {busy ? "检查中…" : "重新检查"}
-        </button>
+        <p className="dx-lead">
+          用这台电脑当前的网络（不走任何环境的代理）逐层探测，看 403 / 连不上卡在哪一层。各环境自己的出口在「环境 → 网络出口」里看。
+        </p>
       )}
+      {part === "net" && !diag && busy && (
+        <div className="em-card dx-loading">
+          <span className="nr-spin" />
+          正在逐层探测：网络出口 → Bot 挑战 → 账号 → 额度…
+        </div>
+      )}
+      {part === "net" && diag && (() => {
+        // 总体结论的色调取最差的一层
+        const worst = diag.layers.some((l) => l.status === "fail")
+          ? "bad"
+          : diag.layers.some((l) => l.status === "warn")
+            ? "mid"
+            : "ok";
+        return (
+          <>
+            <div className={`dx-sum ${worst}`}>
+              <span className="dx-sum-ic">{worst === "ok" ? <IconCheck size={16} /> : <IconWarning size={16} />}</span>
+              <div className="dx-sum-t">
+                <b>{diag.headline}</b>
+                {diag.exitIp && (
+                  <small>
+                    出口 <span className="mono">{diag.exitIp.ip}</span> · {diag.exitIp.asn}
+                  </small>
+                )}
+              </div>
+              <button className="btn" disabled={busy} onClick={() => void load()}>
+                <IconRefresh />
+                {busy ? "检查中…" : "重新检查"}
+              </button>
+            </div>
+
+            <div className="em-card dx-list">
+              {diag.layers.map((l, i) => {
+                const tone = l.status === "ok" ? "ok" : l.status === "warn" ? "mid" : l.status === "fail" ? "bad" : "idle";
+                return (
+                  <div key={l.id} className="dx-row">
+                    <span className={`dx-st ${tone}`}>
+                      {tone === "ok" ? <IconCheck size={12} /> : tone === "idle" ? i + 1 : <IconWarning size={12} />}
+                    </span>
+                    <div className="dx-main">
+                      <div className="dx-t">
+                        <b>{l.label}</b>
+                        <span className={`nr-tag ${tone === "idle" ? "" : tone}`}>
+                          {l.status === "ok" ? "通" : l.status === "warn" ? "注意" : l.status === "fail" ? "不通" : "未测"}
+                        </span>
+                      </div>
+                      <p className="dx-n">{l.note}</p>
+                      <code className="dx-d">{l.detail}</code>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {diag.uaVerdict.tested && diag.uaVerdict.uaDecidesResult && (
+              <div className="em-card dx-ua">
+                <b>UA 对照</b>
+                <span>
+                  浏览器 UA <code>{diag.uaVerdict.browser}</code> · CLI UA <code>{diag.uaVerdict.cli}</code>
+                </span>
+                <small>{diag.uaVerdict.summary}</small>
+              </div>
+            )}
+          </>
+        );
+      })()}
     </>
   );
 }

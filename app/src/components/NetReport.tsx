@@ -18,7 +18,63 @@ const KIND_ZH: Record<string, string> = {
   vpn: "VPN",
 };
 
-function verdict(score: number): { text: string; tone: "ok" | "mid" | "bad" } {
+/** 同一个环境同时只发一次体检，几个地方一起要也只跑一趟 */
+const inflight = new Map<string, Promise<NetReport>>();
+const listeners = new Set<() => void>();
+
+function fetchReport(accountId: string, key: string): Promise<NetReport> {
+  const running = inflight.get(accountId);
+  if (running) return running;
+  const p = window.claudeBuddy
+    .netReport(accountId)
+    .catch((e): NetReport => ({ ok: false, reason: e instanceof Error ? e.message : String(e) }))
+    .then((r) => {
+      cache.set(accountId, { key, at: Date.now(), r });
+      inflight.delete(accountId);
+      listeners.forEach((f) => f());
+      return r;
+    });
+  inflight.set(accountId, p);
+  return p;
+}
+
+/**
+ * 读一个环境的出口体检（带缓存）。会话顶栏、首页输入框这些小地方用它显示一个分数，
+ * 不用每处都自己去测；在「网络出口」里重测后，这些地方跟着更新。
+ */
+export function useNetReport(accountId: string | null | undefined, proxyKey: string): NetReport | null {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump((n) => n + 1);
+    listeners.add(f);
+    return () => {
+      listeners.delete(f);
+    };
+  }, []);
+  const hit = accountId ? cache.get(accountId) : undefined;
+  const stale = !hit || !hit.key.startsWith(`${proxyKey}|`) || Date.now() - hit.at > TTL;
+  useEffect(() => {
+    if (accountId && stale) void fetchReport(accountId, `${proxyKey}|`);
+  }, [accountId, proxyKey, stale]);
+  return hit && hit.key.startsWith(`${proxyKey}|`) ? hit.r : null;
+}
+
+/** 一小枚：🇺🇸 100 纯净。测着时显示「测出口…」，测不通显示「出口不通」 */
+export function NetScore({ accountId, proxyKey }: { accountId: string | null | undefined; proxyKey: string }) {
+  const r = useNetReport(accountId, proxyKey);
+  if (!r) return <span className="nsc dim">测出口…</span>;
+  if (!r.ok) return <span className="nsc bad">出口不通</span>;
+  const v = verdict(r.score ?? 0);
+  return (
+    <span className={`nsc ${v.tone}`} title={`${r.ip} · 信任分 ${r.score}（${v.text}）`}>
+      {flag(r.info?.countryCode ?? r.claude?.loc ?? "")}
+      <b>{r.score}</b>
+      {v.text}
+    </span>
+  );
+}
+
+export function verdict(score: number): { text: string; tone: "ok" | "mid" | "bad" } {
   if (score >= 75) return { text: "纯净", tone: "ok" };
   if (score >= 50) return { text: "一般", tone: "mid" };
   return { text: "高危", tone: "bad" };
@@ -63,8 +119,7 @@ export default function NetReportCard({
   const run = useCallback(async () => {
     setBusy(true);
     try {
-      const res = await window.claudeBuddy.netReport(accountId);
-      cache.set(accountId, { key: `${proxyKey}|${tz}`, at: Date.now(), r: res });
+      const res = await fetchReport(accountId, `${proxyKey}|${tz}`);
       setR(res);
       if (res.ok && res.ip) onIp(res.ip);
     } catch (e) {

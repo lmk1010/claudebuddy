@@ -1099,6 +1099,8 @@ export default function App() {
               const cwd = await pickFolder();
               if (cwd) setToast({ title: `已选择 ${prettyName(cwd)}` });
             }}
+            onSetCwd={(cwd) => update({ lastCwd: cwd })}
+            onEditNetwork={(id) => setEditor({ id, section: "network" })}
             onPickPermission={(el) => setMenu(anchor("permission", el))}
             onStart={(t) => void homeSubmit(t)}
             onQuickStart={(proj) => {
@@ -1134,6 +1136,7 @@ export default function App() {
               onRequestClose={requestCloseWindow}
               onRequestCloseOthers={requestCloseOthers}
               onRename={renameWindow}
+              onEditNetwork={(id) => setEditor({ id, section: "network" })}
               showDiff={showDiff}
               onToggleDiff={() => setShowDiff((v) => !v)}
               onNew={() => {

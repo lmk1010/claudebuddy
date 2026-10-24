@@ -1480,9 +1480,47 @@
 .sv-row.on + .sv-row::before {
   opacity: 0;
 }
+/* 组标题跟下面的会话行共用一条竖轴：头像居中在 28px 图标列里，名字和会话标题左对齐 */
 .sv-grp-h {
   padding: 0 12px 6px;
   border-bottom: 0;
+  gap: 12px;
+}
+.sv-grp-h > .av.xs {
+  margin: 0 4px;
+}
+/* 右侧同理：时间列贴右边、跟组标题的计数对齐；
+   悬停才出现的按钮浮在时间上面，不再平时也占着一截空白把时间往里挤 */
+.sv-grp-h {
+  padding-right: 12px;
+}
+.sv-row {
+  padding-right: 12px;
+}
+.sv-row > .mh-x,
+.sv-row > .sv-go {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.sv-row > .mh-x:last-child {
+  right: 10px;
+}
+.sv-row > .sv-more-btn {
+  right: 40px;
+}
+.sv-row > .sv-go {
+  right: 12px;
+}
+.sv-row .sv-tm {
+  transition: opacity var(--dur-snap) var(--ease-out);
+}
+.sv-row:hover .sv-tm,
+.sv-row:focus-within .sv-tm {
+  opacity: 0;
+}
+.sv-grp-h b + .mono {
+  margin-left: -4px;
 }
 .sv-grp-h b {
   font-size: 13px;
@@ -2269,6 +2307,218 @@
   height: 16px;
   border-radius: 5px;
   font-size: 9.5px;
+}
+
+/* ══════════ 出口小徽章（首页输入框、会话顶栏） ══════════ */
+.nsc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 17px;
+  white-space: nowrap;
+  font-family: var(--sans);
+}
+.nsc b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.nsc.ok {
+  background: rgba(78, 159, 99, 0.12);
+  color: var(--success);
+}
+.nsc.mid {
+  background: rgba(181, 135, 58, 0.14);
+  color: #9a6e24;
+}
+.nsc.bad {
+  background: rgba(198, 69, 69, 0.12);
+  color: var(--danger);
+}
+.nsc.dim {
+  color: var(--t4);
+  font-weight: 400;
+}
+[data-theme="dark"] .nsc.mid {
+  color: #e2b46a;
+}
+.sh-net {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 4px 0 8px;
+  border-radius: 7px;
+  border: var(--hair) solid var(--ln);
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--t3);
+  cursor: pointer;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out);
+}
+.sh-net:hover {
+  background: var(--hv);
+  color: var(--t1);
+}
+
+/* ══════════ 连通诊断 ══════════ */
+.dx-lead {
+  margin: -4px 0 18px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--t3);
+}
+.dx-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px;
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.dx-sum {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  border: var(--hair) solid var(--ln);
+  background: var(--bg);
+  animation: nr-in var(--dur-base) var(--ease-out);
+}
+.dx-sum-ic {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+.dx-sum.ok .dx-sum-ic {
+  background: rgba(78, 159, 99, 0.12);
+  color: var(--success);
+}
+.dx-sum.mid .dx-sum-ic {
+  background: rgba(181, 135, 58, 0.14);
+  color: #9a6e24;
+}
+.dx-sum.bad .dx-sum-ic {
+  background: rgba(198, 69, 69, 0.12);
+  color: var(--danger);
+}
+.dx-sum-t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dx-sum-t b {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--t1);
+}
+.dx-sum-t small {
+  font-size: 11.5px;
+  color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dx-list {
+  animation: nr-in var(--dur-base) var(--ease-out);
+}
+.dx-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.dx-row + .dx-row {
+  border-top: var(--hair) solid var(--ln);
+}
+.dx-st {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  margin-top: -1px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 500;
+}
+.dx-st.ok {
+  background: rgba(78, 159, 99, 0.12);
+  color: var(--success);
+}
+.dx-st.mid {
+  background: rgba(181, 135, 58, 0.14);
+  color: #9a6e24;
+}
+.dx-st.bad {
+  background: rgba(198, 69, 69, 0.12);
+  color: var(--danger);
+}
+.dx-st.idle {
+  background: var(--hv);
+  color: var(--t4);
+}
+.dx-main {
+  flex: 1;
+  min-width: 0;
+}
+.dx-t {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 20px;
+}
+.dx-t b {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t1);
+}
+.dx-n {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--t2);
+}
+.dx-d {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--t4);
+  word-break: break-all;
+  background: none;
+  padding: 0;
+  border: 0;
+}
+.dx-ua {
+  margin-top: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--t3);
+}
+.dx-ua b {
+  font-weight: 500;
+  color: var(--t1);
+}
+[data-theme="dark"] .dx-sum.mid .dx-sum-ic,
+[data-theme="dark"] .dx-st.mid {
+  color: #e2b46a;
 }
 
 /* 清理本机 */
