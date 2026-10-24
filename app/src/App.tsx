@@ -421,7 +421,7 @@ export default function App() {
         ...prev,
         [id]: {
           exists: s.exists,
-          // 会话里 Claude 亲口说过「账号被挂起」的，凭据再在也照样标挂起，直到重新登录
+          // 会话里 Claude 亲口说过「账号正在暂时风控」的，凭据再在也照样标出来，直到重新登录
           auth: s.auth === "signedIn" && stateRef.current.accounts.find((a) => a.id === id)?.heldAt ? "suspended" : s.auth,
           configDir: s.configDir,
           email: s.email,
@@ -491,7 +491,7 @@ export default function App() {
         delete n[id];
         return n;
       });
-      // 重新登录成功 = 换了凭据，之前记下的「挂起」作废，重新判断
+      // 重新登录成功 = 换了凭据，之前记下的「暂时风控」作废，重新判断
       if (exitCode === 0) {
         stateRef.current = {
           ...stateRef.current,
@@ -501,14 +501,14 @@ export default function App() {
       }
       void refreshAccount(id);
     });
-    // 会话里 Claude 说账号被挂起：记下来、立刻标红，并告诉用户
+    // 会话里 Claude 说账号在暂时风控：记下来、立刻标红，并告诉用户
     const offFlag = window.claudeBuddy.onAccountFlag(({ accountId }) => {
       const acc = stateRef.current.accounts.find((a) => a.id === accountId);
       setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === accountId ? { ...a, heldAt: Date.now() } : a)) }));
       setStatus((prev) => (prev[accountId] ? { ...prev, [accountId]: { ...prev[accountId], auth: "suspended" } } : prev));
       setToast({
-        title: tr(`「${acc?.label ?? ""}」的账号被挂起了`, `"${acc?.label ?? ""}" is on hold`),
-        body: tr("Claude 拒绝了这个账号的请求。可以去 claude.ai/restricted 查看或申诉，或换一个环境用", "Claude rejected requests from this account. Check or appeal at claude.ai/restricted, or use another environment"),
+        title: tr(`「${acc?.label ?? ""}」的账号进入暂时风控`, `"${acc?.label ?? ""}" is temporarily restricted`),
+        body: tr("这是风控状态，不等于封号。可以先换一个环境用、等它解除；要看具体原因去 claude.ai/restricted", "This is a risk-control state, not necessarily a ban. Switch to another environment and let it clear; check claude.ai/restricted for the reason"),
       });
     });
     return () => {

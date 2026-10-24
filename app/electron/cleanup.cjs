@@ -412,7 +412,22 @@ function purge({ accountIds = [], services = [], allowMainKeychain = false } = {
   }
 
   // 3) 最后删凭据
-  const servicesToDrop = new Set(services);
+  /**
+   * 只允许删体检结果里真实出现过的条目（孤儿条目 + 本次要清的账号自己的条目）。
+   * 渲染层传进来的 service 必须先过这道白名单，否则等于开放了「删任意 Keychain 条目」。
+   */
+  const knownServices = new Set([
+    ...snap.orphans.map((o) => o.service),
+    ...snap.accounts.map((a) => a.keychainService),
+  ]);
+  const servicesToDrop = new Set();
+  for (const svc of services) {
+    if (!knownServices.has(svc)) {
+      failed.push({ service: svc, reason: L("不在体检结果里", "Not in the checkup results") });
+      continue;
+    }
+    servicesToDrop.add(svc);
+  }
   for (const id of accountIds) {
     const a = byId.get(id);
     if (a?.hasKeychain) servicesToDrop.add(a.keychainService);

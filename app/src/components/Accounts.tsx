@@ -1000,8 +1000,8 @@ function GeneralSection({
         <div className="det-warn">
           <IconWarning size={13} />
           {tr(
-            "这个账号处于挂起状态。风控在 API 请求、OAuth 回调、Token 刷新三处都判定，换本地凭据绕不过去。",
-            "This account is suspended. The risk check applies to API requests, OAuth callbacks and token refresh, so swapping local credentials won't get around it.",
+            "这个账号处于暂时风控。风控在 API 请求、OAuth 回调、Token 刷新三处都判定，换本地凭据绕不过去；这是账号级状态，不是本机没登录。",
+            "This account is temporarily restricted. The risk check applies to API requests, OAuth callbacks and token refresh, so swapping local credentials won't get around it; it's an account-level state, not a local sign-out.",
           )}
         </div>
       )}

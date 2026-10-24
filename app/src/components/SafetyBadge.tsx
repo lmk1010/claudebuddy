@@ -11,7 +11,7 @@ import { tr } from "../lib/i18n";
  * 状态分三档：
  *   · safe    全部就绪，呼吸绿色
  *   · warn    能用但有问题（IP 跳了 / 出口没测 / 未登录）
- *   · danger  不能正常用（凭据失效 / 账号被挂起）
+ *   · danger  不能正常用（凭据失效 / 账号暂时风控）
  */
 
 export type SafetyLevel = "safe" | "warn" | "danger";
@@ -61,7 +61,12 @@ export function assessSafety(
   const auth = status?.auth ?? account.auth;
   if (auth === "signedIn") passed++;
   else if (auth === "suspended")
-    issues.push({ key: "auth", text: tr("账号已被挂起", "Account suspended"), fix: tr("换一个账号", "Switch to another account"), level: "danger" });
+    issues.push({
+      key: "auth",
+      text: tr("账号正在暂时风控", "Account temporarily restricted"),
+      fix: tr("先换个环境用，等它解除", "Use another environment while it clears"),
+      level: "danger",
+    });
   else if (auth === "expired")
     issues.push({ key: "auth", text: tr("登录凭据已失效", "Sign-in expired"), fix: tr("重新登录", "Sign in again"), level: "danger" });
   else

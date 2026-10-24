@@ -180,7 +180,7 @@ function spawnTerm(opts) {
   });
 
   /**
-   * 账号被挂起：`claude auth status` 只看凭据在不在，看不出来；
+   * 账号进入暂时风控：`claude auth status` 只看凭据在不在，看不出来；
    * 只有真正发请求时 Claude 才会说「Your account is on hold」。看到就把这个环境标出来，
    * 不然界面上一直写着「已登录」，用户以为能用。
    */

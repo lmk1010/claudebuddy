@@ -64,7 +64,7 @@ export type AuthState =
   | "signedOut" // 目录存在但没有凭据
   | "signedIn" // 有凭据且能读到账号
   | "expired" // 有凭据但已失效
-  | "suspended" // 账号被挂起（account_on_hold）
+  | "suspended" // 暂时风控（account_on_hold）
   | "unknown"; // 读不到（CLI 未安装 / 超时）
 
 /** 出口代理配置 */
@@ -165,7 +165,7 @@ export interface Account {
   proxy: ProxyConfig;
   /** 上次测到的出口 IP，用于发现 IP 跳变 */
   lastExitIp?: string;
-  /** 会话里 Claude 说过「账号被挂起」的时间；重新登录成功后清掉 */
+  /** 会话里 Claude 说过「账号正在暂时风控」的时间；重新登录成功后清掉 */
   heldAt?: number;
   /** 这个环境登录时用哪个浏览器（browsersList 的 id），记住上次的选择 */
   loginBrowser?: string;
@@ -248,7 +248,7 @@ export interface BuddyState {
 
 /**
  * 账号的实时快照 —— 来自主进程 accountStatus()，不是本地缓存。
- * 界面上的"已登录 / 已挂起"必须用这个，否则就是在骗人。
+ * 界面上的"已登录 / 暂时风控"必须用这个，否则就是在骗人。
  */
 export interface AccountStatusSnapshot {
   exists: boolean;
@@ -406,7 +406,7 @@ export const AUTH_LABEL: Record<AuthState, string> = {
   get signedOut() { return tr("未登录", "Signed out"); },
   get signedIn() { return tr("已登录", "Signed in"); },
   get expired() { return tr("凭据失效", "Credentials expired"); },
-  get suspended() { return tr("已挂起", "Suspended"); },
+  get suspended() { return tr("暂时风控", "Temporarily restricted"); },
   get unknown() { return tr("未知", "Unknown"); },
 };
 

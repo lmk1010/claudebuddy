@@ -236,12 +236,12 @@ export default function Home(p: Props) {
                 </button>
               </div>
               {blocked && auth === "suspended" ? (
-                // 挂起不是没登录：再登录一遍没用，给出真正能做的事
+                // 暂时风控不是没登录：再登录一遍没用，给出真正能做的事
                 <div className="composer-hint danger">
                   <span>
                     {tr(
-                      `「${acc?.label ?? ""}」的账号被 Claude 挂起，现在开不了会话。上面切到别的环境，或去申诉`,
-                      `"${acc?.label ?? ""}" is on hold, so sessions can't start. Switch to another environment above, or appeal`,
+                      `「${acc?.label ?? ""}」的账号正在暂时风控，现在开不了会话。上面切到别的环境用，或去查看原因`,
+                      `"${acc?.label ?? ""}" is temporarily restricted, so sessions can't start. Switch to another environment above, or check the details`,
                     )}
                   </span>
                   <button className="composer-fix" onClick={() => void window.claudeBuddy.openExternal("https://claude.ai/restricted")}>
