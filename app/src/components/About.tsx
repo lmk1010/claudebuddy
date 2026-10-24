@@ -102,7 +102,7 @@ export default function About() {
       </div>
 
       <p className="ab-foot">
-        MIT License · © 2026 mingkang liu
+        MIT License · © 2026 MKStudio
         <br />
         {tr("非 Anthropic 官方产品。Claude 是 Anthropic, PBC 的商标。", "Not an official Anthropic product. Claude is a trademark of Anthropic, PBC.")}
       </p>
