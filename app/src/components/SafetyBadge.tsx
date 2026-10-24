@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Account, AccountStatusSnapshot } from "../lib/model";
-import type { DesktopProbe } from "../lib/bridge";
+import type { DesktopProbe, LeakReport } from "../lib/bridge";
 import { tr } from "../lib/i18n";
 
 /**
@@ -49,6 +49,11 @@ export function assessSafety(
    * 但它在服务端就是同一台机器上的另一个身份 —— 所以要说一声。
    */
   desktop?: DesktopProbe | null,
+  /**
+   * UDP / STUN 泄漏体检。STUN 走 UDP，HTTPS_PROXY 根本管不到，
+   * 一旦有人问出真实公网 IP，环境之间的出口隔离就等于没做。
+   */
+  leak?: LeakReport | null,
 ): SafetyReport {
   const issues: SafetyIssue[] = [];
   let passed = 0;
@@ -131,6 +136,30 @@ export function assessSafety(
         text: tr("Claude Desktop 最近用过，还留着登录痕迹", "Claude Desktop was used recently and still holds sign-in traces"),
         fix: tr("要用这个软件做隔离测试的话，先在 Desktop 里退出登录", "If you're testing isolation, sign out in Desktop first"),
         level: "warn",
+      });
+    }
+  }
+
+  /**
+   * STUN 命中是危险级：它不是“配置不对”，是隔离在事实上不成立 ——
+   * 真实出口 IP 已经泄了，而且所有环境泄的是同一个。
+   *
+   * 只看命中，不看泛泛的 UDP：QUIC、DNS 都会走 UDP，报出来只会变成噪声。
+   */
+  if (leak) {
+    for (const t of leak.targets) {
+      if (t.stun.length === 0) continue;
+      issues.push({
+        key: `stun-${t.key}`,
+        text: tr(
+          `${t.label} 正在发 STUN，真实公网 IP 已经暴露`,
+          `${t.label} is sending STUN; the real public IP is exposed`,
+        ),
+        fix: tr(
+          "STUN 走 UDP，代理管不到它。先退出这个程序再继续测试",
+          "STUN uses UDP, which proxies do not cover. Quit it before continuing",
+        ),
+        level: "danger",
       });
     }
   }

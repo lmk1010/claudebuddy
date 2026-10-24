@@ -3455,6 +3455,11 @@
 .cl-desktop p.dim {
   color: var(--t3);
 }
+
+/* STUN 命中：不是提示，是隔离事实上不成立 */
+.cl-desktop p.cl-leak.bad {
+  color: #c64545;
+}
 .cl-pill {
   padding: 1px 7px;
   border-radius: 99px;

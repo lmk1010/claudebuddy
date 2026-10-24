@@ -58,6 +58,7 @@ import type {
   TraceItem,
   KeychainEntry,
   ScannedDir,
+  LeakReport,
   DesktopProbe,
   SessionSummary,
 } from "./lib/bridge";
@@ -367,6 +368,8 @@ export default function App() {
   );
 
   const [desktop, setDesktop] = useState<DesktopProbe | null>(null);
+  /** UDP / STUN 泄漏面 —— 跟 Desktop 一起周期性体检 */
+  const [leak, setLeak] = useState<LeakReport | null>(null);
   /** 安全状态：常驻右栏顶部，四步全过才显示"环境就绪" */
   const [safetyOpen, setSafetyOpen] = useState(false);
   const safety = useMemo(
@@ -376,8 +379,9 @@ export default function App() {
         activeAccount ? status[activeAccount.id] : undefined,
         activeAccount ? exitIp[activeAccount.id] : null,
         desktop,
+        leak,
       ),
-    [activeAccount, status, exitIp, desktop],
+    [activeAccount, status, exitIp, desktop, leak],
   );
 
   /**
@@ -417,6 +421,14 @@ export default function App() {
         },
         () => {
           /* 探测失败就当没装，不干扰使用 */
+        },
+      );
+      void window.claudeBuddy.leakProbe().then(
+        (r) => {
+          if (alive) setLeak(r);
+        },
+        () => {
+          /* 体检失败不干扰使用 */
         },
       );
     };

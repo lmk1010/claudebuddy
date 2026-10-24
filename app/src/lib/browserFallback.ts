@@ -209,6 +209,7 @@ export function installBrowserFallback(): void {
     accountTraces: async () => [],
     accountRepos: async () => [],
     desktopProbe: async () => ({ installed: false, running: false, hasSafeStorage: false, exists: false, signedIn: "none" as const }),
+    leakProbe: async () => ({ targets: [], stunDetected: false, udpDetected: false }),
     accountClearTraces: async () => ({
       ok: false,
       removed: [],

@@ -90,6 +90,41 @@ export interface DesktopProbe {
   error?: string;
 }
 
+/** 一个进程当前的一条 UDP 外连 */
+export interface UdpFlow {
+  command: string;
+  pid: number;
+  local: string;
+  remote: string;
+  /** 命中 STUN 端口：有人在问「我的公网 IP 是多少」 */
+  stun: boolean;
+  external: boolean;
+}
+
+/** 某个应用（本应用 / Claude Desktop）的 UDP 泄漏面 */
+export interface LeakTarget {
+  key: string;
+  label: string;
+  running: boolean;
+  pids: number[];
+  flows: UdpFlow[];
+  stun: UdpFlow[];
+}
+
+/**
+ * UDP / STUN 泄漏体检。
+ *
+ * STUN 走 UDP，代理管不到它 —— Chromium 系的客户端会用它问出真实公网 IP，
+ * 那个 IP 是整机出口，不管每个环境配了什么代理都一样。
+ */
+export interface LeakReport {
+  targets: LeakTarget[];
+  stunDetected: boolean;
+  udpDetected: boolean;
+  checkedAt?: number;
+  error?: string;
+}
+
 export interface TraceItem {
   key: string;
   label: string;
@@ -427,6 +462,8 @@ export interface ClaudeBuddyBridge {
   accountRepos(id: string): Promise<string[]>;
   /** Claude Desktop 的本地体检：不联网、不解密，只读文件与进程 */
   desktopProbe(force?: boolean): Promise<DesktopProbe>;
+  /** UDP / STUN 泄漏体检：只跑 lsof / ps 看 socket，不发包 */
+  leakProbe(force?: boolean): Promise<LeakReport>;
   accountClearTraces(
     id: string,
     keys: string[],

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CleanupAccount, CleanupResult, CleanupSurvey, DesktopProbe } from "../lib/bridge";
+import type { CleanupAccount, CleanupResult, CleanupSurvey, DesktopProbe, LeakReport } from "../lib/bridge";
 import { tierLabel } from "../lib/model";
 import { ConfirmDialog } from "./Modal";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
@@ -92,6 +92,8 @@ export default function CleanPage({
   const [last, setLast] = useState<CleanupResult | null>(null);
   /** Claude Desktop 的本地体检 —— 它不归环境管，这里只展示不提供删除 */
   const [desk, setDesk] = useState<DesktopProbe | null>(null);
+  /** UDP / STUN 泄漏面 —— 同一道体检拿回来 */
+  const [leak, setLeak] = useState<LeakReport | null>(null);
   const menu = useContextMenu();
 
   useEffect(() => {
@@ -102,6 +104,14 @@ export default function CleanPage({
       },
       () => {
         /* 探测失败就不显示这一块 */
+      },
+    );
+    void window.claudeBuddy.leakProbe().then(
+      (r) => {
+        if (alive) setLeak(r);
+      },
+      () => {
+        /* 体检失败就不显示 */
       },
     );
     return () => {
@@ -462,6 +472,19 @@ export default function CleanPage({
               "If you are testing isolation with this app, sign out in Desktop first and sign back in afterwards.",
             )}
           </p>
+          {leak && (
+            <p className={leak.stunDetected ? "cl-leak bad" : "dim"}>
+              {leak.stunDetected
+                ? tr(
+                    "⚠ 检测到 STUN：有程序正在用 UDP 问公网 IP，代理盖不住它，真实出口已暴露。",
+                    "⚠ STUN detected: something is asking for the public IP over UDP, which proxies do not cover. The real exit is exposed.",
+                  )
+                : tr(
+                    "UDP / STUN：未发现异常（STUN 会用 UDP 问出真实公网 IP，代理盖不住它）。",
+                    "UDP / STUN: nothing abnormal (STUN asks for the public IP over UDP, which proxies do not cover).",
+                  )}
+            </p>
+          )}
         </div>
       )}
 

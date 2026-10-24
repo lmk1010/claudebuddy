@@ -36,6 +36,25 @@ const browsersModule = require("./browsers.cjs");
 const DEV_URL = process.env.CLAUDE_BUDDY_DEV_URL || "";
 const isDev = DEV_URL.length > 0;
 
+/**
+ * 网络层硬化 —— 应用自己不能成为风控信号的来源。
+ *
+ * STUN 走 UDP，HTTPS_PROXY 根本管不到它。Chromium 默认允许 WebRTC
+ * 用非代理的 UDP 去 stun.l.google.com 拿公网 IP，而那个 IP 是整机真实出口 ——
+ * 不管给每个环境配了什么代理，它都一样。两个环境各走各的代理，
+ * 却因为同一个 STUN 结果暴露出同一个真实 IP，隔离就白做了。
+ *
+ * 三刀：
+ *   · disable_non_proxied_udp   WebRTC 只走代理，没有代理就完全不用
+ *   · disable-quic              QUIC 也是 UDP，同样绕过 HTTP 代理
+ *   · 去掉 Media Router        它会在后台找局域网设备，发 mDNS
+ *
+ * 必须在 app ready 之前设，之后改无效。
+ */
+app.commandLine.appendSwitch("force-webrtc-ip-handling-policy", "disable_non_proxied_udp");
+app.commandLine.appendSwitch("disable-quic");
+app.commandLine.appendSwitch("disable-features", "MediaRouter,WebRtcAllowInputVolumeAdjustment");
+
 /** 应用图标：开发和打包两种路径都要能找到 */
 function iconPath() {
   const candidates = [
@@ -143,6 +162,7 @@ function saveState(state) {
 
 const acct = require("./account.cjs");
 const desktopModule = require("./desktop.cjs");
+const leakModule = require("./leak.cjs");
 
 /** 当前账号表（从 state 同步进来） */
 function syncAccounts(list) {
@@ -435,6 +455,16 @@ function createWindow() {
       spellcheck: false,
     },
   });
+
+  /**
+   * 一个权限都不给。
+   *
+   * 这一页只需要显示和自己的 IPC，不需要摄像头、麦克风、屏幕、定位。
+   * 全部拒绝就等于把 WebRTC 的入口也堵上了 —— 上面那个 Chromium
+   * 开关是主防线，这里是第二道：即使开关被某个未来版本忽略，也发不出 STUN。
+   */
+  mainWindow.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  mainWindow.webContents.session.setPermissionCheckHandler(() => false);
 
   mainWindow.on("close", () => saveWindowState(mainWindow));
 
@@ -1404,6 +1434,20 @@ ipcMain.handle("account:traces", (_e, { id }) => {
   const a = resolveAccount(id);
   return acct.inspectTraces(a);
 });
+/**
+ * UDP / STUN 泄漏体检。
+ *
+ * STUN 走 UDP，代理管不到它；Chromium 系的客户端会用它问出真实公网 IP。
+ * 这里只跑 lsof / ps 看 socket，不发包 —— 检测本身不能变成新的信号。
+ */
+ipcMain.handle("leak:udp", (_e, { force } = {}) => {
+  try {
+    return leakModule.probe({ force: Boolean(force) });
+  } catch (err) {
+    return { targets: [], stunDetected: false, udpDetected: false, error: String(err?.message || err) };
+  }
+});
+
 /**
  * Claude Desktop 的本地体检。
  *
