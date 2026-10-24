@@ -3808,49 +3808,101 @@
   color: var(--t3);
 }
 
-/* ── 关于页：更新一块 ── */
+/* ── 关于页：更新卡片 ── */
 .ab-upd {
-  margin: 10px 0 2px;
+  margin: 14px 0 2px;
   display: flex;
   justify-content: center;
 }
-.ab-upd-t {
+/*
+ * 卡片而不是一行字。
+ *
+ * 文字状态太轻了：检查命中 CDN 缓存时状态一闪而过，界面上一个字都没变，
+ * 看起来就像按钮坏了。卡片有固定轮廓，状态一变就是“东西变了”，
+ * 配上进度条才看得出真在干活。
+ */
+.ab-card {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: min(420px, 100%);
+  padding: 10px 12px;
+  border: var(--hair) solid var(--ln);
+  border-radius: 10px;
+  background: var(--bg);
+  text-align: left;
+}
+.ab-card-ico {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--t2);
+  justify-content: center;
 }
-.ab-upd-t b {
+.ab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t4);
+}
+.ab-dot.ok {
+  background: var(--success);
+}
+.ab-dot.mid {
+  background: #b48228;
+}
+.ab-dot.bad {
+  background: #c64545;
+}
+.ab-card-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ab-card-txt b {
+  font-size: 12.5px;
   font-weight: var(--w-semibold);
   color: var(--t1);
 }
-.ab-upd-bad {
-  color: #c64545;
-}
-/*
- * 更新块里的文字按钮。
- *
- * 不能拿 .ab-ic：那个是 20×20 的方形图标按钮（display:grid + place-items），
- * 两个汉字塞进去就变成一列一个字，看着像断行。
- */
-.ab-upd-link {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  padding: 2px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  font: inherit;
-  font-size: 12.5px;
+.ab-card-txt small {
+  font-size: 11.5px;
   color: var(--t3);
-  cursor: pointer;
-  transition: background var(--dur-fast) ease-out, color var(--dur-fast) ease-out;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.ab-upd-link:hover {
-  background: var(--hv);
-  color: var(--t1);
+.ab-card-btn {
+  padding: 3px 10px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* 进度条：确定态给出宽度，不确定态（检查中）来回滑 */
+.ab-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+}
+.ab-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--success);
+  transition: width 200ms linear;
+}
+.ab-bar.indet > i {
+  width: 35%;
+  background: #b48228;
+  animation: ab-indet 900ms ease-in-out infinite;
+}
+@keyframes ab-indet {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
 }
 
 /* ── 健康检查页 ── */

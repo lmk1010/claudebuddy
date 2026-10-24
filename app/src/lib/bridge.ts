@@ -135,6 +135,9 @@ export interface UpdateState {
   current: string;
   latest: string | null;
   percent: number;
+  /** 已下字节 / 总字节 —— 下载时显示 45% · 56 MB / 125 MB */
+  transferred?: number;
+  total?: number;
   error: string | null;
   enabled: boolean;
 }

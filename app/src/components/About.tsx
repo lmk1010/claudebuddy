@@ -27,6 +27,14 @@ export default function About() {
   const [claude, setClaude] = useState<CheckItem | null | undefined>(undefined);
   const [copied, setCopied] = useState(false);
   const [upd, setUpd] = useState<UpdateState | null>(null);
+  /**
+   * 本地“正在检查”开关。
+   *
+   * 为什么要它：检查走 CDN 缓存时 100ms 就回来了，状态从
+   * latest → checking → latest 一闪而过 —— 用户看到的画面一个字都没变，
+   * 会以为按钮坏了。所以点下去先自己转够 0.9 秒，哪怕结果早就回来了。
+   */
+  const [spin, setSpin] = useState(false);
 
   useEffect(() => {
     void window.claudeBuddy.info().then(setInfo);
@@ -40,52 +48,73 @@ export default function About() {
 
   const open = (url: string) => void window.claudeBuddy.openExternal(url);
 
+  const check = () => {
+    setSpin(true);
+    void window.claudeBuddy.updateCheck();
+    setTimeout(() => setSpin(false), 900);
+  };
+
   /**
-   * 更新那一块。
+   * 更新卡片。
    *
    * 只在包里有发布源时才画（upd.enabled）—— 开发态和内测包没有 app-update.yml，
    * 显示一个点了没反应的按钮比不显示更糟。
    */
   const updBlock = (() => {
     if (!upd?.enabled) return null;
-    const st = upd.state;
-    const act = () => void window.claudeBuddy.updateCheck();
-    if (st === "checking") return { node: <span className="ab-upd-t"><i className="spinner" />{tr("正在检查…", "Checking…")}</span> };
+    const st = spin || upd.state === "checking" ? "checking" : upd.state;
+    const mb = (n?: number) => (n ? `${(n / 1048576).toFixed(0)} MB` : "");
+    const cur = tr(`当前 ${upd.current}`, `Current ${upd.current}`);
+
+    if (st === "checking")
+      return { tone: "mid", title: tr("正在检查更新…", "Checking for updates…"), sub: cur, action: null, bar: "indet" as const };
     if (st === "available")
       return {
-        node: (
-          <span className="ab-upd-t">
-            <b>{tr(`有新版 ${upd.latest}`, `${upd.latest} is available`)}</b>
-            <button className="btn pri" onClick={() => void window.claudeBuddy.updateDownload()}>
-              {tr(`下载（${upd.current} → ${upd.latest}）`, `Download (${upd.current} → ${upd.latest})`)}
-            </button>
-          </span>
-        ),
+        tone: "mid",
+        title: tr(`有新版 ${upd.latest}`, `${upd.latest} is available`),
+        sub: cur,
+        action: { label: tr("下载", "Download"), pri: true, run: () => void window.claudeBuddy.updateDownload() },
+        bar: null,
       };
     if (st === "downloading")
-      return { node: <span className="ab-upd-t"><i className="spinner" />{tr(`下载中 ${upd.percent}%`, `Downloading ${upd.percent}%`)}</span> };
+      return {
+        tone: "mid",
+        title: tr(`正在下载 ${upd.latest ?? ""}`, `Downloading ${upd.latest ?? ""}`),
+        sub: `${upd.percent}%${upd.total ? ` · ${mb(upd.transferred)} / ${mb(upd.total)}` : ""}`,
+        action: null,
+        bar: { pct: upd.percent },
+      };
     if (st === "ready")
       return {
-        node: (
-          <span className="ab-upd-t">
-            <b>{tr(`${upd.latest} 已下载`, `${upd.latest} downloaded`)}</b>
-            <button className="btn pri" onClick={() => void window.claudeBuddy.updateInstall()}>
-              {tr("重启并安装", "Restart and install")}
-            </button>
-          </span>
-        ),
+        tone: "ok",
+        title: tr(`${upd.latest} 已下载`, `${upd.latest} downloaded`),
+        sub: tr("重启后生效", "Takes effect after restart"),
+        action: { label: tr("重启并安装", "Restart and install"), pri: true, run: () => void window.claudeBuddy.updateInstall() },
+        bar: { pct: 100 },
       };
-    if (st === "latest") return { node: <span className="ab-upd-t">{tr("已是最新版本", "Up to date")}<button className="ab-upd-link" onClick={act} title={tr("再看一眼", "Check again")}>{tr("重查", "Recheck")}</button></span> };
     if (st === "error")
       return {
-        node: (
-          <span className="ab-upd-t">
-            <b className="ab-upd-bad">{tr("检查失败", "Check failed")}</b>
-            <button className="ab-upd-link" onClick={act}>{tr("重试", "Retry")}</button>
-          </span>
-        ),
+        tone: "bad",
+        title: tr("检查失败", "Check failed"),
+        sub: (upd.error || "").split("\n")[0].slice(0, 90),
+        action: { label: tr("重试", "Retry"), pri: false, run: check },
+        bar: null,
       };
-    return { node: <button className="btn" onClick={act}>{tr("检查更新", "Check for updates")}</button> };
+    if (st === "latest")
+      return {
+        tone: "ok",
+        title: tr("已是最新版本", "Up to date"),
+        sub: cur,
+        action: { label: tr("再查一次", "Check again"), pri: false, run: check },
+        bar: null,
+      };
+    return {
+      tone: "idle",
+      title: tr("自动更新", "Automatic updates"),
+      sub: cur,
+      action: { label: tr("检查更新", "Check for updates"), pri: false, run: check },
+      bar: null,
+    };
   })();
   const claudeVer =
     claude === undefined
@@ -122,7 +151,32 @@ export default function About() {
         <img src="./assets/app-icon.png" alt="" />
         <h1>ClaudeBuddy</h1>
         <p className="ab-ver">{tr("版本", "Version")} {info?.version ?? "—"}</p>
-        {updBlock && <div className="ab-upd">{updBlock.node}</div>}
+        {updBlock && (
+          <div className="ab-upd">
+            <div className={`ab-card t-${updBlock.tone}`}>
+              <span className="ab-card-ico">
+                {updBlock.bar === "indet" ? <i className="spinner" /> : <span className={`ab-dot ${updBlock.tone}`} />}
+              </span>
+              <div className="ab-card-txt">
+                <b>{updBlock.title}</b>
+                <small title={updBlock.sub}>{updBlock.sub}</small>
+              </div>
+              {updBlock.action && (
+                <button
+                  className={`btn${updBlock.action.pri ? " pri" : ""} ab-card-btn`}
+                  onClick={updBlock.action.run}
+                >
+                  {updBlock.action.label}
+                </button>
+              )}
+              {updBlock.bar && (
+                <div className={`ab-bar${updBlock.bar === "indet" ? " indet" : ""}`}>
+                  <i style={updBlock.bar === "indet" ? undefined : { width: `${updBlock.bar.pct}%` }} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <p className="ab-line">{tr("给 Claude Code 一个安静的家 —— 多账号、多线路、互不打扰。", "A quiet home for Claude Code: multiple accounts, multiple routes, no interference.")}</p>
         <nav className="ab-links">
           {LINKS.map(([label, url]) => (

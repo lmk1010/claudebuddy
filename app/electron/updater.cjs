@@ -23,7 +23,7 @@ const { app } = require("electron");
 let autoUpdater = null;
 let feedUrl = null;
 let getWindow = () => null;
-let state = { state: "idle", current: app.getVersion(), latest: null, percent: 0, error: null };
+let state = { state: "idle", current: app.getVersion(), latest: null, percent: 0, transferred: 0, total: 0, error: null };
 
 /** 包里有没有发布源 —— 没有就整块不启用 */
 function hasFeed() {
@@ -60,7 +60,9 @@ function init(getWin) {
   autoUpdater.on("checking-for-update", () => push({ state: "checking", error: null }));
   autoUpdater.on("update-available", (i) => push({ state: "available", latest: i.version, error: null }));
   autoUpdater.on("update-not-available", () => push({ state: "latest", latest: state.current, error: null }));
-  autoUpdater.on("download-progress", (p) => push({ state: "downloading", percent: Math.round(p.percent) }));
+  autoUpdater.on("download-progress", (p) =>
+    push({ state: "downloading", percent: Math.round(p.percent), transferred: p.transferred, total: p.total }),
+  );
   autoUpdater.on("update-downloaded", (i) => push({ state: "ready", latest: i.version, percent: 100 }));
   autoUpdater.on("error", (e) => push({ state: "error", error: String(e?.message || e) }));
 
