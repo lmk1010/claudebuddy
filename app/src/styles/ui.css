@@ -1141,6 +1141,8 @@
   /* 图标要在 30px 方块里居中，中线才跟红绿灯（y=24）和顶栏标题对齐 */
   display: grid;
   place-items: center;
+  /* app.css 里旧窄轨的 align-content:start 会把图标顶到方块上沿，必须盖掉 */
+  align-content: center;
   animation: fade-in 200ms var(--ease) both;
   -webkit-app-region: no-drag;
 }
