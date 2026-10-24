@@ -221,6 +221,8 @@ export interface BuddyState {
   copyOnSelect: boolean;
   terminalFontSize: number;
   terminalFontFamily: string;
+  /** 界面语言；没有就跟系统 */
+  lang?: "zh" | "en";
   /** 终端配色：auto = 跟随应用明暗，其余见 termThemes */
   terminalTheme?: string;
   terminalLineHeight?: number;

@@ -10,6 +10,7 @@ import CommandPalette from "./components/CommandPalette";
 import CleanPage from "./components/CleanPage";
 import NetTestPage from "./components/NetTestPage";
 import Guide from "./components/Guide";
+import { setLang, systemLang, tr } from "./lib/i18n";
 import { browserLabel, loadBrowsers } from "./components/LoginButton";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
@@ -112,6 +113,8 @@ type Menu =
 
 export default function App() {
   const [state, setState] = useState<BuddyState>(EMPTY_STATE);
+  // 语言在渲染前定下来：下面所有子组件里的 tr() 读的都是这一次的值
+  setLang(state.lang ?? systemLang());
   const [ready, setReady] = useState(false);
   const [sysDark, setSysDark] = useState(false);
   const [forcedTheme, setForcedTheme] = useState<"light" | "dark" | null>(null);

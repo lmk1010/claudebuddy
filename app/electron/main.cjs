@@ -998,6 +998,12 @@ ipcMain.handle("account:status", async (_e, { id }) => {
  */
 ipcMain.handle("browsers:list", () => browsersModule.list());
 
+/** 界面语言：主进程里给人看的文字跟着切 */
+ipcMain.handle("app:setLang", (_e, l) => {
+  require("./i18n.cjs").setLang(l);
+  return true;
+});
+
 ipcMain.handle("account:login", async (_e, { id, browser }) => {
   const a = resolveAccount(id);
   acct.ensureConfigDir(a);

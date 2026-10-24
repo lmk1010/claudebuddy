@@ -389,6 +389,8 @@ export interface ClaudeBuddyBridge {
   accountLogin(id: string, browser?: string): Promise<LoginHandle>;
   /** 本机能用来登录的浏览器、用户资料、隐私窗口 */
   browsersList(): Promise<BrowserOption[]>;
+  /** 界面语言同步给主进程 */
+  setLang(lang: "zh" | "en"): Promise<boolean>;
   /** CLI 交出授权链接时触发（已经按选择打开 / 复制） */
   onLoginUrl(cb: (p: { id: string; url: string; browser: string }) => void): () => void;
   accountCloseLogin(id: string, termId?: string): Promise<boolean>;

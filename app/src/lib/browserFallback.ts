@@ -201,6 +201,7 @@ export function installBrowserFallback(): void {
       { id: "copy", label: "复制登录链接", sub: "自己粘到任意浏览器", group: "copy" },
     ],
     onLoginUrl: () => () => {},
+    setLang: async () => true,
     accountCloseLogin: async () => false,
     accountLogout: async () => ({ ok: false, output: unsupported }),
     accountCheckExit: async () => ({ ok: false, ip: null, reason: unsupported }),

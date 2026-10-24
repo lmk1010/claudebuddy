@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   accountStatus: (id) => ipcRenderer.invoke("account:status", { id }),
   accountLogin: (id, browser) => ipcRenderer.invoke("account:login", { id, browser }),
   browsersList: () => ipcRenderer.invoke("browsers:list"),
+  setLang: (l) => ipcRenderer.invoke("app:setLang", l),
   onLoginUrl: (cb) => {
     const h = (_e, p) => cb(p);
     ipcRenderer.on("login:url", h);

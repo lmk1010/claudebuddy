@@ -11,6 +11,7 @@ import {
 } from "./iconAliases";
 import Help from "./Help";
 import About from "./About";
+import { systemLang, tr } from "../lib/i18n";
 
 interface Props {
   state: ShellState;
@@ -71,6 +72,16 @@ export default function Settings({ state, update, cat }: Props) {
           {cat === "general" && (
             <>
               <h1>通用</h1>
+              <Row title="语言 / Language" desc={tr("界面文字的语言，立即生效", "Interface language, applies instantly")}>
+                <Seg
+                  value={state.lang ?? systemLang()}
+                  options={[
+                    { v: "zh" as const, l: "中文" },
+                    { v: "en" as const, l: "English" },
+                  ]}
+                  onChange={(v) => update({ lang: v })}
+                />
+              </Row>
               <Row title="启动时恢复上次的会话" desc="关掉后每次打开都回到首页">
                 <Toggle on={state.restoreSessions} onChange={(v) => update({ restoreSessions: v })} />
               </Row>
