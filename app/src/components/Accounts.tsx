@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Account, AccountStatusSnapshot, ProxyConfig } from "../lib/model";
-import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem } from "../lib/bridge";
+import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem, DesktopProbe, LeakReport } from "../lib/bridge";
 import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, relTime, tierLabel, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
+import HealthSection from "./EnvHealth";
 import Art from "./Art";
 import Modal from "./Modal";
 import Help, { Steps } from "./Help";
@@ -365,13 +366,24 @@ export function ImportDialog({
 
 /* ══════════════════════ 编辑环境（弹窗） ══════════════════════ */
 
-export type EnvSection = "general" | "network" | "fingerprint" | "sessions" | "clean";
+export type EnvSection = "health" | "general" | "network" | "fingerprint" | "sessions" | "clean";
 
 /**
- * 五项，按用户的先后顺序排：先登录 → 再配出口 → 需要时调指纹 → 翻历史 → 收拾。
+ * 六项，健康评分放第一位 —— 打开一个环境先告诉你“它现在怎样、哪几项不对”，
+ * 再往下才是具体怎么调。
  * 之前七项（身份、画像、痕迹、删除各占一格）太碎，同一件事要在两三个菜单里找。
  */
 const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof IconGear }[] = [
+  {
+    id: "health",
+    get label() {
+      return tr("健康评分", "Health score");
+    },
+    get desc() {
+      return tr("这个环境现在得多少分，哪几项不对", "This environment's score, and exactly what is off");
+    },
+    icon: IconWarning,
+  },
   {
     id: "general",
     get label() {
@@ -447,13 +459,17 @@ export function EnvModal({
   traces,
   keychain,
   busy,
-  initialSection = "general",
+  peers,
+  desktop,
+  leak,
+  initialSection = "health",
   canRemove,
   onClose,
   onPatch,
   onLogin,
   onLogout,
   onRotate,
+  onCheckExit,
   onLoadTraces,
   onLoadKeychain,
   onSetProxy,
@@ -484,6 +500,12 @@ export function EnvModal({
   onLogin: (browser?: string) => void;
   onLogout: () => void;
   onRotate: () => void;
+  /** 出口重新测一次 —— 健康页上的“测一下”直接用，不用你再去网络页点 */
+  onCheckExit: () => void;
+  /** 全部环境：算“出口/设备码跟谁撞了”要用 */
+  peers: Account[];
+  desktop: DesktopProbe | null;
+  leak: LeakReport | null;
   onLoadTraces: () => void;
   onLoadKeychain: () => void;
   onSetProxy: (p: ProxyConfig) => void;
@@ -586,6 +608,26 @@ export function EnvModal({
             </div>
 
             <div className="em-body" key={sec} data-dir={dir}>
+              {sec === "health" && (
+                <HealthSection
+                  account={account}
+                  status={status}
+                  exitIp={exitIp}
+                  auth={auth}
+                  peers={peers}
+                  desktop={desktop}
+                  leak={leak}
+                  traces={traces}
+                  busy={busy}
+                  onGo={go}
+                  onLogin={onLogin}
+                  onRotate={onRotate}
+                  onCheckExit={onCheckExit}
+                  onLoadTraces={onLoadTraces}
+                  onClearTraces={onClearTraces}
+                />
+              )}
+
               {sec === "general" && (
                 <GeneralSection
                   account={account}

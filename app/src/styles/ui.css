@@ -3593,6 +3593,71 @@
   opacity: 0.7;
 }
 
+/* ── 环境抽屉里的健康评分 ── */
+.hs-score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.02);
+}
+.hs-score.lv-blocked {
+  background: rgba(198, 69, 69, 0.07);
+}
+.hs-score.lv-risk {
+  background: rgba(180, 130, 40, 0.08);
+}
+.hs-score.lv-ok {
+  background: rgba(78, 159, 99, 0.08);
+}
+.hs-num {
+  font-family: var(--mono);
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.hs-score.lv-blocked .hs-num {
+  color: #c64545;
+}
+.hs-score.lv-risk .hs-num {
+  color: #a8792a;
+}
+.hs-score.lv-ok .hs-num {
+  color: #3f7f52;
+}
+.hs-meta {
+  display: flex;
+  flex-direction: column;
+}
+.hs-meta b {
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+}
+.hs-meta small {
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.hs-list {
+  border-top: 0;
+  padding: 0;
+}
+.hs-list .rk-i {
+  padding: 12px 0;
+}
+.hs-list .rk-i:first-child {
+  border-top: var(--hair) solid var(--ln);
+}
+.hs-ok {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 0;
+  font-size: 12.5px;
+  color: #3f7f52;
+}
+
 /* ── 健康检查页 ── */
 .hc-note {
   display: flex;

@@ -162,6 +162,8 @@ export interface TraceItem {
   exists: boolean;
   size: number;
   count: number;
+  /** 不在配置目录里、所有环境共用的一项（如 MCP 日志缓存、客户端日志） */
+  machineWide?: boolean;
 }
 
 export interface ClearResult {

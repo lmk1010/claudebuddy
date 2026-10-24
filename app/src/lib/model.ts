@@ -32,7 +32,7 @@ import { tr } from "./i18n";
 export type ThemeMode = "light" | "dark" | "system";
 
 /** 顶层视图 */
-export type View = "home" | "sessions" | "session" | "accounts" | "network" | "settings" | "clean" | "health";
+export type View = "home" | "sessions" | "session" | "accounts" | "network" | "settings" | "clean";
 
 /** 权限模式 —— 对应 claude --permission-mode */
 export type PermissionMode =
