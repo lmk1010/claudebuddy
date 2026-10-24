@@ -276,19 +276,25 @@ function survey() {
     .filter((s) => !claimedServices.has(s))
     .map((s) => ({ service: s, reason: "没有对应的配置目录" }));
 
-  accounts.sort((a, b) => b.lastActive - a.lastActive);
+  /**
+   * 其他工具（codex-config-ui）临时建的 prof_* 不列出来：那是别的工具自己管的会话目录，
+   * 用户在那边正用着，这里清掉等于把那边的登录拔了。
+   * 但它们仍然参与上面的「认领」—— 否则它们的凭据会被误判成无人认领、进到建议清理里。
+   */
+  const visible = accounts.filter((a) => a.kind !== "codex-profile");
+  visible.sort((a, b) => b.lastActive - a.lastActive);
 
   /**
    * 建议清理的只有 `empty` —— 真正的空壳。
    * 有对话记录但掉了登录的（signed-out）绝不自动建议：
    * 那 600MB 对话一删就没了，而重新登录本来就能救回来。
    */
-  const disposable = accounts.filter((a) => a.state === "empty");
+  const disposable = visible.filter((a) => a.state === "empty");
 
   return {
     ok: true,
     checkedAt: new Date().toISOString(),
-    accounts,
+    accounts: visible,
     orphans,
     suggested: {
       accountIds: disposable.map((a) => a.id),

@@ -30,7 +30,7 @@
 export type ThemeMode = "light" | "dark" | "system";
 
 /** 顶层视图 */
-export type View = "home" | "sessions" | "session" | "accounts" | "settings" | "clean";
+export type View = "home" | "sessions" | "session" | "accounts" | "network" | "settings" | "clean";
 
 /** 权限模式 —— 对应 claude --permission-mode */
 export type PermissionMode =
@@ -221,6 +221,11 @@ export interface BuddyState {
   copyOnSelect: boolean;
   terminalFontSize: number;
   terminalFontFamily: string;
+  /** 终端配色：auto = 跟随应用明暗，其余见 termThemes */
+  terminalTheme?: string;
+  terminalLineHeight?: number;
+  /** 终端四周留白：compact / normal / wide */
+  terminalPadding?: "compact" | "normal" | "wide";
   /** 启动时把上次没关的会话重新拉起来 */
   restoreSessions: boolean;
   /** 侧栏是否展开 */

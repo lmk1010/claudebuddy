@@ -1178,6 +1178,8 @@ export default function App() {
               onRequestCloseOthers={requestCloseOthers}
               onRename={renameWindow}
               onEditNetwork={(id) => setEditor({ id, section: "network" })}
+              termState={state}
+              onTermChange={update}
               showDiff={showDiff}
               onToggleDiff={() => setShowDiff((v) => !v)}
               onNew={() => {
@@ -1305,7 +1307,7 @@ export default function App() {
           />
         )}
 
-        {view === "settings" && settingsCat !== "clean" && settingsCat !== "net" && settingsCat !== "guide" && (
+        {view === "settings" && settingsCat !== "clean" && settingsCat !== "guide" && (
           <Settings key={settingsCat} cat={settingsCat} state={state} update={update} />
         )}
 
@@ -1315,6 +1317,7 @@ export default function App() {
             <Guide
               onGo={(to) => {
                 if (to === "home" || to === "sessions" || to === "accounts") update({ view: to });
+                else if (to === "net") update({ view: "network" });
                 else if (to === "editNet" || to === "editLogin") {
                   update({ view: "accounts" });
                   if (activeAccount) setEditor({ id: activeAccount.id, section: to === "editNet" ? "network" : "general" });
@@ -1324,7 +1327,7 @@ export default function App() {
           </>
         )}
 
-        {view === "settings" && settingsCat === "net" && (
+        {view === "network" && (
           <>
             <div className="wh" />
             <NetTestPage accounts={state.accounts} />

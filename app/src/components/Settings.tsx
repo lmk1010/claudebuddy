@@ -6,7 +6,6 @@ import {
   IconTerminal,
   IconGrid,
   IconInfo,
-  IconGlobe,
   IconTrash,
   IconFile,
 } from "./iconAliases";
@@ -20,7 +19,7 @@ interface Props {
   cat: SettingsCat;
 }
 
-export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "net" | "guide" | "about";
+export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "guide" | "about";
 
 export type CatItem = { id: SettingsCat; label: string; icon: typeof IconSettings };
 
@@ -47,7 +46,6 @@ export const SETTINGS_GROUPS: { title: string; items: CatItem[] }[] = [
     title: "本机",
     items: [
       { id: "clean", label: "清理本机", icon: IconTrash },
-      { id: "net", label: "网络测试", icon: IconGlobe },
     ],
   },
   {
@@ -158,6 +156,9 @@ export default function Settings({ state, update, cat }: Props) {
               </Row>
               <Row title="选中即复制" desc="跟 iTerm2 的习惯一致">
                 <Toggle on={state.copyOnSelect} onChange={(v) => update({ copyOnSelect: v })} />
+              </Row>
+              <Row title="配色、字体、行高、边距" desc="在会话顶栏右上角的「Aa」里改，边改边看效果">
+                <span className="kbd">Aa</span>
               </Row>
             </>
           )}

@@ -7,7 +7,7 @@ import {
   IconClose,
   IconCopy,
   IconFolder,
-  IconGear,
+  IconGlobe,
   IconKey,
   IconPanel,
   IconPlus,
@@ -106,7 +106,8 @@ export default function Sidebar({
     { icon: IconSparkle, label: "首页", view: "home" },
     { icon: IconTerminal, label: "会话", view: "sessions", count: sessions.length ? String(sessions.length) : "" },
     { icon: IconKey, label: "环境", view: "accounts", count: accounts.length ? String(accounts.length) : "" },
-    { icon: IconGear, label: "设置", view: "settings" },
+    // 设置不占主导航（左下角账号菜单、⌘, 都能进）；这里放更常用的「网络」
+    { icon: IconGlobe, label: "网络", view: "network" },
   ];
 
   return (

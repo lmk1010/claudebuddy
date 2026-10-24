@@ -27,7 +27,11 @@ function fetchReport(accountId: string, key: string): Promise<NetReport> {
   if (running) return running;
   const p = window.claudeBuddy
     .netReport(accountId)
-    .catch((e): NetReport => ({ ok: false, reason: e instanceof Error ? e.message : String(e) }))
+    .catch((e): NetReport => {
+      const msg = e instanceof Error ? e.message : String(e);
+      // 开发时界面热更新了、后台没重启，会出现这个；给人话而不是原始报错
+      return { ok: false, reason: /No handler registered/.test(msg) ? "应用后台是旧版本，重启应用后再试" : msg };
+    })
     .then((r) => {
       cache.set(accountId, { key, at: Date.now(), r });
       inflight.delete(accountId);

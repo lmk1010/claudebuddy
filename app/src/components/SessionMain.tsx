@@ -1,10 +1,12 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import ContextMenu from "./ContextMenu";
 import { IconEdit } from "./Rename";
-import type { Account, GitInfo, ShellWindow } from "../lib/model";
+import type { Account, BuddyState, GitInfo, ShellWindow } from "../lib/model";
 import { fmtDuration, proxyLabel } from "../lib/model";
 import TerminalView from "./TerminalView";
 import { NetScore } from "./NetReport";
+import TermSettings from "./TermSettings";
+import { TERM_PADDING } from "../lib/termThemes";
 import {
   IconClose,
   IconCode,
@@ -40,6 +42,9 @@ interface Props {
   onRename: (id: string, title: string) => void;
   /** 打开某个环境的「网络出口」 */
   onEditNetwork: (id: string) => void;
+  /** 终端外观（配色 / 字体 / 字号 / 行高 / 边距），顶栏「Aa」面板里改 */
+  termState: BuddyState;
+  onTermChange: (patch: Partial<BuddyState>) => void;
   showDiff: boolean;
   onToggleDiff: () => void;
   /** ⌘T：在当前账号下再开一个窗口 */
@@ -70,6 +75,8 @@ export default function SessionMain({
   onRequestCloseOthers,
   onRename,
   onEditNetwork,
+  termState,
+  onTermChange,
   onToggleConsole,
   showDiff,
   onToggleDiff,
@@ -84,6 +91,8 @@ export default function SessionMain({
   const running = active ? Date.now() - active.startedAt : 0;
   const [renaming, setRenaming] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [tset, setTset] = useState<DOMRect | null>(null);
+  const termPad = TERM_PADDING[termState.terminalPadding ?? "normal"];
 
   return (
     <>
@@ -128,6 +137,13 @@ export default function SessionMain({
               改动 <em>{git?.changes.length ?? 0}</em>
             </button>
           </div>
+          <button
+            className={`ib sh-aa${tset ? " on" : ""}`}
+            title="终端外观：配色、字体、字号"
+            onClick={(e) => setTset(tset ? null : e.currentTarget.getBoundingClientRect())}
+          >
+            Aa
+          </button>
           <button
             className={`ib${panelOpen ? " on" : ""}`}
             title={panelOpen ? "收起右栏 ⌘B" : "展开右栏 ⌘B"}
@@ -240,6 +256,9 @@ export default function SessionMain({
                     cursorStyle={cursorStyle}
                     cursorBlink={cursorBlink}
                     copyOnSelect={copyOnSelect}
+                    themeId={termState.terminalTheme ?? "auto"}
+                    lineHeight={termState.terminalLineHeight ?? 1.6}
+                    padding={termPad}
                   />
                 );
               })}
@@ -253,6 +272,8 @@ export default function SessionMain({
           )}
         </div>
       </div>
+
+      {tset && <TermSettings state={termState} anchor={tset} onChange={onTermChange} onClose={() => setTset(null)} />}
 
       {ctx && (
         <ContextMenu

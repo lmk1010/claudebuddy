@@ -2947,6 +2947,155 @@
   color: #e2b46a;
 }
 
+/* ══════════ 终端外观面板（会话顶栏 Aa） ══════════ */
+.sh-aa {
+  width: auto;
+  padding: 0 8px;
+  font-family: var(--serif);
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+.tset {
+  position: fixed;
+  z-index: 85;
+  width: 340px;
+  max-height: min(640px, calc(100vh - 90px));
+  overflow-y: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg);
+  box-shadow: 0 24px 60px rgba(30, 20, 10, 0.18), 0 2px 8px rgba(30, 20, 10, 0.08), 0 0 0 0.5px var(--ln2);
+  animation: tset-in 180ms var(--ease-out) both;
+  transform-origin: top right;
+}
+@keyframes tset-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.tset-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: var(--hair) solid var(--ln);
+}
+.tset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  font-size: 12.5px;
+  color: var(--t2);
+}
+.tset-step {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  background: var(--hv);
+  padding: 2px;
+}
+.tset-step button {
+  width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--t2);
+}
+.tset-step button:hover {
+  background: var(--bg);
+  color: var(--t1);
+}
+.tset-step b {
+  min-width: 28px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.tset-h {
+  margin: 14px 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t4);
+}
+.tset-fonts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.tset-fonts button {
+  padding: 4px 9px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  color: var(--t2);
+  box-shadow: inset 0 0 0 0.5px var(--ln2);
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.tset-fonts button:hover {
+  background: var(--hv);
+}
+.tset-fonts button.on {
+  background: var(--t1);
+  color: var(--bg);
+  box-shadow: none;
+}
+.tset-themes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.tset-th {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  text-align: left;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.tset-th:hover {
+  background: var(--hv);
+}
+.tset-pv {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 58px;
+  padding: 10px 10px 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+.tset-pv i {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+}
+.tset-pv > span {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.tset-pv i.cur {
+  width: 5px;
+  height: 9px;
+  border-radius: 1px;
+}
+.tset-th.on .tset-pv {
+  box-shadow: 0 0 0 2px var(--coral);
+}
+.tset-nm {
+  padding: 0 2px;
+  font-size: 11.5px;
+  color: var(--t2);
+}
+.tset-th.on .tset-nm {
+  color: var(--t1);
+  font-weight: 500;
+}
+
 /* ══════════ 登录按钮：主按钮 + 换浏览器 ▾ ══════════ */
 .lgb {
   display: inline-flex;

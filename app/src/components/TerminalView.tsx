@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { ShellWindow } from "../lib/model";
+import { resolveTermTheme } from "../lib/termThemes";
 
 /**
  * 一个窗口的终端视图。
@@ -16,57 +17,6 @@ import type { ShellWindow } from "../lib/model";
  * 保证纸面上也有 4.5:1。
  */
 
-export function terminalTheme() {
-  const dark = document.documentElement.dataset.theme === "dark";
-  return dark
-    ? {
-        background: "#24221F",
-        foreground: "#ECE7DC",
-        cursor: "#DD906F",
-        cursorAccent: "#24221F",
-        selectionBackground: "rgba(221,144,111,0.26)",
-        black: "#1F1D1A",
-        red: "#E27272",
-        green: "#79C38B",
-        yellow: "#E3AA66",
-        blue: "#8FB0CF",
-        magenta: "#C9A3D8",
-        cyan: "#6CC4B2",
-        white: "#ECE7DC",
-        brightBlack: "#827E75",
-        brightRed: "#F08A8A",
-        brightGreen: "#93D3A2",
-        brightYellow: "#F0BF7E",
-        brightBlue: "#A6C3DE",
-        brightMagenta: "#D9B6E4",
-        brightCyan: "#8AD4C4",
-        brightWhite: "#FAF9F5",
-      }
-    : {
-        background: "#FFFEFB",
-        foreground: "#2B2A26",
-        cursor: "#C0653F",
-        cursorAccent: "#FFFEFB",
-        selectionBackground: "rgba(192,101,63,0.18)",
-        black: "#2B2A26",
-        red: "#B5483E",
-        green: "#3E8A53",
-        yellow: "#B06F24",
-        blue: "#3C6E93",
-        magenta: "#8A5E9E",
-        cyan: "#2B8676",
-        white: "#4A4740",
-        brightBlack: "#9A968C",
-        brightRed: "#C64545",
-        brightGreen: "#4E9F63",
-        brightYellow: "#C98831",
-        brightBlue: "#5B86A8",
-        brightMagenta: "#A277B4",
-        brightCyan: "#3A9E8B",
-        brightWhite: "#141413",
-      };
-}
-
 interface Props {
   win: ShellWindow;
   /** 账号只传 id —— 目录与环境由主进程组装，渲染层拿不到路径 */
@@ -77,6 +27,10 @@ interface Props {
   cursorStyle: "block" | "bar" | "underline";
   cursorBlink: boolean;
   copyOnSelect: boolean;
+  /** 配色 id（auto = 跟随应用） */
+  themeId?: string;
+  lineHeight?: number;
+  padding?: string;
 }
 
 export default function TerminalView({
@@ -88,6 +42,9 @@ export default function TerminalView({
   cursorStyle,
   cursorBlink,
   copyOnSelect,
+  themeId = "auto",
+  lineHeight = 1.6,
+  padding,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -101,14 +58,14 @@ export default function TerminalView({
     const term = new Terminal({
       fontFamily: monoStack(fontFamily),
       fontSize,
-      lineHeight: 1.6,
+      lineHeight,
       letterSpacing: 0,
       cursorBlink,
       cursorStyle,
       allowProposedApi: true,
       scrollback: 10000,
       macOptionIsMeta: true,
-      theme: terminalTheme(),
+      theme: resolveTermTheme(themeId),
     });
 
     const fit = new FitAddon();
@@ -196,6 +153,8 @@ export default function TerminalView({
     t.options.fontFamily = monoStack(fontFamily);
     t.options.cursorStyle = cursorStyle;
     t.options.cursorBlink = cursorBlink;
+    t.options.lineHeight = lineHeight;
+    t.options.theme = resolveTermTheme(themeId);
     requestAnimationFrame(() => {
       if (termRef.current !== t) return;
       try {
@@ -205,7 +164,8 @@ export default function TerminalView({
         /* 忽略 */
       }
     });
-  }, [fontSize, fontFamily, cursorStyle, cursorBlink, win.id]);
+    // padding 变了容器尺寸跟着变，也要重新 fit
+  }, [fontSize, fontFamily, cursorStyle, cursorBlink, lineHeight, themeId, padding, win.id]);
 
   // 选中即复制（iTerm2 习惯）
   useEffect(() => {
@@ -223,7 +183,7 @@ export default function TerminalView({
   useEffect(() => {
     const t = termRef.current;
     if (!t || !active) return;
-    t.options.theme = terminalTheme();
+    t.options.theme = resolveTermTheme(themeId);
     requestAnimationFrame(() => {
       try {
         fitRef.current?.fit();
@@ -236,7 +196,12 @@ export default function TerminalView({
   }, [active, win.id]);
 
   return (
-    <div className="term-pane" data-hidden={active ? "false" : "true"} aria-hidden={!active}>
+    <div
+      className="term-pane"
+      data-hidden={active ? "false" : "true"}
+      aria-hidden={!active}
+      style={{ padding, background: resolveTermTheme(themeId).background }}
+    >
       <div ref={hostRef} style={{ height: "100%" }} />
     </div>
   );
