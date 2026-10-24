@@ -81,6 +81,7 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   reveal: (p) => ipcRenderer.invoke("shell:reveal", p),
   ipInfo: (ip) => ipcRenderer.invoke("ip:info", ip),
+  netReport: (id) => ipcRenderer.invoke("account:netReport", { id }),
 
   /* ── 项目与工作区 ── */
   pickFolder: () => ipcRenderer.invoke("dialog:pickFolder"),

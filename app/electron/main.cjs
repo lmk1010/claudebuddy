@@ -494,11 +494,37 @@ ipcMain.handle("state:save", (_e, state) => {
   return true;
 });
 
-ipcMain.handle("term:spawn", (_e, opts) => {
+ipcMain.handle("term:spawn", async (_e, opts) => {
   try {
+    /**
+     * 开终端前先把过期的凭据续上。
+     *
+     * 否则闲置超过 8 小时的环境，一进来就是 401 ——
+     * 看起来像"号掉了"，其实只是没人去刷新 token。
+     */
+    try {
+      const acc = resolveAccount(opts?.account);
+      const r = await acct.refreshTokenIfNeeded(acc);
+      if (!r.ok && r.reason) {
+        // 续不上不阻断启动：让 CLI 自己报它该报的错，比这里吞掉更有用
+        console.warn(`[token] ${acc.label}: ${r.reason}`);
+      }
+    } catch {
+      /* 账号解析失败交给下面的 spawnTerm 抛 */
+    }
     return { ok: true, ...spawnTerm(opts) };
   } catch (err) {
     return { ok: false, error: err?.message || String(err) };
+  }
+});
+
+/** 手动续期一个环境的凭据（面板上的"续期"按钮用） */
+ipcMain.handle("account:refresh-token", async (_e, id) => {
+  try {
+    const acc = resolveAccount(id);
+    return await acct.refreshTokenIfNeeded(acc, { force: true });
+  } catch (err) {
+    return { ok: false, reason: err?.message || String(err) };
   }
 });
 
@@ -1347,10 +1373,12 @@ ipcMain.handle("shell:openExternal", async (_e, url) => {
  * 不需要走这个环境的代理，直连查即可。结果缓存在内存里，同一个 IP 不重复打。
  */
 const ipInfoCache = new Map();
-ipcMain.handle("ip:info", async (_e, ip) => {
+ipcMain.handle("ip:info", async (_e, ip) => lookupIpInfo(ip));
+
+async function lookupIpInfo(ip) {
   if (typeof ip !== "string" || !/^[0-9a-fA-F:.]{3,45}$/.test(ip)) return null;
   if (ipInfoCache.has(ip)) return ipInfoCache.get(ip);
-  const url = `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,isp,org,as,mobile,proxy,hosting&lang=zh-CN`;
+  const url = `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,timezone,isp,org,as,mobile,proxy,hosting&lang=zh-CN`;
   const raw = await new Promise((resolve) => {
     execFile("curl", ["-sS", "--max-time", "6", url], { timeout: 8000 }, (err, out) => resolve(err ? null : out));
   });
@@ -1364,6 +1392,7 @@ ipcMain.handle("ip:info", async (_e, ip) => {
       countryCode: j.countryCode || "",
       region: j.regionName || "",
       city: j.city || "",
+      timezone: j.timezone || "",
       isp: j.isp || "",
       org: j.org || "",
       as: j.as || "",
@@ -1376,7 +1405,135 @@ ipcMain.handle("ip:info", async (_e, ip) => {
   } catch {
     return null;
   }
+}
+
+/** curl 一次，拿状态码、耗时和正文。失败返回 null，不抛。 */
+function curlProbe(url, proxy, env, maxTime = 8) {
+  const args = ["-sS", "--max-time", String(maxTime), "-w", "\n__META__%{http_code} %{time_total}"];
+  if (proxy) args.push("-x", proxy);
+  args.push(url);
+  return new Promise((resolve) => {
+    execFile("curl", args, { timeout: (maxTime + 2) * 1000, env }, (err, out) => {
+      if (err && !out) return resolve(null);
+      const i = String(out).lastIndexOf("\n__META__");
+      if (i < 0) return resolve(null);
+      const [code, t] = String(out).slice(i + 9).trim().split(" ");
+      const status = Number(code);
+      resolve(status ? { status, ms: Math.round(Number(t) * 1000), body: String(out).slice(0, i) } : null);
+    });
+  });
+}
+
+/** Claude 不服务的地区（官方支持列表之外、最常见的几个） */
+const CLAUDE_BLOCKED = new Set(["CN", "HK", "MO", "RU", "BY", "IR", "KP", "SY", "CU"]);
+
+/**
+ * 出口体检 —— 站在 Claude 的角度看这个环境：
+ *   1. Claude 看到的出口（claude.ai/cdn-cgi/trace，走这个环境的代理）
+ *   2. IP 属性（ip-api：归属、运营商、机房 / 代理 / 移动）
+ *   3. 风险分（proxycheck.io 免费档的 risk 0–100 + 类型）
+ *   4. 连通：claude.ai / api.anthropic.com 延迟，官方状态页
+ *   5. 一致性：环境的时区、语言 跟出口所在地对不对得上
+ *
+ * 信任分是我们按这几项估的，不是 Anthropic 的内部分数 —— 界面上照实说。
+ */
+ipcMain.handle("account:netReport", async (_e, { id }) => {
+  const a = resolveAccount(id);
+  const env = acct.envForAccount(a);
+  const proxy = acct.proxyOrNothing(a);
+
+  const [trace, api, statusPage] = await Promise.all([
+    curlProbe("https://claude.ai/cdn-cgi/trace", proxy, env),
+    curlProbe("https://api.anthropic.com/", proxy, env),
+    curlProbe("https://status.claude.com/api/v2/status.json", proxy, env),
+  ]);
+  const tr = {};
+  if (trace?.body) for (const line of trace.body.split("\n")) {
+    const k = line.indexOf("=");
+    if (k > 0) tr[line.slice(0, k)] = line.slice(k + 1).trim();
+  }
+  let ip = tr.ip || null;
+  if (!ip) ip = (await acct.checkExitIp(a))?.ip ?? null;
+  if (!ip) return { ok: false, reason: "拿不到出口 IP：代理不可达或网络不通" };
+
+  const [info, risk] = await Promise.all([
+    lookupIpInfo(ip),
+    curlProbe(`https://proxycheck.io/v2/${ip}?vpn=1&risk=1&asn=1`, null, process.env, 6).then((r) => {
+      try {
+        const j = JSON.parse(r?.body || "");
+        const d = j[ip];
+        return d ? { risk: Number(d.risk ?? 0), type: d.type || "", proxy: d.proxy === "yes", provider: d.provider || "" } : null;
+      } catch {
+        return null;
+      }
+    }),
+  ]);
+
+  // 信任分：100 − 风险分，再按标记扣
+  let score = risk ? 100 - Math.max(0, Math.min(100, risk.risk)) : 80;
+  const flags = [];
+  if (risk?.proxy || info?.proxy) {
+    score = Math.min(score, 30);
+    flags.push("被标记为代理 / VPN");
+  }
+  const hosting = Boolean(info?.hosting) || /hosting|business|data ?cent/i.test(risk?.type || "");
+  if (hosting) {
+    score -= 15;
+    flags.push("机房 IP");
+  }
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  const loc = tr.loc || info?.countryCode || "";
+  const tz = (a.terminal && a.terminal.tz) || "Asia/Shanghai";
+  const lang = (a.terminal && a.terminal.lang) || "en_US.UTF-8";
+  const ipTz = info?.timezone || "";
+  const zhCountries = new Set(["CN", "TW", "HK", "MO", "SG"]);
+  let st = null;
+  try {
+    st = JSON.parse(statusPage?.body || "").status;
+  } catch {
+    /* 状态页没拿到 */
+  }
+
+  return {
+    ok: true,
+    ip,
+    at: Date.now(),
+    info,
+    risk,
+    score,
+    flags,
+    kind: risk?.type || (info?.mobile ? "Mobile" : hosting ? "Hosting" : "Residential"),
+    claude: {
+      loc,
+      colo: tr.colo || "",
+      supported: loc ? !CLAUDE_BLOCKED.has(loc) : null,
+      web: trace ? { ok: true, ms: trace.ms } : { ok: false, ms: 0 },
+      api: api ? { ok: true, ms: api.ms } : { ok: false, ms: 0 },
+      status: st ? { ok: st.indicator === "none", text: st.description } : null,
+    },
+    consistency: {
+      tz,
+      ipTz,
+      tzOk: !ipTz || tz === ipTz || offsetOf(tz) === offsetOf(ipTz),
+      lang,
+      langOk: !info?.countryCode || zhCountries.has(info.countryCode) === /^zh/i.test(lang),
+    },
+  };
 });
+
+/** 某个时区当前的 UTC 偏移（分钟）。时区名不同但偏移一样的不算不一致 */
+function offsetOf(tz) {
+  try {
+    const s = new Date().toLocaleString("en-US", { timeZone: tz, timeZoneName: "longOffset" });
+    const m = s.match(/GMT([+-]\d{2}):?(\d{2})?/);
+    if (!m) return 0;
+    const sign = m[1].startsWith("-") ? -1 : 1;
+    return Number(m[1]) * 60 + sign * Number(m[2] || 0);
+  } catch {
+    return NaN;
+  }
+}
 
 /** 在访达里显示一个目录 —— 只允许家目录下的路径 */
 ipcMain.handle("shell:reveal", async (_e, p) => {

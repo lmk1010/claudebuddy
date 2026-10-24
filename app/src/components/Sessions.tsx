@@ -182,7 +182,9 @@ export default function Sessions(p: Props) {
                 onClick={() => setEnv(a.id)}
                 style={{ "--c": a.tint } as CSSProperties}
               >
-                <i />
+                <span className="av xs" style={{ background: a.tint }}>
+                  {a.label.slice(0, 1)}
+                </span>
                 {a.label}
                 {tab === "live" && liveBy[a.id] ? <em>{liveBy[a.id]}</em> : null}
               </button>
@@ -242,7 +244,11 @@ export default function Sessions(p: Props) {
                           }}
                           title={`${w.cwd}\n双击重命名 · 右键更多`}
                         >
-                          <span className="sv-live" />
+                          {/* 图标说明它是什么（Claude / 终端），右下角的小点说明它在跑 */}
+                          <span className={`sv-ico${w.runsClaude ? " claude" : ""}`} title={w.runsClaude ? "Claude Code · 运行中" : "终端 · 运行中"}>
+                            {w.runsClaude ? <img src="./assets/claude-spark.png" alt="" /> : <IconTerminal size={14} />}
+                            <i />
+                          </span>
                           <span className="sv-nm">
                             {renaming === w.id ? (
                               <RenameInput
@@ -257,7 +263,6 @@ export default function Sessions(p: Props) {
                             )}
                             <small className="mono">{shortenHome(w.cwd)}</small>
                           </span>
-                          <span className="sv-tag mono">{w.runsClaude ? "claude" : "zsh"}</span>
                           <span className="sv-tm">
                             <span>已运行 {fmtDuration((Date.now() - w.startedAt) / 1000)}</span>
                             <small>{shortTime(w.lastActivityAt)} 活动</small>
@@ -297,7 +302,9 @@ export default function Sessions(p: Props) {
                           }}
                           title={`${s.cwd}\n点一下在原目录里接着开`}
                         >
-                          <span className="sv-idle" />
+                          <span className="sv-ico idle">
+                            <IconClock size={14} />
+                          </span>
                           <span className="sv-nm">
                             <b>{s.title}</b>
                             <small className="mono">{shortenHome(s.cwd)}</small>

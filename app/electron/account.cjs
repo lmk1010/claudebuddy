@@ -15,7 +15,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 const crypto = require("node:crypto");
-const { execFile } = require("node:child_process");
+const { execFile, spawnSync } = require("node:child_process");
 
 const HOME = process.env.CLAUDE_BUDDY_HOME || os.homedir();
 
@@ -95,7 +95,12 @@ function envForAccount(account, { includeProxy = true } = {}) {
   delete env.NO_PROXY;
   delete env.no_proxy;
 
-  env.CLAUDE_CONFIG_DIR = configDirOf(account);
+  /**
+   * 默认环境（~/.claude）不能显式设 CLAUDE_CONFIG_DIR：只要设了，CLI 就去找
+   * 带哈希后缀的 Keychain 条目，读不到主条目里的凭据，明明登录着却报「未登录」。
+   * 不设时 CLI 默认就用 ~/.claude，结果一样。
+   */
+  if (account.configDir !== ".claude") env.CLAUDE_CONFIG_DIR = configDirOf(account);
 
   /**
    * 终端画像：这三项会进 Claude Code 的 env 上报（terminal / lang / 时区）。
@@ -470,11 +475,130 @@ function listKeychainEntries() {
 /** 判断某条 Keychain 是否属于这个账号（后缀 = 配置目录派生的 8 位 hex） */
 function keychainSuffixFor(account) {
   if (account.configDir === ".claude") return null; // 主条目
+  /**
+   * 后缀是 **完整绝对路径** 的 sha256 前 8 位，不是目录名。
+   * 用目录名算出来的值跟 CLI 实际写入的条目对不上 ——
+   * 结果就是"看得见账号、却读不到也续不了它的凭据"。
+   */
   return crypto
     .createHash("sha256")
-    .update(account.configDir)
+    .update(configDirOf(account))
     .digest("hex")
     .slice(0, 8);
+}
+
+/** Keychain 里这条凭据的 service 名 */
+function keychainServiceFor(account) {
+  const suffix = keychainSuffixFor(account);
+  return suffix ? `Claude Code-credentials-${suffix}` : "Claude Code-credentials";
+}
+
+/** 读凭据 JSON。读不到返回 null，不抛。 */
+function readCredential(account) {
+  const svc = keychainServiceFor(account);
+  const r = spawnSync("security", ["find-generic-password", "-s", svc, "-w"], {
+    encoding: "utf8",
+  });
+  if (r.status !== 0 || !r.stdout) return null;
+  try {
+    return JSON.parse(r.stdout);
+  } catch {
+    return null;
+  }
+}
+
+/** 写回凭据。调用方负责确保结构完整。 */
+function writeCredential(account, full) {
+  const svc = keychainServiceFor(account);
+  const r = spawnSync(
+    "security",
+    ["add-generic-password", "-U", "-s", svc, "-a", os.userInfo().username, "-w", JSON.stringify(full)],
+    { encoding: "utf8" }
+  );
+  return r.status === 0;
+}
+
+/**
+ * access token 快过期或已过期时主动续期。
+ *
+ * 为什么必须自己做：CLI 只在真正发请求撞上 401 时才刷新，而一个闲置的
+ * 环境会一直挂着过期的 token。用户下次打开会话就是一句 401，
+ * 看起来像"号又掉了"，其实只是没人去续。
+ *
+ * 提前 2 分钟续，避免刚好卡在边界上。
+ */
+async function refreshTokenIfNeeded(account, { force = false } = {}) {
+  const full = readCredential(account);
+  if (!full || !full.claudeAiOauth) {
+    return { ok: false, reason: "没有可读的凭据" };
+  }
+  const o = full.claudeAiOauth;
+  const exp = Number(o.expiresAt || 0);
+  const now = Date.now();
+  if (!force && exp - now > 2 * 60 * 1000) {
+    return { ok: true, refreshed: false, expiresAt: exp };
+  }
+  if (!o.refreshToken) {
+    return { ok: false, reason: "没有 refresh token，需要重新登录" };
+  }
+
+  const body = JSON.stringify({
+    grant_type: "refresh_token",
+    refresh_token: o.refreshToken,
+    client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+  });
+
+  const json = await new Promise((resolve) => {
+    const req = require("node:https").request(
+      "https://platform.claude.com/v1/oauth/token",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "user-agent": "claude-cli/2.1.309 (external, cli)",
+        },
+        timeout: 15000,
+      },
+      (res) => {
+        let buf = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (buf += c));
+        res.on("end", () => {
+          if (res.statusCode !== 200) {
+            return resolve({ ok: false, reason: `${res.statusCode}: ${buf.slice(0, 200)}` });
+          }
+          try {
+            resolve({ ok: true, data: JSON.parse(buf) });
+          } catch {
+            resolve({ ok: false, reason: "返回不是 JSON" });
+          }
+        });
+      }
+    );
+    req.on("timeout", () => {
+      req.destroy();
+      resolve({ ok: false, reason: "超时" });
+    });
+    req.on("error", (e) => resolve({ ok: false, reason: String(e.code || e.message) }));
+    req.end(body);
+  });
+
+  if (!json.ok) return { ok: false, reason: json.reason };
+
+  // 立刻落盘。refresh token 是一次性轮换的，拿到新值不写回去，
+  // 旧的就废了 —— 这一步不能省，也不能延后。
+  const d = json.data;
+  o.accessToken = d.access_token;
+  if (d.refresh_token) o.refreshToken = d.refresh_token;
+  o.expiresAt = Date.now() + (d.expires_in || 28800) * 1000;
+  if (d.refresh_token_expires_in) {
+    o.refreshTokenExpiresAt = Date.now() + d.refresh_token_expires_in * 1000;
+  }
+  if (d.scope) o.scopes = String(d.scope).split(" ");
+  full.claudeAiOauth = o;
+
+  const written = writeCredential(account, full);
+  return { ok: written, refreshed: true, expiresAt: o.expiresAt, error: written ? undefined : "写入 Keychain 失败" };
 }
 
 /**
@@ -693,10 +817,15 @@ module.exports = {
   rotateIdentity,
   identityFile,
   checkExitIp,
+  proxyOrNothing,
   collectProfile,
   remoteHashOf,
   inspectTraces,
   listKeychainEntries,
   keychainSuffixFor,
+  keychainServiceFor,
+  readCredential,
+  writeCredential,
+  refreshTokenIfNeeded,
   dirSize,
 };

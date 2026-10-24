@@ -119,7 +119,12 @@ export default function Home(p: Props) {
                       {a.label.slice(0, 1)}
                     </span>
                     <span className="envtab-n">{a.label}</span>
-                    <i className={`envtab-st ${st === "signedIn" ? "ok" : st === "suspended" ? "bad" : ""}`} />
+                    {/* 登录好的不打标；没登录的挂一把小钥匙，一眼看出「这个要先登录」 */}
+                    {st !== "signedIn" && (
+                      <span className={`envtab-st${st === "suspended" ? " bad" : ""}`} title={AUTH_LABEL[st]}>
+                        <IconKey size={11} />
+                      </span>
+                    )}
                     {p.runningBy[a.id] ? <em>{p.runningBy[a.id]}</em> : null}
                   </button>
                 );
@@ -133,7 +138,7 @@ export default function Home(p: Props) {
               <Steps
                 items={[
                   "上面选中哪个环境，新会话就开在哪个环境里",
-                  "绿点 = 已登录，灰点 = 还没登录（点它再点「现在登录」）",
+                  "名字后面挂着小钥匙的 = 还没登录（选中它再点「现在登录」）",
                   "双击环境名能编辑：改名、登录、设代理、清痕迹",
                   "点 + 新建一个环境，给另一个账号用",
                 ]}

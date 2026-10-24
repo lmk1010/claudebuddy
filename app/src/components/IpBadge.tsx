@@ -3,7 +3,7 @@ import type { IpInfo } from "../lib/bridge";
 import { useContextMenu } from "./ContextMenu";
 
 /** 国家码 → 旗帜 emoji */
-function flag(cc: string): string {
+export function flag(cc: string): string {
   if (!/^[A-Z]{2}$/i.test(cc)) return "";
   return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 }
@@ -24,7 +24,8 @@ export function ipKind(i: IpInfo): { label: string; tone: "ok" | "mid" | "bad"; 
 }
 
 /** 去外部站点看更完整的纯净度评分 */
-const CHECKERS: { label: string; url: (ip: string) => string }[] = [
+export const CHECKERS: { label: string; url: (ip: string) => string }[] = [
+  { label: "ip.net.coffee · IP 评分", url: (ip) => `https://ip.net.coffee/ip/?ip=${ip}` },
   { label: "Scamalytics · 欺诈分", url: (ip) => `https://scamalytics.com/ip/${ip}` },
   { label: "IPinfo · 归属与类型", url: (ip) => `https://ipinfo.io/${ip}` },
   { label: "ping0 · 原生 / 广播", url: (ip) => `https://ping0.cc/ip/${ip}` },

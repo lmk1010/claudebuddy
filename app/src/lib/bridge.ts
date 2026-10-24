@@ -224,6 +224,32 @@ export interface IpInfo {
   proxy: boolean;
   /** 机房 / 云服务器 IP */
   hosting: boolean;
+  /** IP 所在时区，如 America/Los_Angeles */
+  timezone?: string;
+}
+
+/** 出口体检：站在 Claude 的角度看一个环境的出口 */
+export interface NetReport {
+  ok: boolean;
+  reason?: string;
+  ip?: string;
+  at?: number;
+  info?: IpInfo | null;
+  /** proxycheck.io：risk 0–100，越低越干净 */
+  risk?: { risk: number; type: string; proxy: boolean; provider: string } | null;
+  /** 我们估的信任分 0–100 */
+  score?: number;
+  flags?: string[];
+  kind?: string;
+  claude?: {
+    loc: string;
+    colo: string;
+    supported: boolean | null;
+    web: { ok: boolean; ms: number };
+    api: { ok: boolean; ms: number };
+    status: { ok: boolean; text: string } | null;
+  };
+  consistency?: { tz: string; ipTz: string; tzOk: boolean; lang: string; langOk: boolean };
 }
 
 export interface ProxyCandidate {
@@ -329,6 +355,8 @@ export interface ClaudeBuddyBridge {
   reveal(path: string): Promise<boolean>;
   /** 出口 IP 的归属与类型；查不到返回 null */
   ipInfo(ip: string): Promise<IpInfo | null>;
+  /** 出口体检（走这个环境的代理） */
+  netReport(id: string): Promise<NetReport>;
   gitInfo(cwd: string): Promise<GitInfo>;
   recentProjects(id?: string): Promise<RecentProject[]>;
   sessionUsage(opts: { configDir: string; cwd: string }): Promise<SessionUsage | null>;

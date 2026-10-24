@@ -5,7 +5,7 @@ import Inspector, { InspectorEmpty } from "./components/Inspector";
 import AccountsPage, { CreateEnvDialog, EnvModal, ImportDialog, type EnvSection } from "./components/Accounts";
 import Sessions from "./components/Sessions";
 import Home from "./components/Home";
-import Settings from "./components/Settings";
+import Settings, { type SettingsCat } from "./components/Settings";
 import CommandPalette from "./components/CommandPalette";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
@@ -20,6 +20,7 @@ import {
   IconPlan,
   IconSettings,
   IconShield,
+  IconTrash,
 } from "./components/iconAliases";
 import {
   ACCOUNT_TINTS,
@@ -116,7 +117,9 @@ export default function App() {
   // 账号实时状态（全部来自主进程）
   const [status, setStatus] = useState<Record<string, AccountStatusSnapshot>>({});
   const [exitIp, setExitIp] = useState<Record<string, string | null>>({});
-  const [checking, setChecking] = useState<Record<string, boolean>>({});
+  const [, setChecking] = useState<Record<string, boolean>>({});
+  /** 从别处直接跳进设置的某个分类（比如账号菜单里的「清理本机」） */
+  const [settingsCat, setSettingsCat] = useState<SettingsCat | null>(null);
   const [loginTerm, setLoginTerm] = useState<Record<string, string>>({});
   const [traces, setTraces] = useState<Record<string, TraceItem[] | undefined>>({});
   const [keychain, setKeychain] = useState<KeychainEntry[] | null>(null);
@@ -1187,7 +1190,6 @@ export default function App() {
             account={drawerAccount}
             status={status[drawerAccount.id]}
             exitIp={exitIp[drawerAccount.id] ?? null}
-            checking={Boolean(checking[drawerAccount.id])}
             loginTermId={loginTerm[drawerAccount.id] ?? null}
             traces={traces[drawerAccount.id]}
             keychain={keychain}
@@ -1195,7 +1197,6 @@ export default function App() {
             onClose={() => setEditor(null)}
             onLogin={() => login(drawerAccount.id)}
             onLogout={() => logout(drawerAccount.id)}
-            onCheckExit={() => checkExit(drawerAccount.id)}
             onRotate={() => rotate(drawerAccount.id)}
             onLoadTraces={() => loadTraces(drawerAccount.id)}
             onLoadKeychain={loadKeychain}
@@ -1262,10 +1263,11 @@ export default function App() {
 
         {view === "settings" && (
           <Settings
+            key={settingsCat ?? "default"}
+            initialCat={settingsCat ?? undefined}
             state={state}
             update={update}
             onClose={() => update({ view: "home" })}
-            onAddAccount={() => setCreateOpen(true)}
           />
         )}
 
@@ -1350,8 +1352,9 @@ export default function App() {
               setMenu(null);
               update({ onboarded: false });
             }}
-            onOpenSettings={() => {
+            onOpenSettings={(cat) => {
               setMenu(null);
+              setSettingsCat(cat ?? null);
               update({ view: "settings" });
             }}
           />
@@ -1512,13 +1515,13 @@ function MenuBody({
   onOpenSettings,
 }: {
   onGuide: () => void;
+  onOpenSettings: (cat?: SettingsCat) => void;
   menu: NonNullable<Menu>;
   state: BuddyState;
   onPickAccount: (id: string) => void;
   onPickPermission: (p: PermissionMode) => void;
   onEditAccount: (id: string) => void;
   onManageAccounts: () => void;
-  onOpenSettings: () => void;
 }) {
   const { ref, pos } = useAnchoredPosition(menu.at);
   // 首次量之前先藏在屏幕外，避免在 (0,0) 闪一帧
@@ -1573,7 +1576,9 @@ function MenuBody({
               role="menuitemradio"
               aria-checked={on}
             >
-              <span className="pop-dot" style={{ background: a.tint }} />
+              <span className="av xs" style={{ background: a.tint }}>
+                {a.label.slice(0, 1)}
+              </span>
               <span className="pi-main">{a.label}</span>
               <small>{AUTH_LABEL[a.auth] ?? AUTH_LABEL.unknown}</small>
               <span className="pi-mark">{on ? <IconCheck size={11} /> : null}</span>
@@ -1591,11 +1596,15 @@ function MenuBody({
           <IconAccounts size={15} />
           <span className="pi-main">管理环境…</span>
         </button>
+        <button className="pi" onClick={() => onOpenSettings("clean")} role="menuitem">
+          <IconTrash size={15} />
+          <span className="pi-main">清理本机…</span>
+        </button>
         <button className="pi" onClick={onGuide} role="menuitem">
           <IconAuto size={15} />
           <span className="pi-main">新手引导</span>
         </button>
-        <button className="pi" onClick={onOpenSettings} role="menuitem">
+        <button className="pi" onClick={() => onOpenSettings()} role="menuitem">
           <IconSettings size={15} />
           <span className="pi-main">设置…</span>
           <small>⌘,</small>

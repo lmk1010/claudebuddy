@@ -414,6 +414,20 @@ export function proxyUrl(p: ProxyConfig): string | null {
   return `${p.protocol}://${auth}${p.host}:${p.port}`;
 }
 
+/** 订阅档位的人话：default_claude_max_5x → Max 5x */
+export function tierLabel(tier: string | null | undefined): string {
+  if (!tier) return "";
+  const t = tier.toLowerCase();
+  const m = t.match(/max_(\d+x)/);
+  if (m) return `Max ${m[1]}`;
+  if (t.includes("max")) return "Max";
+  if (t.includes("pro")) return "Pro";
+  if (t.includes("team")) return "Team";
+  if (t.includes("enterprise")) return "Enterprise";
+  if (t.includes("free")) return "Free";
+  return tier.replace(/^default_claude_/, "");
+}
+
 /** 界面上显示的短形式：socks5://127.0.0.1:1080 */
 export function proxyLabel(p: ProxyConfig): string {
   const url = proxyUrl(p);

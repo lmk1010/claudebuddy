@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Account, AccountStatusSnapshot, ProxyConfig } from "../lib/model";
 import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem } from "../lib/bridge";
-import { ACCOUNT_TINTS, AUTH_LABEL, AUTH_PILL, proxyLabel, relTime, type SimilarityReport } from "../lib/model";
+import { ACCOUNT_TINTS, AUTH_LABEL, AUTH_PILL, proxyLabel, relTime, tierLabel, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
 import Art from "./Art";
 import Modal from "./Modal";
 import Help, { Steps } from "./Help";
 import IpBadge from "./IpBadge";
+import NetReportCard from "./NetReport";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import type { ProxyCandidate } from "../lib/bridge";
 import {
@@ -76,7 +77,7 @@ export default function Accounts(p: Props) {
       { label: "复制配置目录路径", icon: <IconCopy size={14} />, run: () => p.onCopy(`~/${a.configDir}`) },
       { label: "在访达中打开目录", icon: <IconFile size={14} />, run: () => p.onReveal(`~/${a.configDir}`) },
       "sep",
-      { label: "删除环境…", icon: <IconTrash size={14} />, danger: true, run: () => p.onOpenDetail(a, "danger") },
+      { label: "删除环境…", icon: <IconTrash size={14} />, danger: true, run: () => p.onOpenDetail(a, "clean") },
     ];
   };
   return (
@@ -280,7 +281,7 @@ export function ImportDialog({
                       <b className="mono">~/{d.configDir}</b>
                       <small>
                         {d.email ?? "未登录"}
-                        {d.tier ? ` · ${d.tier}` : ""} · {d.sessions} 个会话 · {fmtSize(d.sizeBytes)}
+                        {d.tier ? ` · ${tierLabel(d.tier)}` : ""} · {d.sessions} 个会话 · {fmtSize(d.sizeBytes)}
                         {d.lastActive ? ` · ${relTime(d.lastActive)}` : ""}
                       </small>
                     </span>
@@ -309,15 +310,18 @@ export function ImportDialog({
 
 /* ══════════════════════ 编辑环境（弹窗） ══════════════════════ */
 
-export type EnvSection = "general" | "network" | "identity" | "profile" | "sessions" | "traces" | "danger";
+export type EnvSection = "general" | "network" | "fingerprint" | "sessions" | "clean";
 
+/**
+ * 五项，按用户的先后顺序排：先登录 → 再配出口 → 需要时调指纹 → 翻历史 → 收拾。
+ * 之前七项（身份、画像、痕迹、删除各占一格）太碎，同一件事要在两三个菜单里找。
+ */
 const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof IconGear }[] = [
-  { id: "general", label: "通用", desc: "名字、标识色和这个环境的登录状态", icon: IconGear },
-  { id: "network", label: "网络出口", desc: "这个环境走哪条线路出去。一个环境固定一个出口", icon: IconGlobe },
-  { id: "identity", label: "设备身份", desc: "遥测里代表\"这台机器\"的那串 ID", icon: IconShield },
-  { id: "profile", label: "终端画像", desc: "终端类型、语言、时区 —— 会进 env 上报", icon: IconTerminal },
+  { id: "general", label: "通用", desc: "名字、标识色和登录", icon: IconGear },
+  { id: "network", label: "网络出口", desc: "这个环境走哪条线路出去，以及 Claude 看到的出口质量", icon: IconGlobe },
+  { id: "fingerprint", label: "设备指纹", desc: "设备 ID、终端类型、语言、时区 —— 都会随请求上报", icon: IconShield },
   { id: "sessions", label: "历史会话", desc: "这个环境跑过的会话，点一条在原目录里接着开", icon: IconClock },
-  { id: "traces", label: "本机痕迹", desc: "这个环境在磁盘和 Keychain 里留下了什么", icon: IconFile },
+  { id: "clean", label: "清理", desc: "这个环境在磁盘和 Keychain 里留下的东西，以及删除环境", icon: IconTrash },
 ];
 
 /**
@@ -330,7 +334,6 @@ export function EnvModal({
   account,
   status,
   exitIp,
-  checking,
   loginTermId,
   traces,
   keychain,
@@ -341,7 +344,6 @@ export function EnvModal({
   onPatch,
   onLogin,
   onLogout,
-  onCheckExit,
   onRotate,
   onLoadTraces,
   onLoadKeychain,
@@ -360,7 +362,6 @@ export function EnvModal({
   account: Account;
   status: AccountStatusSnapshot | undefined;
   exitIp: string | null;
-  checking: boolean;
   loginTermId: string | null;
   traces: TraceItem[] | undefined;
   keychain: KeychainEntry[] | null;
@@ -372,7 +373,6 @@ export function EnvModal({
   onPatch: (patch: Partial<Account>) => void;
   onLogin: () => void;
   onLogout: () => void;
-  onCheckExit: () => void;
   onRotate: () => void;
   onLoadTraces: () => void;
   onLoadKeychain: () => void;
@@ -391,7 +391,7 @@ export function EnvModal({
   const auth = status?.auth ?? account.auth ?? "unknown";
   const [sec, setSec] = useState<EnvSection>(initialSection);
   const [dir, setDir] = useState<"up" | "down">("down");
-  const order: EnvSection[] = [...SECTIONS.map((s) => s.id), "danger"];
+  const order: EnvSection[] = SECTIONS.map((s) => s.id);
 
   const go = (next: EnvSection) => {
     if (next === sec) return;
@@ -410,14 +410,11 @@ export function EnvModal({
   // 进到需要数据的分类时自动去读，不让用户再点一次「加载」
   useEffect(() => {
     if (sec === "sessions" && sessions === undefined) onLoadSessions();
-    if (sec === "traces" && traces === undefined) onLoadTraces();
+    if (sec === "clean" && traces === undefined) onLoadTraces();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sec]);
 
-  const meta = SECTIONS.find((s) => s.id === sec) ?? {
-    label: "删除环境",
-    desc: "从列表里移除，或者连目录一起删掉",
-  };
+  const meta = SECTIONS.find((s) => s.id === sec) ?? SECTIONS[0];
 
   return (
     <Modal onClose={onClose} className="em" label={`编辑 ${account.label}`}>
@@ -448,11 +445,6 @@ export function EnvModal({
                   {s.id === "general" && auth !== "signedIn" && <em className="em-badge" title="还没登录" />}
                 </button>
               ))}
-              <span className="em-sep" />
-              <button data-sec="danger" className={`em-danger${sec === "danger" ? " on" : ""}`} onClick={() => go("danger")}>
-                <IconTrash size={15} />
-                <span>删除环境</span>
-              </button>
             </div>
 
             <div className="em-foot">
@@ -496,15 +488,19 @@ export function EnvModal({
               {sec === "network" && (
                 <NetworkSection
                   account={account}
-                  exitIp={exitIp}
-                  checking={checking}
                   onSetProxy={onSetProxy}
-                  onCheckExit={onCheckExit}
+                  onIp={(ip) => {
+                    onPatch({ lastExitIp: ip, lastExitCheckedAt: Date.now() });
+                  }}
+                  onAlign={(t) => onPatch({ terminal: { ...account.terminal, ...t } })}
                 />
               )}
 
-              {sec === "identity" && (
+              {sec === "fingerprint" && (
                 <>
+                  <div className="em-sub">
+                    <span>设备身份</span>
+                  </div>
                   <div className="em-card">
                     <Row title="userID" desc="遥测里的 device_id">
                       <code className="em-code">{status?.identity.userID ? `${status.identity.userID.slice(0, 18)}…` : "尚未生成"}</code>
@@ -530,14 +526,9 @@ export function EnvModal({
                       </button>
                     </Row>
                   </div>
-                  <div className="em-note">
-                    轮换换不掉账号 UUID、uname 画像、仓库哈希和出口 IP —— 这些不在本地，改不了也不假装能改。
+                  <div className="em-sub">
+                    <span>终端画像</span>
                   </div>
-                </>
-              )}
-
-              {sec === "profile" && (
-                <>
                   <div className="em-card">
                     <Row title="终端类型" desc="TERM / TERM_PROGRAM">
                       <code className="em-code">{account.terminal?.term ?? "—"}</code>
@@ -596,6 +587,9 @@ export function EnvModal({
                       </div>
                     </div>
                   )}
+                  <div className="em-note">
+                    轮换换不掉账号 UUID、uname 画像、仓库哈希和出口 IP —— 这些不在本地，改不了也不假装能改。
+                  </div>
                 </>
               )}
 
@@ -634,19 +628,21 @@ export function EnvModal({
                 </>
               )}
 
-              {sec === "traces" && (
-                <TracesSection
-                  traces={traces}
-                  keychain={keychain}
-                  busy={busy}
-                  onLoadTraces={onLoadTraces}
-                  onLoadKeychain={onLoadKeychain}
-                  onClearTraces={onClearTraces}
-                />
-              )}
-
-              {sec === "danger" && (
-                <DangerSection account={account} canRemove={canRemove} busy={busy} onRemove={onRemove} />
+              {sec === "clean" && (
+                <>
+                  <TracesSection
+                    traces={traces}
+                    keychain={keychain}
+                    busy={busy}
+                    onLoadTraces={onLoadTraces}
+                    onLoadKeychain={onLoadKeychain}
+                    onClearTraces={onClearTraces}
+                  />
+                  <div className="em-sub">
+                    <span>删除环境</span>
+                  </div>
+                  <DangerSection account={account} canRemove={canRemove} busy={busy} onRemove={onRemove} />
+                </>
               )}
             </div>
           </section>
@@ -710,26 +706,30 @@ function GeneralSection({
   const signedIn = auth === "signedIn";
   const hasProxy = account.proxy.protocol !== "none";
   const ipKnown = Boolean(exitIp || account.lastExitIp);
+  /**
+   * 两步就够：登录、配出口。出口填了代理、或者直连测过一次 IP，就算配好 ——
+   * 之前把「测 IP」单列一步，配完代理每次进来还挂着一条待办，像是没配完。
+   */
+  const netDone = hasProxy || ipKnown;
   const steps: { done: boolean; title: string; desc: string; act: string; run: () => void }[] = [
     {
       done: signedIn,
       title: "登录 Claude 账号",
-      desc: signedIn ? `已登录 ${status?.email ?? ""}` : "点「登录」会打开浏览器，在网页上点授权，回来就自动识别",
-      act: "登录",
+      desc: signedIn
+        ? `已登录 ${status?.email ?? ""}`
+        : status?.email
+          ? `上次登录的是 ${status.email}，凭据已不在，需要重新授权`
+          : "点「登录」会打开浏览器，在网页上点授权，回来就自动识别",
+      act: status?.email ? "重新登录" : "登录",
       run: onLogin,
     },
     {
-      done: hasProxy,
-      title: "设置网络出口（建议）",
-      desc: hasProxy ? `走 ${proxyLabel(account.proxy)}` : "多个号最好各走各的线路。用梯子的话点进去「自动探测」就行",
+      done: netDone,
+      title: "配网络出口",
+      desc: netDone
+        ? `${proxyLabel(account.proxy)}${ipKnown ? ` · 出口 ${exitIp ?? account.lastExitIp}` : ""}`
+        : "多个号最好各走各的线路。用梯子的话点进去「自动探测」，不用梯子选「直连」",
       act: "去设置",
-      run: () => onGo("network"),
-    },
-    {
-      done: ipKnown,
-      title: "确认出口 IP",
-      desc: ipKnown ? `出口 ${exitIp ?? account.lastExitIp}` : "测一下这个环境实际从哪个 IP 出去，之后跳变会提醒你",
-      act: "去检测",
       run: () => onGo("network"),
     },
   ];
@@ -819,12 +819,25 @@ function GeneralSection({
         </button>
       </div>
       <div className="em-card">
-        <Row title="账号" desc={signedIn ? "已授权，凭据在 Keychain" : "这个环境还没有登录过"}>
-          <span className="em-val">{status?.email ?? (auth === "unknown" ? "读不到状态" : "未登录")}</span>
+        {/* 没登录但有档案 = 登录过、凭据没了。邮箱照样显示，但明说是「上次」，
+            不然「未登录」旁边挂一个邮箱，看着像状态读错了 */}
+        <Row
+          title="账号"
+          desc={
+            signedIn
+              ? "已授权，凭据在 Keychain"
+              : status?.email
+                ? "上次登录的账号。凭据已不在 Keychain，要重新授权"
+                : "这个环境还没有登录过"
+          }
+        >
+          <span className={`em-val${signedIn ? "" : " dim"}`}>
+            {status?.email ?? (auth === "unknown" ? "读不到状态" : "未登录")}
+          </span>
         </Row>
-        {status?.tier && (
+        {signedIn && status?.tier && (
           <Row title="订阅">
-            <span className="em-val">{status.tier}</span>
+            <span className="em-val">{tierLabel(status.tier)}</span>
           </Row>
         )}
         <Row title={signedIn ? "退出登录" : "登录授权"} desc={signedIn ? "从 Keychain 清掉这个环境的凭据" : "打开浏览器授权，完成后自动识别"}>
@@ -860,16 +873,14 @@ function GeneralSection({
 
 function NetworkSection({
   account,
-  exitIp,
-  checking,
   onSetProxy,
-  onCheckExit,
+  onIp,
+  onAlign,
 }: {
   account: Account;
-  exitIp: string | null;
-  checking: boolean;
   onSetProxy: (p: ProxyConfig) => void;
-  onCheckExit: () => void;
+  onIp: (ip: string) => void;
+  onAlign: (t: { tz?: string; lang?: string }) => void;
 }) {
   const p = account.proxy;
   const [scan, setScan] = useState<ProxyCandidate[] | null>(null);
@@ -882,17 +893,41 @@ function NetworkSection({
       setScanning(false);
     }
   };
+  // 配过（有代理，或直连测过 IP）就不再摆大段引导，只留一个小的「重新探测」
+  const configured = p.protocol !== "none" || Boolean(account.lastExitIp);
   return (
     <>
-      <div className="em-tipbox">
-        <span>
-          <b>不知道该填什么？</b>点「自动探测」，会把本机正在跑的代理（Clash、V2RayN、Surge 等）都找出来，并实测每个能不能通、出口 IP 是多少，挑一个点「用这个」就行。
-        </span>
-        <button className="btn pri" onClick={() => void discover()} disabled={scanning}>
-          <IconRefresh />
-          {scanning ? "探测中…" : scan ? "重新探测" : "自动探测"}
-        </button>
+      <div className="em-sub">
+        <span>出口体检</span>
       </div>
+      <NetReportCard
+        accountId={account.id}
+        proxyKey={proxyLabel(p)}
+        lastIp={account.lastExitIp ?? null}
+        tz={account.terminal?.tz ?? "Asia/Shanghai"}
+        onIp={onIp}
+        onAlign={onAlign}
+      />
+
+      <div className="em-sub">
+        <span>线路</span>
+        {configured && (
+          <button className="det-k" onClick={() => void discover()} disabled={scanning}>
+            {scanning ? "探测中…" : "探测本机代理"}
+          </button>
+        )}
+      </div>
+      {!configured && (
+        <div className="em-tipbox">
+          <span>
+            <b>不知道该填什么？</b>点「自动探测」，会把本机正在跑的代理（Clash、V2RayN、Surge 等）都找出来，并实测每个能不能通、出口 IP 是多少，挑一个点「用这个」就行。
+          </span>
+          <button className="btn pri" onClick={() => void discover()} disabled={scanning}>
+            <IconRefresh />
+            {scanning ? "探测中…" : scan ? "重新探测" : "自动探测"}
+          </button>
+        </div>
+      )}
 
       {scan && (
         <div className="em-card em-scan">
@@ -940,9 +975,6 @@ function NetworkSection({
         </div>
       )}
 
-      <div className="em-sub">
-        <span>手动设置</span>
-      </div>
       <div className="em-card">
         <Row
           title="出口方式"
@@ -1016,37 +1048,7 @@ function NetworkSection({
             </span>
           </Row>
         )}
-        <Row
-          title="实测出口 IP"
-          desc={
-            exitIp || account.lastExitIp ? (
-              <IpBadge ip={exitIp || account.lastExitIp} />
-            ) : (
-              `${proxyLabel(p)} · 点「检测」看实际从哪出去`
-            )
-          }
-          tip={
-            <Help title="为什么要测出口 IP">
-              <p>Anthropic 看到的是这个 IP，不是你填的代理地址。测一下才知道线路真的生效了。</p>
-              <p>测过之后会记住；以后 IP 变了，这里会提醒你 —— 同一个号频繁换 IP 本身就是风控信号。</p>
-            </Help>
-          }
-        >
-          <span className="em-ipline">
-            <code className="em-code">{exitIp || "未检测"}</code>
-            <button className="btn" onClick={onCheckExit} disabled={checking}>
-              <IconGlobe />
-              {checking ? "检测中…" : "检测"}
-            </button>
-          </span>
-        </Row>
       </div>
-      {exitIp && account.lastExitIp && exitIp !== account.lastExitIp && (
-        <div className="det-warn">
-          <IconWarning size={13} />
-          IP 跳变：{account.lastExitIp} → {exitIp}。频繁换出口本身就是信号。
-        </div>
-      )}
     </>
   );
 }

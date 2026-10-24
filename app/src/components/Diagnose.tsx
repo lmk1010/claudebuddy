@@ -49,7 +49,7 @@ function when(ts: number) {
   return d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 }
 
-export default function Diagnose() {
+export default function Diagnose({ part }: { part: "clean" | "net" }) {
   const [survey, setSurvey] = useState<CleanupSurvey | null>(null);
   const [diag, setDiag] = useState<DiagnoseResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -62,20 +62,22 @@ export default function Diagnose() {
     setBusy(true);
     setErr(null);
     try {
-      // 两个都并行跑：账号扫描是本地的，很快就回；连通诊断要发请求，慢一些
-      const [s, d] = await Promise.all([
-        window.claudeBuddy.cleanupSurvey(),
-        window.claudeBuddy.diagnoseRun().catch(() => null),
-      ]);
-      if (!s.ok) setErr("主进程还没准备好，请用 npm run app 启动。");
-      else setSurvey(s);
-      setDiag(d && d.ok ? d : null);
+      // 清理只扫本地（很快）；连通诊断要发请求，慢一些 —— 各看各的，不互相等
+      if (part === "clean") {
+        const s = await window.claudeBuddy.cleanupSurvey();
+        if (!s.ok) setErr("主进程还没准备好，请用 npm run app 启动。");
+        else setSurvey(s);
+      } else {
+        const d = await window.claudeBuddy.diagnoseRun().catch(() => null);
+        setDiag(d && d.ok ? d : null);
+        if (!d || !d.ok) setErr("诊断没跑起来，请用 npm run app 启动。");
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [part]);
 
   // 进来就查，不等用户点
   useEffect(() => {
@@ -105,19 +107,32 @@ export default function Diagnose() {
 
   return (
     <>
-      <h1>体检</h1>
+      <h1>{part === "clean" ? "清理本机" : "连通诊断"}</h1>
 
       {err && <div className="diag-head">{err}</div>}
 
-      {/* ── 账号 ── */}
-      <h2>本机账号</h2>
-      <p className="diag-cap">
-        {survey
-          ? `${survey.accounts.length} 个 · 含其他工具建的配置目录`
-          : busy
-            ? "正在扫描…"
-            : "未扫描"}
-      </p>
+      {part === "clean" && (
+        <>
+      <div className="clean-intro">
+        <b>把这台电脑上所有 Claude Code 的登录痕迹找出来</b>
+        <p>
+          包括本应用建的环境、别的工具建的配置目录（prof_* 等），以及 Keychain 里没人认领的凭据。
+          想从零开始登录一个新号，先在这里清干净。目录会移到 <code>~/.claude-buddy-trash</code>，需要时能捞回；Keychain 凭据删了就没了。
+        </p>
+      </div>
+
+      <div className="diag-cap-row">
+        <span className="diag-cap">
+          {survey
+            ? `找到 ${survey.accounts.length} 个配置目录${survey.orphans.length ? ` · ${survey.orphans.length} 条孤儿凭据` : ""}`
+            : busy
+              ? "正在扫描…"
+              : "未扫描"}
+        </span>
+        <button className="det-k" disabled={busy} onClick={() => void load()}>
+          {busy ? "扫描中…" : "重新扫描"}
+        </button>
+      </div>
 
       {suggestedCount > 0 && (
         <div className="diag-bulk">
@@ -249,10 +264,14 @@ export default function Diagnose() {
         </div>
       )}
 
+        </>
+      )}
+
       {/* ── 连通 ── */}
-      {diag && (
+      {part === "net" && !diag && busy && <p className="diag-cap">正在逐层探测：DNS → TCP → TLS → claude.ai → API…</p>}
+      {part === "net" && diag && (
         <>
-          <h2>连通</h2>
+          <p className="diag-cap">用这台电脑当前的网络（不走任何环境的代理）逐层探测，看 403 / 连不上卡在哪一层。各环境自己的出口在「环境 → 网络出口」里看。</p>
           <div className="diag-head">
             <IconPulse size={15} />
             <span>{diag.headline}</span>
@@ -287,9 +306,11 @@ export default function Diagnose() {
         </>
       )}
 
-      <button className="btn btn-quiet diag-refresh" disabled={busy} onClick={() => void load()}>
-        {busy ? "检查中…" : "重新检查"}
-      </button>
+      {part === "net" && (
+        <button className="btn diag-refresh" disabled={busy} onClick={() => void load()}>
+          {busy ? "检查中…" : "重新检查"}
+        </button>
+      )}
     </>
   );
 }
