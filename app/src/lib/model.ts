@@ -473,7 +473,13 @@ export function healthOf(
     reasons.push(tr("登录态还没确认", "Sign-in state not confirmed yet"));
   }
 
-  if (auth === "suspended") {
+  /**
+   * 风控看的是 heldAt，不是 auth。
+   *
+   * 账号级风控跟本地凭据是两件事：凭据没了不代表风控解除了，
+   * 反过来也一样。以前绑在 auth 上，凭据一掉这条就跟着消失。
+   */
+  if (account.heldAt) {
     return {
       score: 0,
       level: "blocked",

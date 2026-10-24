@@ -527,7 +527,14 @@ export default function App() {
         [id]: {
           exists: s.exists,
           // 会话里 Claude 亲口说过「账号正在暂时风控」的，凭据再在也照样标出来，直到重新登录
-          auth: s.auth === "signedIn" && stateRef.current.accounts.find((a) => a.id === id)?.heldAt ? "suspended" : s.auth,
+          /**
+           * auth 只说本地凭据（登着 / 失效 / 没登），不再把 heldAt 揉进来。
+           *
+           * 以前是 `s.auth === "signedIn" && heldAt ? "suspended" : s.auth`——
+           * 于是凭据一消失就退回“未登录”，“这个号被风控了”这件事跟着一起不见了。
+           * 现在两条轴分开：auth 管凭据，heldAt 管风控，界面两者都显示。
+           */
+          auth: s.auth,
           configDir: s.configDir,
           email: s.email,
           accountUuid: s.accountUuid,
@@ -610,7 +617,7 @@ export default function App() {
     const offFlag = window.claudeBuddy.onAccountFlag(({ accountId }) => {
       const acc = stateRef.current.accounts.find((a) => a.id === accountId);
       setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === accountId ? { ...a, heldAt: Date.now() } : a)) }));
-      setStatus((prev) => (prev[accountId] ? { ...prev, [accountId]: { ...prev[accountId], auth: "suspended" } } : prev));
+      setStatus((prev) => (prev[accountId] ? { ...prev, [accountId]: { ...prev[accountId] } } : prev));
       setToast({
         title: tr(`「${acc?.label ?? ""}」的账号进入暂时风控`, `"${acc?.label ?? ""}" is temporarily restricted`),
         body: tr("这是风控状态，不等于封号。可以先换一个环境用、等它解除；要看具体原因去 claude.ai/restricted", "This is a risk-control state, not necessarily a ban. Switch to another environment and let it clear; check claude.ai/restricted for the reason"),

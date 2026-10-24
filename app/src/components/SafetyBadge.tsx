@@ -57,7 +57,8 @@ export function assessSafety(
 ): SafetyReport {
   const issues: SafetyIssue[] = [];
   let passed = 0;
-  const total = 4;
+  // 五项：风控 / 凭据 / 出口 / 出口跳变 / 设备码
+  const total = 5;
 
   if (!account) {
     return {
@@ -68,18 +69,23 @@ export function assessSafety(
     };
   }
 
-  // ① 登录态
+  /** 本地凭据的真实状态，不揉进风控 */
   const auth = status?.auth ?? account.auth;
-  if (auth === "signedIn") passed++;
-  else if (auth === "suspended")
+
+  // ① 账号级风控（跟本地凭据是两条轴，两件都报）
+  if (account.heldAt) {
     issues.push({
-      key: "auth",
+      key: "held",
       text: tr("账号正在暂时风控", "Account temporarily restricted"),
       fix: tr("先换个环境用，等它解除", "Use another environment while it clears"),
       level: "danger",
     });
+  }
+
+  // ② 本地凭据
+  if (auth === "signedIn") passed++;
   else if (auth === "expired")
-    issues.push({ key: "auth", text: tr("登录凭据已失效", "Sign-in expired"), fix: tr("重新登录", "Sign in again"), level: "danger" });
+    issues.push({ key: "auth", text: tr("登录凭据已失效", "Sign-in expired"), fix: tr("重新授权一次", "Authorize once to restore"), level: "danger" });
   else
     issues.push({ key: "auth", text: tr("这个环境还没登录", "This environment isn't signed in"), fix: tr("去登录", "Sign in"), level: "warn" });
 

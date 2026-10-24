@@ -517,7 +517,7 @@ export interface ClaudeBuddyBridge {
   ): Promise<{ ok: boolean; purged?: boolean; configDir?: string; reason?: string }>;
   onLoginExit(cb: (p: { id: string; exitCode: number }) => void): () => void;
   /** 会话里看到 Claude 说「账号在暂时风控」时，主进程把这个环境标出来 */
-  onAccountFlag(cb: (p: { accountId: string; auth: "suspended" }) => void): () => void;
+  onAccountFlag(cb: (p: { accountId: string }) => void): () => void;
 
   pickFolder(): Promise<string | null>;
   /** 在系统浏览器里打开链接（登录授权用） */

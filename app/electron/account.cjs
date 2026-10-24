@@ -218,8 +218,16 @@ async function readAuthStatus(account) {
   }
 
   if (!j.loggedIn) {
-    // 目录里有凭据文件但 CLI 说没登录 → 凭据失效
-    const hasCreds = fs.existsSync(path.join(dir, "credentials.json"));
+    /**
+     * 凭据失效 vs 从没登录，靠“本地还有没有凭据”分。
+     *
+     * 这里必须把 Keychain 也算上：macOS 上凭据就存在 Keychain，
+     * 根本没有 credentials.json 这个文件。以前只查文件，于是**所有**掉凭据的
+     * 环境都被报成“未登录”—— 用户看不出是“从没登过”还是“登过但废了”，
+     * 而这两件事该做的事完全不同（一个去登录，一个去重新授权）。
+     */
+    const hasCreds =
+      fs.existsSync(path.join(dir, "credentials.json")) || hasKeychainCredential(account);
     // 未登录也要把已知档案读出来：用户需要看见"这是哪个账号，只是掉了登录"
     const known = readOAuthAccount(account);
     return {
@@ -647,6 +655,17 @@ function deleteProxySecret(accountId) {
   spawnSync("security", ["delete-generic-password", "-s", PROXY_SECRET_SERVICE, "-a", accountId], {
     encoding: "utf8",
   });
+}
+
+/**
+ * Keychain 里还有没有这个环境的凭据。
+ *
+ * 只看存在性，不带 -w —— 不解密、不弹钥匙串授权框。
+ */
+function hasKeychainCredential(account) {
+  const svc = keychainServiceFor(account);
+  const r = spawnSync("security", ["find-generic-password", "-s", svc], { encoding: "utf8" });
+  return r.status === 0;
 }
 
 /** 读凭据 JSON。读不到返回 null，不抛。 */

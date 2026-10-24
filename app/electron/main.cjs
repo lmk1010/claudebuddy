@@ -262,7 +262,7 @@ function spawnTerm(opts) {
     if (!flagged && /account is on hold|claude\.ai\/restricted|account has been (suspended|disabled)/i.test(String(data))) {
       flagged = true;
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send("account:flag", { accountId: resolved.id, auth: "suspended" });
+        mainWindow.webContents.send("account:flag", { accountId: resolved.id });
       }
     }
   });

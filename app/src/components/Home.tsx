@@ -252,7 +252,7 @@ export default function Home(p: Props) {
                   <IconArrowUp />
                 </button>
               </div>
-              {blocked && auth === "suspended" ? (
+              {blocked && acc?.heldAt ? (
                 // 暂时风控不是没登录：再登录一遍没用，给出真正能做的事
                 <div className="composer-hint danger">
                   <span>

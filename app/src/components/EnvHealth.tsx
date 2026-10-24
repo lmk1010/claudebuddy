@@ -121,15 +121,8 @@ export default function HealthSection({
   const machineTraces = traceItems.filter((t) => t.machineWide);
   const localSize = localTraces.reduce((s, t) => s + t.size, 0);
 
-  /** 登录行的三种状态 */
+  /** 凭据行的三种状态（只说本地凭据，风控单独一行） */
   const loginRow = (() => {
-    if (auth === "suspended")
-      return {
-        state: "bad" as State,
-        value: tr("暂时风控", "Temporarily restricted"),
-        note: tr("账号级状态，换本机凭据绕不过去；等它解除", "Account-level; local credentials will not get around it"),
-        action: undefined,
-      };
     if (auth === "expired")
       return {
         state: "bad" as State,
@@ -217,6 +210,15 @@ export default function HealthSection({
       </div>
 
       <div className="hs-rows">
+        {/* 风控跟凭据是两条轴，各占一行 —— 上一版绑在一起，凭据一掉风控就看不见了 */}
+        {account.heldAt && (
+          <Row
+            state="bad"
+            label={tr("风控", "Risk control")}
+            value={tr("暂时风控", "Temporarily restricted")}
+            note={tr("账号级状态，换本机凭据绕不过去；等它解除", "Account-level; local credentials will not get around it")}
+          />
+        )}
         <Row state={loginRow.state} label={tr("登录", "Sign-in")} value={loginRow.value} note={loginRow.note} action={loginRow.action} />
         <Row state={exitRow.state} label={tr("出口", "Exit")} value={exitRow.value} note={exitRow.note} action={exitRow.action} />
         <Row state={deviceRow.state} label={tr("设备码", "Device ID")} value={deviceRow.value} note={deviceRow.note} action={deviceRow.action} />

@@ -176,7 +176,7 @@ export default function Accounts(p: Props) {
                     className={`pill ${h.level === "blocked" ? "p-bad" : h.level === "risk" ? "p-warn" : "p-ok"}`}
                     title={h.reasons.length ? h.reasons.join("；") : tr("一切就绪", "All good")}
                   >
-                    {h.score} · {AUTH_LABEL[auth]}
+                    {h.score} · {a.heldAt ? AUTH_LABEL.suspended : AUTH_LABEL[auth]}
                   </span>
                 );
               })()}
@@ -190,7 +190,7 @@ export default function Accounts(p: Props) {
                   menu.open({ clientX: r.right - 220, clientY: r.bottom + 4, preventDefault: () => {} }, envMenu(a), a.label);
                 }}
               >
-                {auth === "suspended" ? <IconWarning size={13} /> : <IconDots size={14} />}
+                {a.heldAt ? <IconWarning size={13} /> : <IconDots size={14} />}
               </span>
             </button>
           );
@@ -600,7 +600,7 @@ export function EnvModal({
                     className={`pill ${h.level === "blocked" ? "p-bad" : h.level === "risk" ? "p-warn" : "p-ok"}`}
                     title={h.reasons.length ? h.reasons.join("；") : tr("一切就绪", "All good")}
                   >
-                    {h.score} · {AUTH_LABEL[auth]}
+                    {h.score} · {account.heldAt ? AUTH_LABEL.suspended : AUTH_LABEL[auth]}
                   </span>
                 );
               })()}
@@ -1105,7 +1105,7 @@ function GeneralSection({
         </Row>
       </div>
 
-      {auth === "suspended" && (
+      {account.heldAt && (
         <div className="det-warn">
           <IconWarning size={13} />
           {tr(
