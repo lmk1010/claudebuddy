@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { ShellWindow } from "../lib/model";
 import { resolveTermTheme } from "../lib/termThemes";
+import { takePendingPrompt } from "../lib/pendingPrompt";
 import { tr } from "../lib/i18n";
 
 /**
@@ -44,7 +45,7 @@ export default function TerminalView({
   cursorBlink,
   copyOnSelect,
   themeId = "auto",
-  lineHeight = 1.6,
+  lineHeight = 1.2,
   padding,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -103,18 +104,38 @@ export default function TerminalView({
       term.write(`\r\n\x1b[38;5;244m[${tr(`进程已退出，代码 ${p.exitCode}`, `Process exited, code ${p.exitCode}`)}]\x1b[0m\r\n`);
     });
 
-    const dims = { cols: term.cols, rows: term.rows };
-    window.claudeBuddy
-      .spawnTerm({
+    /**
+     * 先量好再启动。之前一建好就用 xterm 默认的 80×24 起 PTY，随后才 fit 到真实宽度 ——
+     * Claude Code 的界面在启动中途被改尺寸，会把 logo 和标题画成两份、互相压在一起。
+     * 所以：等字体加载完 → fit → 拿到真实的 cols/rows 再起进程。
+     */
+    const start = async () => {
+      try {
+        await document.fonts?.ready;
+      } catch {
+        /* 没有 fonts API 就直接量 */
+      }
+      // 容器可能还没排版完：最多等几帧，直到有宽度
+      for (let i = 0; i < 10 && (!host.offsetWidth || !term.element?.offsetWidth); i++) {
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+      }
+      safeFit();
+      if (disposed) return;
+      const r = await window.claudeBuddy.spawnTerm({
         id: win.id,
         account: accountId,
         cwd: win.cwd,
-        cols: dims.cols,
-        rows: dims.rows,
+        cols: term.cols,
+        rows: term.rows,
         command: win.runsClaude ? "claude" : undefined,
-      })
+        permission: win.permission,
+        prompt: win.runsClaude ? takePendingPrompt(win.id) : undefined,
+      });
+      return r;
+    };
+    void start()
       .then((r) => {
-        if (!r.ok) {
+        if (r && !r.ok) {
           term.write(
             `\x1b[38;5;173m${tr("启动失败", "Failed to start")}: ${r.error ?? tr("未知错误", "Unknown error")}\x1b[0m\r\n`,
           );

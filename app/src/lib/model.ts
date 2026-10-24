@@ -45,13 +45,13 @@ export type PermissionMode =
   | "bypassPermissions";
 
 export const PERMISSION_LABEL: Record<PermissionMode, string> = {
-  get default() { return tr("逐次确认", "Ask each time"); },
+  get default() { return tr("跟随 Claude 设置", "Claude's default"); },
   get acceptEdits() { return tr("自动接受编辑", "Auto-accept edits"); },
   get plan() { return tr("计划模式", "Plan mode"); },
-  get manual() { return tr("每步都问", "Ask every step"); },
+  get manual() { return tr("逐次确认", "Ask each time"); },
   get auto() { return tr("自动判定", "Auto"); },
   get dontAsk() { return tr("不问不做", "Don't ask"); },
-  get bypassPermissions() { return tr("全部放行", "Bypass all"); },
+  get bypassPermissions() { return tr("跳过所有确认", "Skip all permissions"); },
 };
 
 /** 只给引导页挑三个常用的，其余在设置里 */
@@ -165,6 +165,8 @@ export interface Account {
   proxy: ProxyConfig;
   /** 上次测到的出口 IP，用于发现 IP 跳变 */
   lastExitIp?: string;
+  /** 会话里 Claude 说过「账号被挂起」的时间；重新登录成功后清掉 */
+  heldAt?: number;
   /** 这个环境登录时用哪个浏览器（browsersList 的 id），记住上次的选择 */
   loginBrowser?: string;
   lastExitCheckedAt?: number;
@@ -197,6 +199,8 @@ export interface ShellWindow {
   branch?: string | null;
   /** 本窗口实际生效的出口（账号级或缺省直连） */
   exitIp?: string;
+  /** 启动 Claude Code 时用的权限模式（建窗口时从首页的选择记下来，恢复会话时照旧） */
+  permission?: PermissionMode;
 }
 
 // ─────────────────────────────────────────── 全局状态

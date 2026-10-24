@@ -212,7 +212,11 @@ export default function Home(p: Props) {
                   <span className="mono">{p.cwd ? shortenHome(p.cwd) : tr("选择目录…", "Choose folder…")}</span>
                   <IconChevronDown size={11} />
                 </button>
-                <button className="chip" onClick={(e) => p.onPickPermission(e.currentTarget)} title={tr("权限模式", "Permission mode")}>
+                <button
+                  className={`chip${p.permission === "bypassPermissions" ? " chip-danger" : ""}`}
+                  onClick={(e) => p.onPickPermission(e.currentTarget)}
+                  title={tr("权限模式", "Permission mode")}
+                >
                   <IconShield />
                   {PERMISSION_LABEL[p.permission]}
                   <IconChevronDown size={11} />
@@ -231,7 +235,20 @@ export default function Home(p: Props) {
                   <IconArrowUp />
                 </button>
               </div>
-              {blocked && (
+              {blocked && auth === "suspended" ? (
+                // 挂起不是没登录：再登录一遍没用，给出真正能做的事
+                <div className="composer-hint danger">
+                  <span>
+                    {tr(
+                      `「${acc?.label ?? ""}」的账号被 Claude 挂起，现在开不了会话。上面切到别的环境，或去申诉`,
+                      `"${acc?.label ?? ""}" is on hold, so sessions can't start. Switch to another environment above, or appeal`,
+                    )}
+                  </span>
+                  <button className="composer-fix" onClick={() => void window.claudeBuddy.openExternal("https://claude.ai/restricted")}>
+                    {tr("查看 / 申诉 ↗", "Details / appeal ↗")}
+                  </button>
+                </div>
+              ) : blocked ? (
                 <div className="composer-hint">
                   <span>{blocked}{tr("，登录后才能开会话", ". Sign in to start a session")}</span>
                   <button className="composer-fix" onClick={() => acc && p.onLogin(acc.id)}>
@@ -239,7 +256,7 @@ export default function Home(p: Props) {
                     {tr("现在登录", "Sign in now")}
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
 
             <div className="sugg">

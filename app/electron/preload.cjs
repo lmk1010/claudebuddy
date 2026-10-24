@@ -83,6 +83,11 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
     ipcRenderer.on("login:exit", h);
     return () => ipcRenderer.off("login:exit", h);
   },
+  onAccountFlag: (cb) => {
+    const h = (_e, p) => cb(p);
+    ipcRenderer.on("account:flag", h);
+    return () => ipcRenderer.off("account:flag", h);
+  },
 
   /* ── 系统 ── */
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),

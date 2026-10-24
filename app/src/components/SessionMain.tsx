@@ -258,7 +258,7 @@ export default function SessionMain({
                     cursorBlink={cursorBlink}
                     copyOnSelect={copyOnSelect}
                     themeId={termState.terminalTheme ?? "auto"}
-                    lineHeight={termState.terminalLineHeight ?? 1.6}
+                    lineHeight={Math.min(termState.terminalLineHeight ?? 1.2, 1.4)}
                     padding={termPad}
                   />
                 );

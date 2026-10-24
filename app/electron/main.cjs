@@ -119,6 +119,25 @@ function resolveAccount(input) {
 
 // ─────────────────────────────────────────── PTY
 
+/**
+ * 拼启动命令。只认白名单里的权限模式 —— 渲染层传来的字符串绝不直接拼进 shell。
+ * bypassPermissions 用官方的 --dangerously-skip-permissions，跟用户在终端里敲的一样。
+ */
+const PERMISSION_MODES = new Set(["acceptEdits", "auto", "manual", "dontAsk", "plan"]);
+function claudeCommand(command, permission, prompt) {
+  if (command !== "claude") return command;
+  let cmd = "claude";
+  if (permission === "bypassPermissions") cmd += " --dangerously-skip-permissions";
+  else if (PERMISSION_MODES.has(permission)) cmd += ` --permission-mode ${permission}`;
+  // 第一句话：单引号包起来、内部单引号转义，shell 不会解析里面的任何东西；
+  // 前面加 -- 防止以「-」开头的话被当成参数
+  if (typeof prompt === "string" && prompt.trim()) {
+    const p = prompt.trim().slice(0, 8000);
+    cmd += ` -- '${p.replace(/'/g, "'\\''")}'`;
+  }
+  return cmd;
+}
+
 function spawnTerm(opts) {
   if (!pty) throw new Error(L("node-pty 不可用", "node-pty is unavailable"));
 
@@ -132,7 +151,15 @@ function spawnTerm(opts) {
   env.CLAUDE_BUDDY_WINDOW = id;
 
   const userShell = process.env.SHELL || "/bin/zsh";
-  const args = ["-l"];
+  /**
+   * 指定了启动命令（起 claude）时，让 shell 直接执行它，而不是等 prompt 出来再「打字」进去：
+   * 打字的做法会把命令回显两遍、还得猜 rc 什么时候跑完。
+   * -l -i 保证 .zprofile / .zshrc 照常加载（nvm、conda 的 PATH 才在）；
+   * claude 退出后 exec 一个普通登录 shell，终端留着继续用。
+   */
+  const args = command
+    ? ["-l", "-i", "-c", `${claudeCommand(command, opts.permission, opts.prompt)}; exec ${JSON.stringify(userShell)} -l`]
+    : ["-l"];
 
   const p = pty.spawn(userShell, args, {
     name: "xterm-256color",
@@ -150,6 +177,21 @@ function spawnTerm(opts) {
     lastDataAt: Date.now(),
     // 每分钟一格的请求计数，用于右栏的 24 根分钟柱
     minutes: new Map(),
+  });
+
+  /**
+   * 账号被挂起：`claude auth status` 只看凭据在不在，看不出来；
+   * 只有真正发请求时 Claude 才会说「Your account is on hold」。看到就把这个环境标出来，
+   * 不然界面上一直写着「已登录」，用户以为能用。
+   */
+  let flagged = false;
+  p.onData((data) => {
+    if (!flagged && /account is on hold|claude\.ai\/restricted|account has been (suspended|disabled)/i.test(String(data))) {
+      flagged = true;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("account:flag", { accountId: resolved.id, auth: "suspended" });
+      }
+    }
   });
 
   p.onData((data) => {
@@ -174,31 +216,6 @@ function spawnTerm(opts) {
       mainWindow.webContents.send("term:exit", { id, exitCode });
     }
   });
-
-  // 如果指定了启动命令（例如直接起 claude），等登录 shell 的 rc 跑完再写。
-  //
-  // 这里不能用固定延时：zsh -l 要先跑完 .zshrc（用户可能装了一堆东西，
-  // 比如 nvm / conda / 主题），早写的命令会被 shell 吞掉或者乱序。
-  // 做法是等第一段静默期 —— 输出停下来了，说明 prompt 已经就绪。
-  if (command) {
-    let quietTimer = null;
-    let fired = false;
-    const fire = () => {
-      if (fired) return;
-      fired = true;
-      if (quietTimer) clearTimeout(quietTimer);
-      const live = terms.get(id);
-      if (live) live.write(command + "\r");
-    };
-    const arm = () => {
-      if (quietTimer) clearTimeout(quietTimer);
-      quietTimer = setTimeout(fire, 420);
-    };
-    arm();
-    p.onData(arm);
-    // 兜底：rc 卡住或一直刷屏时，4 秒后无论如何都发
-    setTimeout(fire, 4000);
-  }
 
   return { pid: p.pid };
 }

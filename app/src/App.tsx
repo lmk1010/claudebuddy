@@ -12,6 +12,7 @@ import NetTestPage from "./components/NetTestPage";
 import Guide from "./components/Guide";
 import { setLang, systemLang, tr } from "./lib/i18n";
 import { resetNetReports } from "./components/NetReport";
+import { setPendingPrompt } from "./lib/pendingPrompt";
 import { browserLabel, loadBrowsers } from "./components/LoginButton";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
@@ -420,7 +421,8 @@ export default function App() {
         ...prev,
         [id]: {
           exists: s.exists,
-          auth: s.auth,
+          // 会话里 Claude 亲口说过「账号被挂起」的，凭据再在也照样标挂起，直到重新登录
+          auth: s.auth === "signedIn" && stateRef.current.accounts.find((a) => a.id === id)?.heldAt ? "suspended" : s.auth,
           configDir: s.configDir,
           email: s.email,
           accountUuid: s.accountUuid,
@@ -482,16 +484,37 @@ export default function App() {
 
   // 登录进程退出：清掉控制台并复核状态，避免界面挂在"等待输出"
   useEffect(() => {
-    const off = window.claudeBuddy.onLoginExit(({ id }) => {
+    const off = window.claudeBuddy.onLoginExit(({ id, exitCode }) => {
       setLoginTerm((m) => {
         if (!(id in m)) return m;
         const n = { ...m };
         delete n[id];
         return n;
       });
+      // 重新登录成功 = 换了凭据，之前记下的「挂起」作废，重新判断
+      if (exitCode === 0) {
+        stateRef.current = {
+          ...stateRef.current,
+          accounts: stateRef.current.accounts.map((a) => (a.id === id ? { ...a, heldAt: undefined } : a)),
+        };
+        setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === id ? { ...a, heldAt: undefined } : a)) }));
+      }
       void refreshAccount(id);
     });
-    return off;
+    // 会话里 Claude 说账号被挂起：记下来、立刻标红，并告诉用户
+    const offFlag = window.claudeBuddy.onAccountFlag(({ accountId }) => {
+      const acc = stateRef.current.accounts.find((a) => a.id === accountId);
+      setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === accountId ? { ...a, heldAt: Date.now() } : a)) }));
+      setStatus((prev) => (prev[accountId] ? { ...prev, [accountId]: { ...prev[accountId], auth: "suspended" } } : prev));
+      setToast({
+        title: tr(`「${acc?.label ?? ""}」的账号被挂起了`, `"${acc?.label ?? ""}" is on hold`),
+        body: tr("Claude 拒绝了这个账号的请求。可以去 claude.ai/restricted 查看或申诉，或换一个环境用", "Claude rejected requests from this account. Check or appeal at claude.ai/restricted, or use another environment"),
+      });
+    });
+    return () => {
+      off();
+      offFlag();
+    };
   }, [refreshAccount]);
 
   // 登录终端只在"正在等授权"时才有意义：一旦账号已登录就立刻收掉，
@@ -596,7 +619,7 @@ export default function App() {
   }, [activeWindow]);
 
   // ── 建会话
-  const spawnWindow = useCallback((account: Account, cwd: string, runsClaude: boolean) => {
+  const spawnWindow = useCallback((account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string) => {
     // 家目录的目录名就是用户名，几个会话全叫同一个名字 分不清 —— 直接叫「主目录」
     const base = cwd === home ? tr("主目录", "Home") : prettyName(cwd);
     const win: ShellWindow = {
@@ -607,7 +630,9 @@ export default function App() {
       runsClaude,
       startedAt: Date.now(),
       lastActivityAt: Date.now(),
+      permission: stateRef.current.permission,
     };
+    if (firstPrompt) setPendingPrompt(win.id, firstPrompt);
     setState((s) => ({
       ...s,
       // 同一个目录开第二个时，页签上要能分得清：api-server · 2
@@ -673,10 +698,9 @@ export default function App() {
       if (!acc) return;
       const cwd = state.lastCwd ?? (await pickFolder());
       if (!cwd) return;
-      spawnWindow(acc, cwd, true);
-      if (text) {
-        setTimeout(() => window.claudeBuddy.writeTerm(lastIdRef.current, text + "\r"), 2400);
-      }
+      // 第一句话作为 Claude Code 的启动参数传进去，不再等几秒后往终端里「打字」——
+      // Claude 启动慢一点（比如在自动更新）那句话就丢了或者打进了 shell
+      spawnWindow(acc, cwd, true, text);
     },
     [activeAccount, state.lastCwd, pickFolder, spawnWindow],
   );
@@ -1682,28 +1706,38 @@ function MenuBody({
   if (menu.kind === "permission") {
     return (
       <div className="pop" ref={ref} style={style} data-dir={dir} role="menu">
-        <div className="pop-hint">{tr("权限模式决定 Claude Code 会问你多少", "Permission mode controls how often Claude Code asks you")}</div>
+        <div className="pop-hint">{tr("启动 Claude Code 时用哪种权限模式", "Permission mode for new Claude Code sessions")}</div>
+        {/* 跟 Claude Code 的启动参数一一对应：选什么，启动命令里就带什么（右边小字就是实际参数） */}
         {(
           [
-            ["default", tr("逐次确认", "Ask each time"), tr("每一步都先问你", "Asks before every step"), IconShield],
-            ["acceptEdits", tr("自动接受编辑", "Auto-accept edits"), tr("改文件不再逐次确认", "File edits no longer ask"), IconAuto],
-            ["plan", tr("计划模式", "Plan mode"), tr("只出方案，不动文件", "Plans only, no file changes"), IconPlan],
+            // 不带参数 = 用 Claude 自己 settings 里的默认模式（每个人不一样，比如有人设成 auto）
+            ["default", tr("跟随 Claude 设置", "Use Claude's default"), "claude", IconSettings, false],
+            ["manual", tr("逐次确认", "Ask each time"), "--permission-mode manual", IconShield, false],
+            ["acceptEdits", tr("自动接受编辑", "Auto-accept edits"), "--permission-mode acceptEdits", IconAuto, false],
+            ["plan", tr("计划模式", "Plan mode"), "--permission-mode plan", IconPlan, false],
+            ["auto", tr("自动判定", "Auto"), "--permission-mode auto", IconAuto, false],
+            ["bypassPermissions", tr("跳过所有确认", "Skip all permissions"), "--dangerously-skip-permissions", IconShield, true],
           ] as const
-        ).map(([p, label, desc, Icon]) => (
-          <button
-            key={p}
-            className={`pi${state.permission === p ? " on" : ""}`}
-            onClick={() => onPickPermission(p)}
-            role="menuitemradio"
-            aria-checked={state.permission === p}
-          >
-            <Icon size={15} />
-            <span className="pi-main">{label}</span>
-            <small>{desc}</small>
-            <span className="pi-mark">
-              {state.permission === p ? <IconCheck size={11} /> : null}
-            </span>
-          </button>
+        ).map(([p, label, flag, Icon, danger]) => (
+          <div key={p}>
+            {danger && <div className="pop-sep" />}
+            <button
+              className={`pi pi-perm${state.permission === p ? " on" : ""}${danger ? " danger" : ""}`}
+              onClick={() => onPickPermission(p)}
+              role="menuitemradio"
+              aria-checked={state.permission === p}
+              title={
+                danger
+                  ? tr("Claude 执行任何命令、改任何文件都不再问你。只在你信得过的目录里用", "Claude runs any command and edits any file without asking. Only use in folders you trust")
+                  : undefined
+              }
+            >
+              <Icon size={15} />
+              <span className="pi-main">{label}</span>
+              <small className="mono">{flag}</small>
+              <span className="pi-mark">{state.permission === p ? <IconCheck size={11} /> : null}</span>
+            </button>
+          </div>
         ))}
       </div>
     );

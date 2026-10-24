@@ -47,7 +47,8 @@ export default function TermSettings({
 
   const cur = state.terminalTheme ?? "auto";
   const size = state.terminalFontSize;
-  const lh = state.terminalLineHeight ?? 1.6;
+  // 终端行高超过 1.4，Claude Code 用方块字符拼的 logo 和边框就会断开
+  const lh = Math.min(state.terminalLineHeight ?? 1.2, 1.4);
   const pad = state.terminalPadding ?? "normal";
 
   const themes = [{ id: "auto", name: tr("跟随应用", "Follow app") }, ...TERM_THEMES];
@@ -78,9 +79,9 @@ export default function TermSettings({
           <Seg
             value={lh}
             opts={[
-              [1.3, tr("紧凑", "Compact")],
-              [1.6, tr("标准", "Standard")],
-              [1.9, tr("宽松", "Relaxed")],
+              [1.0, tr("紧凑", "Compact")],
+              [1.2, tr("标准", "Standard")],
+              [1.4, tr("宽松", "Relaxed")],
             ]}
             onPick={(v) => onChange({ terminalLineHeight: v })}
           />

@@ -218,6 +218,7 @@ export function installBrowserFallback(): void {
     accountSessions: async () => [],
     accountRemove: async () => ({ ok: false, reason: unsupported }),
     onLoginExit: () => () => {},
+    onAccountFlag: () => () => {},
 
     pickFolder: async () => "/Users/you/projects/demo",
     openExternal: async (url) => {

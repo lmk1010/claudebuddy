@@ -87,6 +87,14 @@ function envForAccount(account, { includeProxy = true } = {}) {
   delete env.ANTHROPIC_BASE_URL;
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
   delete env.CLAUDE_CONFIG_DIR;
+  /**
+   * Claude Code 自己的运行标记也要清：应用若是从一个 Claude Code 会话里启动的，
+   * 会继承 CLAUDECODE / CLAUDE_CODE_CHILD_SESSION 等，新会话就会以为自己是子会话
+   * （实测会报「Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker」，不存对话记录）。
+   */
+  for (const k of Object.keys(env)) {
+    if (k === "CLAUDECODE" || k.startsWith("CLAUDE_CODE_")) delete env[k];
+  }
   delete env.HTTPS_PROXY;
   delete env.HTTP_PROXY;
   delete env.https_proxy;

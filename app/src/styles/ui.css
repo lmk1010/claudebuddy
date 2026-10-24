@@ -2955,6 +2955,26 @@
   filter: drop-shadow(0 2px 4px rgba(40, 30, 20, 0.12));
 }
 
+.composer-hint.danger span {
+  color: var(--danger);
+}
+
+/* 权限菜单：右边是实际的启动参数；跳过所有确认单独一档、红字 */
+.pi-perm small.mono {
+  font-size: 10.5px;
+  color: var(--t4);
+}
+.pi-perm.danger,
+.pi-perm.danger small.mono {
+  color: var(--danger);
+}
+/* 首页权限按钮：选了「跳过所有确认」时变成警示色，一眼看得出现在很危险 */
+.chip.chip-danger {
+  color: var(--danger);
+  background: rgba(198, 69, 69, 0.08);
+  border-color: rgba(198, 69, 69, 0.25);
+}
+
 /* ══════════ 终端外观面板（会话顶栏 Aa） ══════════ */
 .sh-aa {
   width: auto;

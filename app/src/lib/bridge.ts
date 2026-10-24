@@ -24,6 +24,10 @@ export interface SpawnOpts {
   cols: number;
   rows: number;
   command?: string;
+  /** 启动 claude 时的权限模式；主进程只认白名单 */
+  permission?: string;
+  /** 第一句话，作为 claude 的启动参数（主进程负责转义） */
+  prompt?: string;
 }
 
 export interface AccountStatus {
@@ -413,6 +417,8 @@ export interface ClaudeBuddyBridge {
     purge?: boolean,
   ): Promise<{ ok: boolean; purged?: boolean; configDir?: string; reason?: string }>;
   onLoginExit(cb: (p: { id: string; exitCode: number }) => void): () => void;
+  /** 会话里看到 Claude 说「账号被挂起」时，主进程把这个环境标出来 */
+  onAccountFlag(cb: (p: { accountId: string; auth: "suspended" }) => void): () => void;
 
   pickFolder(): Promise<string | null>;
   /** 在系统浏览器里打开链接（登录授权用） */
