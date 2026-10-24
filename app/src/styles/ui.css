@@ -2947,6 +2947,14 @@
   color: #e2b46a;
 }
 
+/* 首页问候旁的 App 图标：图标四周自带一圈透明边，所以比原来的火花放大一点才等重 */
+.greet img.greet-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 0;
+  filter: drop-shadow(0 2px 4px rgba(40, 30, 20, 0.12));
+}
+
 /* ══════════ 终端外观面板（会话顶栏 Aa） ══════════ */
 .sh-aa {
   width: auto;

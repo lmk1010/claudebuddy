@@ -225,7 +225,7 @@ function ArtTry() {
   return (
     <Win side={<SideNav on="首页" />}>
       <div className="ga-hello">
-        <img className="ga-spark sm" src="./assets/claude-spark.png" alt="" />
+        <img className="ga-spark sm" src="./assets/app-icon.png" alt="" />
         <b>下午好</b>
       </div>
       <div className="ga-envs">

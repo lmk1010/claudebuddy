@@ -118,7 +118,8 @@ export default function Home(p: Props) {
       <div className="hm">
         <div className="hm-c">
           <div className="greet">
-            <img src="./assets/claude-spark.png" alt="" />
+            {/* 用自己的 App 图标（带 >_），跟 Claude 官方的火花区分开 */}
+            <img className="greet-icon" src="./assets/app-icon.png" alt="" />
             <h1>
               {greeting()}，{p.username || "本机用户"}
             </h1>
