@@ -378,6 +378,50 @@ function remoteHashOf(cwd) {
   }
 }
 
+/**
+ * 这个环境碰过的仓库指纹。
+ *
+ * Claude Code 拿 git remote 地址的 sha256 前 16 位当项目标识，同一个仓库
+ * 换设备 ID 还是同一个值 —— 所以两个环境如果共用仓库，这条线是连得上的。
+ * 只跑本地 git，不联网；最多看 limit 个项目，按最近动过的优先。
+ */
+function listRepoHashes(account, limit = 8) {
+  const projects = path.join(configDirOf(account), "projects");
+  let dirs = [];
+  try {
+    dirs = fs
+      .readdirSync(projects, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+  } catch {
+    return [];
+  }
+
+  const recent = dirs
+    .map((name) => {
+      const real = decodeProjectDir(name);
+      if (!real) return null;
+      let mtime = 0;
+      try {
+        mtime = fs.statSync(path.join(projects, name)).mtimeMs;
+      } catch {
+        /* 忽略 */
+      }
+      return { real, mtime };
+    })
+    .filter(Boolean)
+    .sort((x, y) => y.mtime - x.mtime)
+    .slice(0, limit);
+
+  const seen = new Set();
+  for (const it of recent) {
+    const h = remoteHashOf(it.real);
+    if (!h || seen.has(h)) continue;
+    seen.add(h);
+  }
+  return [...seen];
+}
+
 // ─────────────────────────────────────────── 痕迹统计
 
 function dirSize(dir, budget) {
@@ -500,6 +544,42 @@ function keychainSuffixFor(account) {
 function keychainServiceFor(account) {
   const suffix = keychainSuffixFor(account);
   return suffix ? `Claude Code-credentials-${suffix}` : "Claude Code-credentials";
+}
+
+/**
+ * 代理密码不跟 state.json 走。
+ *
+ * 配置文件是明文的，里面放密码等于把公司代理的账号密码写在桌面上。
+ * 所以密码单独存 Keychain，按环境 id 索引 —— 读配置的时候再补回去。
+ */
+const PROXY_SECRET_SERVICE = "claude-buddy-proxy";
+
+function writeProxySecret(accountId, password) {
+  if (!accountId || !password) return false;
+  const r = spawnSync(
+    "security",
+    ["add-generic-password", "-U", "-s", PROXY_SECRET_SERVICE, "-a", accountId, "-w", password],
+    { encoding: "utf8" },
+  );
+  return r.status === 0;
+}
+
+function readProxySecret(accountId) {
+  if (!accountId) return null;
+  const r = spawnSync(
+    "security",
+    ["find-generic-password", "-s", PROXY_SECRET_SERVICE, "-a", accountId, "-w"],
+    { encoding: "utf8" },
+  );
+  if (r.status !== 0 || !r.stdout) return null;
+  return r.stdout.replace(/\n$/, "");
+}
+
+function deleteProxySecret(accountId) {
+  if (!accountId) return;
+  spawnSync("security", ["delete-generic-password", "-s", PROXY_SECRET_SERVICE, "-a", accountId], {
+    encoding: "utf8",
+  });
 }
 
 /** 读凭据 JSON。读不到返回 null，不抛。 */
@@ -829,6 +909,10 @@ module.exports = {
   proxyOrNothing,
   collectProfile,
   remoteHashOf,
+  listRepoHashes,
+  writeProxySecret,
+  readProxySecret,
+  deleteProxySecret,
   inspectTraces,
   listKeychainEntries,
   keychainSuffixFor,

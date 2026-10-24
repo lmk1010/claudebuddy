@@ -207,6 +207,8 @@ export function installBrowserFallback(): void {
     accountCheckExit: async () => ({ ok: false, ip: null, reason: unsupported }),
     accountRotateIdentity: async () => ({ ok: false, reason: unsupported }),
     accountTraces: async () => [],
+    accountRepos: async () => [],
+    desktopProbe: async () => ({ installed: false, running: false, hasSafeStorage: false, exists: false, signedIn: "none" as const }),
     accountClearTraces: async () => ({
       ok: false,
       removed: [],

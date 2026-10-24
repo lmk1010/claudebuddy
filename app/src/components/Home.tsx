@@ -96,7 +96,21 @@ export default function Home(p: Props) {
     menu.open({ clientX: r.left, clientY: r.bottom + 6, preventDefault: () => {}, stopPropagation: () => {} }, items, tr("在哪个目录里启动", "Folder to start in"));
   };
 
-  const blocked = !signedIn ? tr(`「${acc?.label ?? "这个环境"}」还没登录`, `"${acc?.label ?? "This environment"}" is not signed in`) : null;
+  /**
+   * 三种拦下理由分开算：没登录、暂时风控、要求走代理却没出口。
+   * 以前只分两种，第三种会被当成“没登录”而引导去重新登录，做了也没用。
+   */
+  const proxyReady = Boolean(acc && acc.proxy && acc.proxy.protocol !== "none" && acc.proxy.host);
+  const proxyBlocked = Boolean(acc?.enforceProxy) && !proxyReady;
+
+  const blocked = !signedIn
+    ? tr(`「${acc?.label ?? "这个环境"}」还没登录`, `"${acc?.label ?? "This environment"}" is not signed in`)
+    : proxyBlocked
+      ? tr(
+          `「${acc?.label ?? "这个环境"}」要求必须走代理，但还没有配出口`,
+          `"${acc?.label ?? "This environment"}" requires a proxy, but none is set`,
+        )
+      : null;
   const submit = () => {
     if (blocked) return;
     p.onStart(text.trim());
@@ -246,6 +260,13 @@ export default function Home(p: Props) {
                   </span>
                   <button className="composer-fix" onClick={() => void window.claudeBuddy.openExternal("https://claude.ai/restricted")}>
                     {tr("查看 / 申诉 ↗", "Details / appeal ↗")}
+                  </button>
+                </div>
+              ) : proxyBlocked ? (
+                <div className="composer-hint danger">
+                  <span>{blocked}{tr("，会话没有启动", ". The session was not started")}</span>
+                  <button className="composer-fix" onClick={() => acc && p.onEditNetwork(acc.id)}>
+                    {tr("去配出口", "Set the exit")}
                   </button>
                 </div>
               ) : blocked ? (

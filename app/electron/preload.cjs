@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   accountCheckExit: (id) => ipcRenderer.invoke("account:checkExit", { id }),
   accountRotateIdentity: (id) => ipcRenderer.invoke("account:rotateIdentity", { id }),
   accountTraces: (id) => ipcRenderer.invoke("account:traces", { id }),
+  accountRepos: (id) => ipcRenderer.invoke("account:repos", { id }),
+  desktopProbe: (force) => ipcRenderer.invoke("desktop:probe", { force }),
   accountClearTraces: (id, keys, includeCredentials) =>
     ipcRenderer.invoke("account:clearTraces", { id, keys, includeCredentials }),
   accountKeychain: () => ipcRenderer.invoke("account:keychain"),

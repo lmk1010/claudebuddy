@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Account, AccountStatusSnapshot } from "../lib/model";
+import type { DesktopProbe } from "../lib/bridge";
 import { tr } from "../lib/i18n";
 
 /**
@@ -43,6 +44,11 @@ export function assessSafety(
   account: Account | null,
   status: AccountStatusSnapshot | undefined,
   exitIp: string | null | undefined,
+  /**
+   * Claude Desktop 的本地体检。它不是某个环境的一部分，
+   * 但它在服务端就是同一台机器上的另一个身份 —— 所以要说一声。
+   */
+  desktop?: DesktopProbe | null,
 ): SafetyReport {
   const issues: SafetyIssue[] = [];
   let passed = 0;
@@ -106,13 +112,36 @@ export function assessSafety(
       level: "warn",
     });
 
-  const level: SafetyLevel = issues.some((i) => i.level === "danger")
+  /**
+   * Desktop 只在“现在真的开着”或“最近真的登录过”时才提醒。
+   * 很久没动过的旧痕迹不弹 —— 那是清理页该说的事，不是安全指示器的活，
+   * 否则每次开应用都报一条，用户很快就当它不存在了。
+   */
+  if (desktop) {
+    if (desktop.running) {
+      issues.push({
+        key: "desktop-running",
+        text: tr("Claude Desktop 正开着", "Claude Desktop is running"),
+        fix: tr("它不归环境管，和这些环境共用整机身份；测完建议退出", "It sits outside these environments and shares the machine's identity; quit it after testing"),
+        level: "warn",
+      });
+    } else if (desktop.signedIn === "likely" || desktop.signedIn === "running-no-key") {
+      issues.push({
+        key: "desktop-recent",
+        text: tr("Claude Desktop 最近用过，还留着登录痕迹", "Claude Desktop was used recently and still holds sign-in traces"),
+        fix: tr("要用这个软件做隔离测试的话，先在 Desktop 里退出登录", "If you're testing isolation, sign out in Desktop first"),
+        level: "warn",
+      });
+    }
+  }
+
+  const finalLevel: SafetyLevel = issues.some((i) => i.level === "danger")
     ? "danger"
     : issues.length > 0
       ? "warn"
       : "safe";
 
-  return { level, issues, passed, total };
+  return { level: finalLevel, issues, passed, total };
 }
 
 const LABEL: Record<SafetyLevel, string> = {

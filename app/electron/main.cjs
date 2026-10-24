@@ -77,16 +77,59 @@ function statePath() {
 }
 
 function loadState() {
+  let s = null;
   try {
-    return JSON.parse(fs.readFileSync(statePath(), "utf8"));
+    s = JSON.parse(fs.readFileSync(statePath(), "utf8"));
   } catch {
     return null;
   }
+  // 代理密码不在配置文件里，从 Keychain 补回去；补不到就用不了带认证的代理
+  for (const a of s?.accounts ?? []) {
+    const px = a?.proxy;
+    if (px && px.protocol !== "none" && px.host && !px.password) {
+      const pw = acct.readProxySecret(a.id);
+      if (pw) px.password = pw;
+    }
+  }
+  return s;
+}
+
+/** 上次写进 Keychain 的代理密码 —— 只在真变了才写，不然每次保存都捅一次 Keychain */
+const stashedSecrets = new Map();
+
+/**
+ * 落盘前把代理密码抽出来存进 Keychain。
+ *
+ * 写入失败就保留明文 —— 宁可在配置文件里留一份，也不能让用户的代理直接不能用。
+ */
+function withoutProxySecrets(state) {
+  if (!state || !Array.isArray(state.accounts)) return state;
+  const out = JSON.parse(JSON.stringify(state));
+  for (const a of out.accounts) {
+    const px = a?.proxy;
+    if (!px || !px.password) {
+      if (a?.id) stashedSecrets.delete(a.id);
+      continue;
+    }
+    if (stashedSecrets.get(a.id) !== px.password) {
+      if (!acct.writeProxySecret(a.id, px.password)) continue;
+      stashedSecrets.set(a.id, px.password);
+    }
+    delete px.password;
+  }
+  return out;
 }
 
 function saveState(state) {
   try {
-    fs.writeFileSync(statePath(), JSON.stringify(state, null, 2));
+    const p = statePath();
+    fs.writeFileSync(p, JSON.stringify(withoutProxySecrets(state), null, 2));
+    // 配置里有邮箱、身份、代理账号 —— 只给自己读
+    try {
+      fs.chmodSync(p, 0o600);
+    } catch {
+      /* 文件系统不支持就算了 */
+    }
   } catch (err) {
     console.error("[claude-buddy] 状态保存失败：", err?.message);
   }
@@ -99,6 +142,7 @@ function saveState(state) {
 // 因为隔离的规则必须只有一处 —— 两处迟早会不一致。
 
 const acct = require("./account.cjs");
+const desktopModule = require("./desktop.cjs");
 
 /** 当前账号表（从 state 同步进来） */
 function syncAccounts(list) {
@@ -1324,6 +1368,9 @@ ipcMain.handle("account:remove", async (_e, { id, purge }) => {
     }
   }
 
+  // 代理密码跟着这个环境一起走，不能留在本机
+  acct.deleteProxySecret(a.id);
+
   return { ok: true, purged: Boolean(purge), configDir: a.configDir };
 });
 
@@ -1356,6 +1403,30 @@ ipcMain.handle("account:rotateIdentity", async (_e, { id }) => {
 ipcMain.handle("account:traces", (_e, { id }) => {
   const a = resolveAccount(id);
   return acct.inspectTraces(a);
+});
+/**
+ * Claude Desktop 的本地体检。
+ *
+ * 只读文件与进程，不发请求、不解密、不弹授权框 —— 探测本身
+ * 不能成为新的风控信号，也不能让界面等。desktop.cjs 内部自己缓存 30 秒。
+ */
+ipcMain.handle("desktop:probe", (_e, { force } = {}) => {
+  try {
+    return desktopModule.probe({ force: Boolean(force) });
+  } catch (err) {
+    return { installed: false, running: false, hasSafeStorage: false, exists: false, signedIn: "none", error: String(err?.message || err) };
+  }
+});
+
+/**
+ * 这个环境碰过的仓库指纹。
+ *
+ * 会真的跑 git 命令（本地，不联网），所以不能放在状态刷新里 ——
+ * 只在打开相似度时才问，一次最多几个项目。
+ */
+ipcMain.handle("account:repos", (_e, { id }) => {
+  const a = resolveAccount(id);
+  return acct.listRepoHashes(a);
 });
 
 /** Keychain 里的 Claude Code 条目（只读列举，不删） */

@@ -58,6 +58,7 @@ import type {
   TraceItem,
   KeychainEntry,
   ScannedDir,
+  DesktopProbe,
   SessionSummary,
 } from "./lib/bridge";
 import "./styles/app.css";
@@ -172,6 +173,8 @@ export default function App() {
   }, [state.view]);
   const [loginTerm, setLoginTerm] = useState<Record<string, string>>({});
   const [traces, setTraces] = useState<Record<string, TraceItem[] | undefined>>({});
+  /** 每个环境碰过的仓库指纹：undefined = 还没量（要跑 git，按需取） */
+  const [repos, setRepos] = useState<Record<string, string[] | undefined>>({});
   const [keychain, setKeychain] = useState<KeychainEntry[] | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [scanned, setScanned] = useState<ScannedDir[] | null>(null);
@@ -363,6 +366,7 @@ export default function App() {
     [state.accounts, drawerAccountId],
   );
 
+  const [desktop, setDesktop] = useState<DesktopProbe | null>(null);
   /** 安全状态：常驻右栏顶部，四步全过才显示"环境就绪" */
   const [safetyOpen, setSafetyOpen] = useState(false);
   const safety = useMemo(
@@ -371,8 +375,9 @@ export default function App() {
         activeAccount,
         activeAccount ? status[activeAccount.id] : undefined,
         activeAccount ? exitIp[activeAccount.id] : null,
+        desktop,
       ),
-    [activeAccount, status, exitIp],
+    [activeAccount, status, exitIp, desktop],
   );
 
   /**
@@ -388,9 +393,59 @@ export default function App() {
     const other = others.find((a) => a.auth === "signedIn") ?? others[0];
     return {
       otherLabel: other.label,
-      report: compareEnvironments(drawerAccount, other, (id) => exitIp[id]),
+      report: compareEnvironments(
+        drawerAccount,
+        other,
+        (id) => exitIp[id],
+        (id) => repos[id],
+      ),
     };
-  }, [drawerAccount, state.accounts, exitIp]);
+  }, [drawerAccount, state.accounts, exitIp, repos]);
+
+  /**
+   * Claude Desktop 的本地体检。
+   *
+   * 只读文件和进程，不发请求 —— 探测本身不能变成新的风控信号。
+   * 主进程那边有 30 秒缓存，这边隔几分钟问一次就够了。
+   */
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      void window.claudeBuddy.desktopProbe().then(
+        (r) => {
+          if (alive) setDesktop(r);
+        },
+        () => {
+          /* 探测失败就当没装，不干扰使用 */
+        },
+      );
+    };
+    load();
+    const timer = setInterval(load, 5 * 60 * 1000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  /**
+   * 打开环境详情时，把参与对比的两个环境的仓库指纹量出来。
+   *
+   * 这一步要真的跑 git（本地、不联网），所以不能塞进状态刷新，
+   * 也不能每次保存都跑 —— 只在箱庭打开时取一次，取到就缓在 repos 里。
+   */
+  useEffect(() => {
+    if (!drawerAccountId) return;
+    const others = stateRef.current.accounts.filter((a) => a.id !== drawerAccountId);
+    const other = others.find((a) => a.auth === "signedIn") ?? others[0];
+    for (const id of [drawerAccountId, other?.id]) {
+      if (!id || repos[id] !== undefined) continue;
+      void window.claudeBuddy.accountRepos(id).then(
+        (h) => setRepos((m) => ({ ...m, [id]: h })),
+        () => setRepos((m) => ({ ...m, [id]: [] })),
+      );
+    }
+  }, [drawerAccountId, repos]);
 
   /**
    * 一键拉开差距：把终端画像换成和现有环境都不同的一组。
@@ -622,6 +677,24 @@ export default function App() {
 
   // ── 建会话
   const spawnWindow = useCallback((account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string) => {
+    /**
+     * 强制代理的硬闸。
+     *
+     * 首页那个按钮只是其中一个人口，侧栏、右键、历史会话都能开会话，
+     * 所以拦截只能放在这里——否则“必须走代理”就只是句口号。
+     */
+    const px = account.proxy;
+    if (account.enforceProxy && !(px && px.protocol !== "none" && px.host)) {
+      setEditor({ id: account.id, section: "network" });
+      setToast({
+        title: tr("这个环境还没配出口", "No exit configured yet"),
+        body: tr(
+          "它设了必须走代理才允许开会话，所以这次没有启动。先在网络出口里配一个可用的线路。",
+          "It is set to require a proxy before a session can start, so nothing was launched. Configure a working route first.",
+        ),
+      });
+      return;
+    }
     // 家目录的目录名就是用户名，几个会话全叫同一个名字 分不清 —— 直接叫「主目录」
     const base = cwd === home ? tr("主目录", "Home") : prettyName(cwd);
     const win: ShellWindow = {

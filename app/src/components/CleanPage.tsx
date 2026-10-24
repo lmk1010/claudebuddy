@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CleanupAccount, CleanupResult, CleanupSurvey } from "../lib/bridge";
+import type { CleanupAccount, CleanupResult, CleanupSurvey, DesktopProbe } from "../lib/bridge";
 import { tierLabel } from "../lib/model";
 import { ConfirmDialog } from "./Modal";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
@@ -90,7 +90,24 @@ export default function CleanPage({
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [confirm, setConfirm] = useState<Item[] | null>(null);
   const [last, setLast] = useState<CleanupResult | null>(null);
+  /** Claude Desktop 的本地体检 —— 它不归环境管，这里只展示不提供删除 */
+  const [desk, setDesk] = useState<DesktopProbe | null>(null);
   const menu = useContextMenu();
+
+  useEffect(() => {
+    let alive = true;
+    void window.claudeBuddy.desktopProbe().then(
+      (r) => {
+        if (alive) setDesk(r);
+      },
+      () => {
+        /* 探测失败就不显示这一块 */
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -416,6 +433,37 @@ export default function CleanPage({
           )}
         </div>
       </div>
+
+      {desk?.installed && desk.exists && (
+        <div className="cl-desktop">
+          <div className="cl-desktop-h">
+            <b>{tr("Claude Desktop", "Claude Desktop")}</b>
+            <span className={`cl-pill ${desk.running ? "bad" : "mid"}`}>
+              {desk.running ? tr("正在运行", "Running") : tr("没在运行", "Not running")}
+            </span>
+            {desk.hasSafeStorage && <span className="cl-pill mid">{tr("有登录痕迹", "Sign-in traces")}</span>}
+            <span className="cl-sp" />
+            <span className="mono">
+              {bytes(desk.sizeBytes ?? 0)} · {desk.lastActiveAt ? when(desk.lastActiveAt) : tr("从未", "Never")}
+            </span>
+            <button className="det-k" onClick={() => void window.claudeBuddy.reveal(desk.supportDir ?? "")}>
+              {tr("在访达中打开", "Show in Finder")}
+            </button>
+          </div>
+          <p>
+            {tr(
+              "桌面端不在任何环境的管辖范围内：它的 Cookies、IndexedDB、Safe Storage 都是整机一份，无论开多少个环境，它在服务端就是同一台机器上的另一个身份。所以这里只告诉你它在不了、什么时候动过，不替你做主 —— 删它会把你 Desktop 那边踢下线，要不要这样做取决于你。",
+              "Desktop sits outside every environment: its cookies, IndexedDB and Safe Storage are shared machine-wide, so whatever the number of environments, it is still another identity on this machine. So this panel only reports what is there and when it last changed; it does not act for you, because removing it would sign you out of Desktop.",
+            )}
+          </p>
+          <p className="dim">
+            {tr(
+              "要用这个软件做隔离测试，建议先在 Desktop 里退出登录，测完再登回去。",
+              "If you are testing isolation with this app, sign out in Desktop first and sign back in afterwards.",
+            )}
+          </p>
+        </div>
+      )}
 
       {confirm && (
         <ConfirmDialog

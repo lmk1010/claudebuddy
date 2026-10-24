@@ -581,6 +581,7 @@ export function EnvModal({
                 <NetworkSection
                   account={account}
                   onSetProxy={onSetProxy}
+                  onPatch={onPatch}
                   onIp={(ip) => {
                     onPatch({ lastExitIp: ip, lastExitCheckedAt: Date.now() });
                   }}
@@ -697,7 +698,13 @@ export function EnvModal({
                               {ax.label}
                             </span>
                             <span className="sim-ax-vals mono">
-                              {ax.fixed ? tr("同机，改不掉", "Same machine, can't change") : ax.differs ? tr("已不同", "Different") : tr("相同", "Same")}
+                              {ax.fixed
+                                ? tr("同机，改不掉", "Same machine, can't change")
+                                : ax.unknown
+                                  ? tr("未知", "Unknown")
+                                  : ax.differs
+                                    ? tr("已不同", "Different")
+                                    : tr("相同", "Same")}
                             </span>
                           </div>
                         ))}
@@ -1013,11 +1020,13 @@ function GeneralSection({
 function NetworkSection({
   account,
   onSetProxy,
+  onPatch,
   onIp,
   onAlign,
 }: {
   account: Account;
   onSetProxy: (p: ProxyConfig) => void;
+  onPatch: (patch: Partial<Account>) => void;
   onIp: (ip: string) => void;
   onAlign: (t: { tz?: string; lang?: string }) => void;
 }) {
@@ -1047,6 +1056,33 @@ function NetworkSection({
         onIp={onIp}
         onAlign={onAlign}
       />
+
+      <div className="em-card">
+        <Row
+          title={tr("没配出口就不允许开会话", "No exit, no session")}
+          desc={tr(
+            "打开后，这个环境在所有入口（侧栏、右键、历史会话）都要求先有可用线路",
+            "When on, every entry point (sidebar, context menu, past sessions) requires a working route first",
+          )}
+          tip={
+            <Help title={tr("为什么要强制？", "Why force it?")}>
+              <p>
+                {tr(
+                  "环境之间共用一个出口，在服务端看来就是同一台机器后面的多个身份。这台机器上没装网络命名空间，拦不住进程直连，所以唯一能做的是“没配就不放行”。",
+                  "Environments sharing one exit look like several identities on the same machine. There are no network namespaces here to stop a direct connection, so the best available guarantee is refusing to start.",
+                )}
+              </p>
+            </Help>
+          }
+        >
+          <input
+            type="checkbox"
+            checked={Boolean(account.enforceProxy)}
+            onChange={(e) => onPatch({ enforceProxy: e.target.checked })}
+            aria-label={tr("没配出口就不允许开会话", "No exit, no session")}
+          />
+        </Row>
+      </div>
 
       <div className="em-sub">
         <span>{tr("线路", "Route")}</span>

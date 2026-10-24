@@ -69,6 +69,27 @@ export interface RotateResult {
   machineID?: string;
 }
 
+/**
+ * Claude Desktop 的本地体检结果。
+ *
+ * 桌面端不归任何环境管：Cookies、IndexedDB、Safe Storage 都是整机一份，
+ * 所以它在服务端就是同一台机器上的另一个身份。这里只报告看到了什么。
+ */
+export interface DesktopProbe {
+  installed: boolean;
+  appPath?: string | null;
+  running: boolean;
+  hasSafeStorage: boolean;
+  supportDir?: string;
+  exists: boolean;
+  sizeBytes?: number;
+  lastActiveAt?: number;
+  /** none / maybe / stale / likely / running-no-key / running */
+  signedIn: "none" | "maybe" | "stale" | "likely" | "running-no-key" | "running";
+  checkedAt?: number;
+  error?: string;
+}
+
 export interface TraceItem {
   key: string;
   label: string;
@@ -402,6 +423,10 @@ export interface ClaudeBuddyBridge {
   accountCheckExit(id: string): Promise<ExitCheck>;
   accountRotateIdentity(id: string): Promise<RotateResult>;
   accountTraces(id: string): Promise<TraceItem[]>;
+  /** 这个环境碰过的仓库指纹（git remote 的 sha256 前 16 位） */
+  accountRepos(id: string): Promise<string[]>;
+  /** Claude Desktop 的本地体检：不联网、不解密，只读文件与进程 */
+  desktopProbe(force?: boolean): Promise<DesktopProbe>;
   accountClearTraces(
     id: string,
     keys: string[],

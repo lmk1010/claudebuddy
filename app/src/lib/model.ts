@@ -163,6 +163,8 @@ export interface Account {
 
   /** 网络出口 */
   proxy: ProxyConfig;
+  /** 要求必须先有可用出口才允许开会话 —— 没配就拦，不只是一个黄字提醒 */
+  enforceProxy?: boolean;
   /** 上次测到的出口 IP，用于发现 IP 跳变 */
   lastExitIp?: string;
   /** 会话里 Claude 说过「账号正在暂时风控」的时间；重新登录成功后清掉 */
@@ -530,6 +532,8 @@ export interface SimilarityAxis {
   fixed: boolean;
   /** 两边是否不同 */
   differs: boolean;
+  /** 两边至少有一边量不出来 —— 界面上说「未知」，不说「相同」 */
+  unknown?: boolean;
 }
 
 export interface SimilarityReport {
@@ -545,8 +549,20 @@ export function compareEnvironments(
   a: Account,
   b: Account,
   ipOf: (id: string) => string | null | undefined,
+  /** 每个环境碰过的仓库指纹；不传就退回账号上的 profile */
+  repoOf?: (id: string) => string[] | undefined,
 ): SimilarityReport {
   const short = (v?: string | null) => (v && v.length > 10 ? `${v.slice(0, 10)}…` : v || "—");
+
+  /**
+   * 仓库指纹：同一个 git remote 在两个环境里算出同一个哈希，
+   * 所以「共用仓库」是一条真存在、且用户看不见的连线。
+   * 两边都有数据才能下结论，只有一边有就说未知 —— 不猜。
+   */
+  const reposA = repoOf?.(a.id) ?? a.profile?.repoHashes ?? [];
+  const reposB = repoOf?.(b.id) ?? b.profile?.repoHashes ?? [];
+  const sharedRepos = reposA.filter((h) => reposB.includes(h)).length;
+  const repoKnown = reposA.length > 0 && reposB.length > 0;
 
   const axes: SimilarityAxis[] = [
     // ── 换不掉：同一台机器上必然相同 ──
@@ -618,6 +634,15 @@ export function compareEnvironments(
       b: b.terminal?.tz ?? "—",
       fixed: false,
       differs: (a.terminal?.tz ?? "") !== (b.terminal?.tz ?? ""),
+    },
+    {
+      key: "repo",
+      label: tr("仓库哈希", "Repo hash"),
+      a: reposA.length ? tr(`${reposA.length} 个仓库`, `${reposA.length} repos`) : "—",
+      b: reposB.length ? tr(`${reposB.length} 个仓库`, `${reposB.length} repos`) : "—",
+      fixed: false,
+      unknown: !repoKnown,
+      differs: repoKnown ? sharedRepos === 0 : false,
     },
   ];
 
