@@ -3304,126 +3304,137 @@
 }
 
 /* ══════════ 关于 ══════════ */
+/* 照「关于本机」：居中、留白、图标直接放在纸面上 */
 .ab {
-  padding-top: 18px;
-  animation: nr-in var(--dur-base) var(--ease-out);
-}
-.ab-hero {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 22px;
-  padding: 26px 28px;
-  border-radius: 18px;
-  border: var(--hair) solid var(--ln);
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--coral-soft), transparent 55%),
-    var(--bg);
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 56px 0 40px;
+  animation: nr-in var(--dur-slow) var(--ease-out);
 }
-.ab-hero img {
-  width: 84px;
-  height: 84px;
-  border-radius: 20px;
+.ab-id {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.ab-id img {
+  width: 112px;
+  height: 112px;
   display: block;
-  box-shadow: 0 8px 24px rgba(196, 112, 79, 0.25), 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* 只要一层很淡的落地阴影，让图标「放」在纸上，不发光 */
+  filter: drop-shadow(0 6px 14px rgba(40, 30, 20, 0.12)) drop-shadow(0 1px 2px rgba(40, 30, 20, 0.08));
 }
-.ab-hero-t h1 {
-  margin: 0;
+.ab-id h1 {
+  margin: 20px 0 0;
   font-family: var(--serif);
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--t1);
 }
-.ab-hero-t p {
-  margin: 4px 0 10px;
-  font-size: 13.5px;
-  color: var(--t3);
-}
-.ab-tags {
-  display: flex;
-  gap: 6px;
-}
-.ab-tag {
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  line-height: 20px;
-  color: var(--t2);
-  background: var(--pp);
-  border: var(--hair) solid var(--ln);
-}
-.ab-acts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 16px 0 22px;
-}
-.ab-feats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 26px;
-}
-.ab-feat {
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: var(--hair) solid var(--ln);
-  background: var(--bg);
-}
-.ab-feat-ic {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 10px;
-  background: var(--coral-soft);
-  color: var(--coral);
-}
-.ab-feat b {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--t1);
-}
-.ab-feat p {
+.ab-ver {
   margin: 4px 0 0;
   font-size: 12px;
-  line-height: 1.6;
-  color: var(--t3);
+  color: var(--t4);
+  font-variant-numeric: tabular-nums;
+}
+.ab-line {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--t2);
+}
+.ab-links {
+  display: flex;
+  align-items: center;
+  margin-top: 18px;
+}
+.ab-links button {
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--coral);
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out);
+}
+.ab-links button:hover {
+  background: var(--coral-soft);
+}
+.ab-links button + button {
+  position: relative;
+}
+.ab-links button + button::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  width: 1px;
+  height: 11px;
+  transform: translateY(-50%);
+  background: var(--ln2);
+}
+.ab-info {
+  width: 100%;
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: var(--hair) solid var(--ln);
 }
 .ab-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  min-height: 42px;
-  padding: 0 16px;
-  font-size: 12.5px;
-  color: var(--t3);
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--t4);
 }
-.ab-row + .ab-row {
-  border-top: var(--hair) solid var(--ln);
-}
-.ab-row > .mono,
-.ab-row-v .mono {
-  font-size: 11.5px;
-  color: var(--t1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.ab-row-v {
+.ab-v {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  font-size: 11.5px;
+  color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ab-ic {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--t4);
+}
+.ab-ic:hover {
+  background: var(--hv);
+  color: var(--t1);
+}
+.ab-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 3px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.ab-copy:hover {
+  background: var(--hv);
+  color: var(--t1);
 }
 .ab-foot {
-  margin: 18px 2px 0;
+  margin: 36px 0 0;
+  text-align: center;
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--t4);
 }
 
