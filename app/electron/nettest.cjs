@@ -11,14 +11,15 @@
  */
 const { execFile } = require("node:child_process");
 const dns = require("node:dns");
+const { L } = require("./i18n.cjs");
 
 /** 要测的目标：Claude Code 实际会连的域名 */
 const TARGETS = [
-  { id: "api", host: "api.anthropic.com", url: "https://api.anthropic.com/", role: "模型 API（对话、补全都走这里）" },
-  { id: "web", host: "claude.ai", url: "https://claude.ai/cdn-cgi/trace", role: "登录授权、网页" },
-  { id: "console", host: "console.anthropic.com", url: "https://console.anthropic.com/", role: "OAuth 回调、账号" },
-  { id: "dist", host: "storage.googleapis.com", url: "https://storage.googleapis.com/", role: "Claude Code 安装包 / 自动更新" },
-  { id: "status", host: "status.claude.com", url: "https://status.claude.com/api/v2/status.json", role: "官方状态页" },
+  { id: "api", host: "api.anthropic.com", url: "https://api.anthropic.com/", get role() { return L("模型 API（对话、补全都走这里）", "Model API (chat and completions)"); } },
+  { id: "web", host: "claude.ai", url: "https://claude.ai/cdn-cgi/trace", get role() { return L("登录授权、网页", "Sign-in authorization, web"); } },
+  { id: "console", host: "console.anthropic.com", url: "https://console.anthropic.com/", get role() { return L("OAuth 回调、账号", "OAuth callback, account"); } },
+  { id: "dist", host: "storage.googleapis.com", url: "https://storage.googleapis.com/", get role() { return L("Claude Code 安装包 / 自动更新", "Claude Code installer / auto-update"); } },
+  { id: "status", host: "status.claude.com", url: "https://status.claude.com/api/v2/status.json", get role() { return L("官方状态页", "Official status page"); } },
 ];
 
 const FMT = "%{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total} %{http_code} %{remote_ip} %{ssl_verify_result} %{http_version}";
@@ -32,7 +33,7 @@ function curlTime(url, proxy, timeout = 10) {
     execFile("curl", args, { timeout: (timeout + 2) * 1000 }, (err, out, stderr) => {
       const p = String(out || "").trim().split(" ");
       const code = Number(p[5]);
-      if (!code) return resolve({ ok: false, error: String(stderr || err?.message || "失败").trim().split("\n")[0].replace(/^curl: \(\d+\) /, "") });
+      if (!code) return resolve({ ok: false, error: String(stderr || err?.message || L("失败", "Failed")).trim().split("\n")[0].replace(/^curl: \(\d+\) /, "") });
       const s = (i) => Math.round(Number(p[i]) * 1000);
       resolve({
         ok: true,
@@ -87,7 +88,7 @@ async function probeTarget(t, proxy, rounds) {
     tlsOk: ok.length ? ok.every((r) => r.tlsOk) : null,
     http: ok[ok.length - 1]?.http ?? "",
     connectAt: pick("connectAt"),
-    error: ok.length ? null : runs[0]?.error ?? "连不上",
+    error: ok.length ? null : runs[0]?.error ?? L("连不上", "Unable to connect"),
   };
 }
 

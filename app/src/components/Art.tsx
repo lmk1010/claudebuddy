@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { tr } from "../lib/i18n";
 
 /**
  * 插画组件 —— 浅色 / 暗色各一张**带透明的 PNG**。
@@ -23,22 +24,22 @@ const ART: Record<ArtName, { light: string; dark: string; alt: string }> = {
   welcome: {
     light: "./assets/hero-welcome.png",
     dark: "./assets/hero-welcome-dark.png",
-    alt: "一间亮着灯的小屋",
+    get alt() { return tr("一间亮着灯的小屋", "A small house with its light on"); },
   },
   isolation: {
     light: "./assets/isolation.png",
     dark: "./assets/isolation-dark.png",
-    alt: "三间各自独立的小屋",
+    get alt() { return tr("三间各自独立的小屋", "Three separate small houses"); },
   },
   rhythm: {
     light: "./assets/rhythm.png",
     dark: "./assets/rhythm-dark.png",
-    alt: "一台节拍器",
+    get alt() { return tr("一台节拍器", "A metronome"); },
   },
   empty: {
     light: "./assets/empty-sessions.png",
     dark: "./assets/empty-sessions-dark.png",
-    alt: "一块空着的留言板",
+    get alt() { return tr("一块空着的留言板", "An empty message board"); },
   },
 };
 

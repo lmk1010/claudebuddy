@@ -4,19 +4,35 @@ import { CHECKERS, flag } from "./IpBadge";
 import { useContextMenu } from "./ContextMenu";
 import Help from "./Help";
 import { IconRefresh, IconWarning } from "./iconAliases";
+import { tr } from "../lib/i18n";
 
 /** 同一个环境、同一条线路，5 分钟内切回来不重测 */
 const cache = new Map<string, { key: string; at: number; r: NetReport }>();
+
+/** 切语言后清掉：缓存里的城市名、说明文字还是旧语言 */
+export function resetNetReports() {
+  cache.clear();
+}
 const TTL = 5 * 60 * 1000;
 
-const KIND_ZH: Record<string, string> = {
-  residential: "住宅宽带",
-  mobile: "移动网络",
-  wireless: "移动网络",
-  hosting: "机房 IP",
-  business: "企业线路",
-  vpn: "VPN",
-};
+/** 函数而不是常量：文案要跟着当前语言走 */
+function kindName(k: string): string | undefined {
+  switch (k) {
+    case "residential":
+      return tr("住宅宽带", "Residential");
+    case "mobile":
+    case "wireless":
+      return tr("移动网络", "Mobile");
+    case "hosting":
+      return tr("机房 IP", "Datacenter");
+    case "business":
+      return tr("企业线路", "Business");
+    case "vpn":
+      return "VPN";
+    default:
+      return undefined;
+  }
+}
 
 /** 同一个环境同时只发一次体检，几个地方一起要也只跑一趟 */
 const inflight = new Map<string, Promise<NetReport>>();
@@ -30,7 +46,7 @@ function fetchReport(accountId: string, key: string): Promise<NetReport> {
     .catch((e): NetReport => {
       const msg = e instanceof Error ? e.message : String(e);
       // 开发时界面热更新了、后台没重启，会出现这个；给人话而不是原始报错
-      return { ok: false, reason: /No handler registered/.test(msg) ? "应用后台是旧版本，重启应用后再试" : msg };
+      return { ok: false, reason: /No handler registered/.test(msg) ? tr("应用后台是旧版本，重启应用后再试", "The app backend is outdated. Restart the app and try again") : msg };
     })
     .then((r) => {
       cache.set(accountId, { key, at: Date.now(), r });
@@ -66,11 +82,11 @@ export function useNetReport(accountId: string | null | undefined, proxyKey: str
 /** 一小枚：🇺🇸 100 纯净。测着时显示「测出口…」，测不通显示「出口不通」 */
 export function NetScore({ accountId, proxyKey }: { accountId: string | null | undefined; proxyKey: string }) {
   const r = useNetReport(accountId, proxyKey);
-  if (!r) return <span className="nsc dim">测出口…</span>;
-  if (!r.ok) return <span className="nsc bad">出口不通</span>;
+  if (!r) return <span className="nsc dim">{tr("测出口…", "Testing exit…")}</span>;
+  if (!r.ok) return <span className="nsc bad">{tr("出口不通", "Exit unreachable")}</span>;
   const v = verdict(r.score ?? 0);
   return (
-    <span className={`nsc ${v.tone}`} title={`${r.ip} · 信任分 ${r.score}（${v.text}）`}>
+    <span className={`nsc ${v.tone}`} title={tr(`${r.ip} · 信任分 ${r.score}（${v.text}）`, `${r.ip} · Trust score ${r.score} (${v.text})`)}>
       {flag(r.info?.countryCode ?? r.claude?.loc ?? "")}
       <b>{r.score}</b>
       {v.text}
@@ -79,9 +95,9 @@ export function NetScore({ accountId, proxyKey }: { accountId: string | null | u
 }
 
 export function verdict(score: number): { text: string; tone: "ok" | "mid" | "bad" } {
-  if (score >= 75) return { text: "纯净", tone: "ok" };
-  if (score >= 50) return { text: "一般", tone: "mid" };
-  return { text: "高危", tone: "bad" };
+  if (score >= 75) return { text: tr("纯净", "Clean"), tone: "ok" };
+  if (score >= 50) return { text: tr("一般", "Fair"), tone: "mid" };
+  return { text: tr("高危", "Risky"), tone: "bad" };
 }
 
 function ms(n: number) {
@@ -144,7 +160,7 @@ export default function NetReportCard({
     return (
       <div className="nr nr-loading">
         <span className="nr-spin" />
-        <span>正在从这个环境的线路连 Claude，看它眼里的出口…</span>
+        <span>{tr("正在从这个环境的线路连 Claude，看它眼里的出口…", "Connecting to Claude through this environment's route to see the exit as it does…")}</span>
       </div>
     );
   }
@@ -153,9 +169,9 @@ export default function NetReportCard({
     return (
       <div className="nr nr-fail">
         <IconWarning size={15} />
-        <span>{r.reason ?? "检测失败"}</span>
+        <span>{r.reason ?? tr("检测失败", "Check failed")}</span>
         <button className="btn" onClick={() => void run()} disabled={busy}>
-          {busy ? "检测中…" : "重试"}
+          {busy ? tr("检测中…", "Checking…") : tr("重试", "Retry")}
         </button>
       </div>
     );
@@ -166,8 +182,8 @@ export default function NetReportCard({
   const info = r.info;
   const c = r.claude!;
   const cs = r.consistency!;
-  const kind = KIND_ZH[(r.kind || "").toLowerCase()] ?? r.kind ?? "未知";
-  const hosting = /机房|企业|VPN/.test(kind);
+  const kind = kindName((r.kind || "").toLowerCase()) ?? r.kind ?? tr("未知", "Unknown");
+  const hosting = ["hosting", "business", "vpn"].includes((r.kind || "").toLowerCase()) || /机房|企业|VPN/.test(kind);
   const jumped = prevIp.current && r.ip && prevIp.current !== r.ip;
 
   return (
@@ -179,7 +195,7 @@ export default function NetReportCard({
         </div>
         <div className="nr-id">
           {/* 「出口」有好几种：本机直连的、代理的、DNS 的……这里说清楚是哪一个 */}
-          <div className="nr-cap">Claude 看到的出口 · 走 {proxyKey}</div>
+          <div className="nr-cap">{tr(`Claude 看到的出口 · 走 ${proxyKey}`, `Exit seen by Claude · via ${proxyKey}`)}</div>
           <div className="nr-ip">
             <span className="mono">{r.ip}</span>
             <span className={`ipb-kind ${hosting ? "mid" : "ok"}`}>{kind}</span>
@@ -191,26 +207,30 @@ export default function NetReportCard({
                 {info.isp ? ` · ${info.isp}` : ""}
               </>
             ) : (
-              "归属查不到"
+              tr("归属查不到", "Location unavailable")
             )}
           </div>
-          <div className="nr-meter" title="0 高危 · 100 可信">
+          <div className="nr-meter" title={tr("0 高危 · 100 可信", "0 risky · 100 trusted")}>
             <i style={{ left: `${score}%` }} />
           </div>
         </div>
         <div className="nr-acts">
           <button className="btn" onClick={() => void run()} disabled={busy}>
             <IconRefresh />
-            {busy ? "检测中…" : "重新检测"}
+            {busy ? tr("检测中…", "Checking…") : tr("重新检测", "Check again")}
           </button>
-          <Help title="这个分怎么来的？" wide>
+          <Help title={tr("这个分怎么来的？", "How is this score calculated?")} wide>
             <p>
-              信任分 = 100 − proxycheck.io 的风险分，被标成代理 / VPN 直接压到 30 以下，机房 IP 再扣 15。它是按公开数据估的，
-              <b>不是 Anthropic 的内部分数</b>，只用来对比线路好坏。
+              {tr(
+                "信任分 = 100 − proxycheck.io 的风险分，被标成代理 / VPN 直接压到 30 以下，机房 IP 再扣 15。它是按公开数据估的，",
+                "Trust score = 100 minus the proxycheck.io risk score. An IP flagged as proxy / VPN is capped below 30, and a datacenter IP loses another 15. It is estimated from public data, ",
+              )}
+              <b>{tr("不是 Anthropic 的内部分数", "not an internal Anthropic score")}</b>
+              {tr("，只用来对比线路好坏。", ", and is only for comparing routes.")}
             </p>
-            <p>这里的 IP 是直接请求 claude.ai 时，Cloudflare 回报的来源地址，走的就是这个环境的线路，跟真实会话同一条路。</p>
-            <p>它跟「设置 → 网络测试」里的「本机直连出口」不一定一样：那个不走任何环境的代理。</p>
-            <p>IP 属性两个来源各说各的（ip-api、proxycheck），照实列出，不按运营商名字去猜。</p>
+            <p>{tr("这里的 IP 是直接请求 claude.ai 时，Cloudflare 回报的来源地址，走的就是这个环境的线路，跟真实会话同一条路。", "This IP is the source address Cloudflare reports when claude.ai is requested directly. It uses this environment's route, the same path as a real session.")}</p>
+            <p>{tr("它跟「设置 → 网络测试」里的「本机直连出口」不一定一样：那个不走任何环境的代理。", "It may differ from the direct exit of this Mac under Settings → Network test, which does not use any environment's proxy.")}</p>
+            <p>{tr("IP 属性两个来源各说各的（ip-api、proxycheck），照实列出，不按运营商名字去猜。", "The two sources for IP attributes (ip-api, proxycheck) can disagree. Both are listed as reported, with no guessing from the carrier name.")}</p>
           </Help>
         </div>
       </div>
@@ -218,44 +238,47 @@ export default function NetReportCard({
       {jumped && (
         <div className="nr-warn">
           <IconWarning size={13} />
-          出口变了：{prevIp.current} → {r.ip}。同一个号频繁换出口本身就是风控信号。
+          {tr(
+            `出口变了：${prevIp.current} → ${r.ip}。同一个号频繁换出口本身就是风控信号。`,
+            `Exit changed: ${prevIp.current} → ${r.ip}. Frequently changing the exit on one account is itself a risk signal.`,
+          )}
         </div>
       )}
 
       <div className="nr-grid">
         <div className="nr-col">
-          <h4>Claude 看到的</h4>
-          <Line k="地区">
+          <h4>{tr("Claude 看到的", "What Claude sees")}</h4>
+          <Line k={tr("地区", "Region")}>
             {flag(c.loc)} {c.loc || "—"}
-            {c.supported === false ? <Tag tone="bad">不在服务区</Tag> : c.supported ? <Tag tone="ok">支持</Tag> : null}
+            {c.supported === false ? <Tag tone="bad">{tr("不在服务区", "Unsupported region")}</Tag> : c.supported ? <Tag tone="ok">{tr("支持", "Supported")}</Tag> : null}
           </Line>
-          <Line k="claude.ai">{c.web.ok ? <Tag tone={c.web.ms > 1500 ? "mid" : "ok"}>{ms(c.web.ms)}</Tag> : <Tag tone="bad">不通</Tag>}</Line>
-          <Line k="API">{c.api.ok ? <Tag tone={c.api.ms > 1500 ? "mid" : "ok"}>{ms(c.api.ms)}</Tag> : <Tag tone="bad">不通</Tag>}</Line>
-          <Line k="服务状态">
-            {c.status ? <Tag tone={c.status.ok ? "ok" : "mid"}>{c.status.ok ? "全部正常" : c.status.text}</Tag> : "—"}
+          <Line k="claude.ai">{c.web.ok ? <Tag tone={c.web.ms > 1500 ? "mid" : "ok"}>{ms(c.web.ms)}</Tag> : <Tag tone="bad">{tr("不通", "Unreachable")}</Tag>}</Line>
+          <Line k="API">{c.api.ok ? <Tag tone={c.api.ms > 1500 ? "mid" : "ok"}>{ms(c.api.ms)}</Tag> : <Tag tone="bad">{tr("不通", "Unreachable")}</Tag>}</Line>
+          <Line k={tr("服务状态", "Service status")}>
+            {c.status ? <Tag tone={c.status.ok ? "ok" : "mid"}>{c.status.ok ? tr("全部正常", "All OK") : c.status.text}</Tag> : "—"}
           </Line>
         </div>
 
         <div className="nr-col">
-          <h4>IP 属性</h4>
-          <Line k="代理 / VPN">{r.risk?.proxy || info?.proxy ? <Tag tone="bad">已标记</Tag> : <Tag tone="ok">未检测到</Tag>}</Line>
+          <h4>{tr("IP 属性", "IP attributes")}</h4>
+          <Line k={tr("代理 / VPN", "Proxy / VPN")}>{r.risk?.proxy || info?.proxy ? <Tag tone="bad">{tr("已标记", "Flagged")}</Tag> : <Tag tone="ok">{tr("未检测到", "Not detected")}</Tag>}</Line>
           {/* 两个来源分开列，各说各的 */}
           <Line k="proxycheck">
             {r.risk ? (
               <Tag tone={r.risk.risk >= 50 ? "bad" : r.risk.risk >= 25 ? "mid" : "ok"}>
-                {KIND_ZH[r.risk.type.toLowerCase()] ?? (r.risk.type || "未知")} · {r.risk.risk}
+                {kindName(r.risk.type.toLowerCase()) ?? (r.risk.type || tr("未知", "Unknown"))} · {r.risk.risk}
               </Tag>
             ) : (
-              "没查到"
+              tr("没查到", "No result")
             )}
           </Line>
           <Line k="ip-api">
             {info ? (
               <Tag tone={info.proxy ? "bad" : info.hosting ? "mid" : "ok"}>
-                {info.proxy ? "代理" : info.hosting ? "机房" : info.mobile ? "移动网络" : "非机房"}
+                {info.proxy ? tr("代理", "Proxy") : info.hosting ? tr("机房", "Datacenter") : info.mobile ? tr("移动网络", "Mobile") : tr("非机房", "Not datacenter")}
               </Tag>
             ) : (
-              "没查到"
+              tr("没查到", "No result")
             )}
           </Line>
           <Line k="ASN">
@@ -266,34 +289,34 @@ export default function NetReportCard({
         </div>
 
         <div className="nr-col">
-          <h4>一致性</h4>
-          <Line k="时区">
+          <h4>{tr("一致性", "Consistency")}</h4>
+          <Line k={tr("时区", "Time zone")}>
             {cs.tzOk ? (
-              <Tag tone="ok">一致</Tag>
+              <Tag tone="ok">{tr("一致", "Match")}</Tag>
             ) : (
-              <button className="nr-fix" onClick={() => onAlign({ tz: cs.ipTz })} title={`把环境时区改成 ${cs.ipTz}，下次开会话生效`}>
-                <Tag tone="mid">不一致</Tag>
-                <span>对齐</span>
+              <button className="nr-fix" onClick={() => onAlign({ tz: cs.ipTz })} title={tr(`把环境时区改成 ${cs.ipTz}，下次开会话生效`, `Set the environment time zone to ${cs.ipTz}, effective for the next session`)}>
+                <Tag tone="mid">{tr("不一致", "Mismatch")}</Tag>
+                <span>{tr("对齐", "Align")}</span>
               </button>
             )}
           </Line>
-          <Line k="环境时区">
+          <Line k={tr("环境时区", "Env zone")}>
             <span className="mono nr-trunc">{cs.tz}</span>
           </Line>
-          <Line k="出口时区">
+          <Line k={tr("出口时区", "Exit zone")}>
             <span className="mono nr-trunc">{cs.ipTz || "—"}</span>
           </Line>
-          <Line k="语言">
+          <Line k={tr("语言", "Language")}>
             {cs.langOk ? (
               <Tag tone="ok">{cs.lang.split(".")[0]}</Tag>
             ) : (
               <button
                 className="nr-fix"
                 onClick={() => onAlign({ lang: /^zh/i.test(cs.lang) ? "en_US.UTF-8" : "zh_CN.UTF-8" })}
-                title={`环境 ${cs.lang}，跟出口所在地不搭。点一下改过来，下次开会话生效`}
+                title={tr(`环境 ${cs.lang}，跟出口所在地不搭。点一下改过来，下次开会话生效`, `Environment is ${cs.lang}, which doesn't fit the exit location. Click to fix, effective for the next session`)}
               >
                 <Tag tone="mid">{cs.lang.split(".")[0]}</Tag>
-                <span>对齐</span>
+                <span>{tr("对齐", "Align")}</span>
               </button>
             )}
           </Line>
@@ -301,7 +324,7 @@ export default function NetReportCard({
       </div>
 
       <div className="nr-foot">
-        <span>数据：claude.ai · ip-api.com · proxycheck.io{r.at ? ` · ${new Date(r.at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
+        <span>{tr("数据：", "Data: ")}claude.ai · ip-api.com · proxycheck.io{r.at ? ` · ${new Date(r.at).toLocaleTimeString(tr("zh-CN", "en-US"), { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
         <button
           className="nr-more"
           onClick={(e) => {
@@ -309,11 +332,11 @@ export default function NetReportCard({
             menu.open(
               { clientX: b.left, clientY: b.bottom + 4, preventDefault: () => {}, stopPropagation: () => {} },
               CHECKERS.map((x) => ({ label: x.label, hint: "↗", run: () => void window.claudeBuddy.openExternal(x.url(r.ip!)) })),
-              `到第三方站点查 ${r.ip}`,
+              tr(`到第三方站点查 ${r.ip}`, `Look up ${r.ip} on third-party sites`),
             );
           }}
         >
-          更多评分 ↗
+          {tr("更多评分 ↗", "More scores ↗")}
         </button>
       </div>
       {menu.node}

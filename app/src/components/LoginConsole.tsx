@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { IconArrowRight, IconCheck } from "./iconAliases";
+import { tr } from "../lib/i18n";
 
 /**
  * 登录控制台 —— 登录这一步真正的闭环在这里。
@@ -77,15 +78,20 @@ export default function LoginConsole({
   return (
     <div className="login-console">
       <pre className="ob-term selectable" ref={boxRef}>
-        {clean || (silentTooLong ? "" : "正在启动授权流程…")}
+        {clean || (silentTooLong ? "" : tr("正在启动授权流程…", "Starting the authorization flow…"))}
       </pre>
 
       {silentTooLong && !clean && !signedIn && (
         <div className="det-warn">
           <span>
-            CLI 没有任何输出。多半是 <code>claude</code> 命令不在 PATH 上，
-            或者这个环境的配置目录不可用。先在终端里手动跑一次{" "}
-            <code>claude auth login</code> 确认能起来。
+            {tr("CLI 没有任何输出。多半是 ", "The CLI produced no output. Most likely the ")}
+            <code>claude</code>
+            {tr(
+              " 命令不在 PATH 上，或者这个环境的配置目录不可用。先在终端里手动跑一次 ",
+              " command is not on PATH, or this environment's config folder is unavailable. Run ",
+            )}
+            <code>claude auth login</code>
+            {tr(" 确认能起来。", " manually in a terminal to check that it starts.")}
           </span>
         </div>
       )}
@@ -101,9 +107,9 @@ export default function LoginConsole({
             }}
             title={url}
           >
-            在浏览器中打开授权页
+            {tr("在浏览器中打开授权页", "Open authorization page in browser")}
           </button>
-          <span className="in-cap">登录后复制返回的授权码，贴到下面</span>
+          <span className="in-cap">{tr("登录后复制返回的授权码，贴到下面", "After signing in, copy the returned code and paste it below")}</span>
         </div>
       )}
 
@@ -113,7 +119,7 @@ export default function LoginConsole({
             ref={inputRef}
             className="ob-input"
             value={code}
-            placeholder="把授权码粘贴到这里，回车提交"
+            placeholder={tr("把授权码粘贴到这里，回车提交", "Paste the code here and press Enter")}
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.nativeEvent.isComposing) {
@@ -127,7 +133,7 @@ export default function LoginConsole({
             disabled={!code.trim()}
             onClick={submit}
           >
-            提交
+            {tr("提交", "Submit")}
             {code.trim() ? <IconArrowRight /> : null}
           </button>
         </div>
@@ -136,7 +142,7 @@ export default function LoginConsole({
       {sent && !signedIn && (
         <div className="ob-wait" style={{ marginTop: 8 }}>
           <span className="spinner" />
-          已提交，正在校验…
+          {tr("已提交，正在校验…", "Submitted, verifying…")}
         </div>
       )}
 
@@ -144,8 +150,8 @@ export default function LoginConsole({
         <div className="ob-ok" style={{ marginTop: 10, marginBottom: 0 }}>
           <IconCheck />
           <div>
-            <b>登录成功</b>
-            <small>凭据已写进这个环境自己的目录</small>
+            <b>{tr("登录成功", "Signed in")}</b>
+            <small>{tr("凭据已写进这个环境自己的目录", "Credentials were saved to this environment's own folder")}</small>
           </div>
         </div>
       )}
@@ -153,7 +159,7 @@ export default function LoginConsole({
       {!signedIn && onCancel && (
         <div style={{ marginTop: 2 }}>
           <button className="btn ghost" onClick={onCancel} style={{ height: 28, fontSize: 12 }}>
-            取消登录
+            {tr("取消登录", "Cancel sign in")}
           </button>
         </div>
       )}

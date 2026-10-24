@@ -7,6 +7,7 @@ import TerminalView from "./TerminalView";
 import { NetScore } from "./NetReport";
 import TermSettings from "./TermSettings";
 import { TERM_PADDING } from "../lib/termThemes";
+import { tr } from "../lib/i18n";
 import {
   IconClose,
   IconCode,
@@ -98,7 +99,7 @@ export default function SessionMain({
     <>
       <div className="sh">
         <div className="sh-l">
-          <span className="sh-t">{active?.title ?? "会话"}</span>
+          <span className="sh-t">{active?.title ?? tr("会话", "Session")}</span>
           {active && accountById.get(active.accountId) && (
             <span className="sh-env" title={`~/${accountById.get(active.accountId)!.configDir}`}>
               <span className="tw-tab-av" style={{ background: accountById.get(active.accountId)!.tint }}>
@@ -112,7 +113,7 @@ export default function SessionMain({
             <button
               className="sh-net"
               onClick={() => onEditNetwork(active.accountId)}
-              title="这个环境的网络出口 · 点开看体检"
+              title={tr("这个环境的网络出口 · 点开看体检", "This environment's network exit · click for health check")}
             >
               <IconGlobe size={12} />
               <span className="mono">{proxyLabel(accountById.get(active.accountId)!.proxy)}</span>
@@ -122,7 +123,7 @@ export default function SessionMain({
           {active?.branch ? <span className="sh-br">branch {active.branch}</span> : null}
           <span className="sh-dot" />
           <span className="sh-st">
-            {active ? `运行中 · ${fmtDuration(running / 1000)}` : "没有活动会话"}
+            {active ? tr(`运行中 · ${fmtDuration(running / 1000)}`, `Running · ${fmtDuration(running / 1000)}`) : tr("没有活动会话", "No active session")}
           </span>
         </div>
 
@@ -130,23 +131,23 @@ export default function SessionMain({
           <div className="seg sm">
             <button className={showDiff ? "" : "on"} onClick={onToggleConsole}>
               <IconTerminal />
-              终端
+              {tr("终端", "Terminal")}
             </button>
             <button className={showDiff ? "on" : ""} onClick={onToggleDiff} disabled={!git?.branch}>
               <IconCode />
-              改动 <em>{git?.changes.length ?? 0}</em>
+              {tr("改动", "Changes")} <em>{git?.changes.length ?? 0}</em>
             </button>
           </div>
           <button
             className={`ib sh-aa${tset ? " on" : ""}`}
-            title="终端外观：配色、字体、字号"
+            title={tr("终端外观：配色、字体、字号", "Terminal appearance: theme, font, size")}
             onClick={(e) => setTset(tset ? null : e.currentTarget.getBoundingClientRect())}
           >
             Aa
           </button>
           <button
             className={`ib${panelOpen ? " on" : ""}`}
-            title={panelOpen ? "收起右栏 ⌘B" : "展开右栏 ⌘B"}
+            title={panelOpen ? tr("收起右栏 ⌘B", "Collapse side panel ⌘B") : tr("展开右栏 ⌘B", "Expand side panel ⌘B")}
             onClick={onTogglePanel}
           >
             <IconPanel />
@@ -176,7 +177,7 @@ export default function SessionMain({
                     e.preventDefault();
                     setCtx({ id: w.id, x: e.clientX, y: e.clientY });
                   }}
-                  title={`${w.title} · ${acc?.label ?? ""}\n${w.cwd}\n双击重命名 · 右键更多`}
+                  title={`${w.title} · ${acc?.label ?? ""}\n${w.cwd}\n${tr("双击重命名 · 右键更多", "Double-click to rename · right-click for more")}`}
                 >
                   <span className="tw-tab-av" style={{ background: acc?.tint }}>
                     {acc?.label.slice(0, 1)}
@@ -209,7 +210,7 @@ export default function SessionMain({
                   {/* 页签自己的关闭入口：hover 或当前页签才露出来，免得一排叉号把标签挤碎 */}
                   <button
                     className="tw-tab-x"
-                    title="关闭会话 ⌘W"
+                    title={tr("关闭会话 ⌘W", "Close session ⌘W")}
                     onClick={(e) => {
                       e.stopPropagation();
                       onRequestClose(w.id);
@@ -220,7 +221,7 @@ export default function SessionMain({
                 </div>
               );
             })}
-            <button className="tw-add" title="新会话 ⌘T" onClick={onNew}>
+            <button className="tw-add" title={tr("新会话 ⌘T", "New session ⌘T")} onClick={onNew}>
               <IconPlus />
             </button>
           </div>
@@ -237,8 +238,8 @@ export default function SessionMain({
             <DiffPane git={git} />
           ) : !ptyOk ? (
             <div className="term-hint">
-              <span>浏览器预览模式没有 PTY</span>
-              <span>用 npm run app 启动 Electron 才能在 {active?.cwd ?? "目录"} 里起终端</span>
+              <span>{tr("浏览器预览模式没有 PTY", "Browser preview mode has no PTY")}</span>
+              <span>{tr(`用 npm run app 启动 Electron 才能在 ${active?.cwd ?? "目录"} 里起终端`, `Launch Electron with npm run app to start a terminal in ${active?.cwd ?? "the folder"}`)}</span>
             </div>
           ) : (
             <>
@@ -264,8 +265,8 @@ export default function SessionMain({
               })}
               {windows.length === 0 && (
                 <div className="term-hint">
-                  <span>还没有会话</span>
-                  <span>按 ⌘N 在选定目录里启动 Claude Code</span>
+                  <span>{tr("还没有会话", "No sessions yet")}</span>
+                  <span>{tr("按 ⌘N 在选定目录里启动 Claude Code", "Press ⌘N to start Claude Code in the selected folder")}</span>
                 </div>
               )}
             </>
@@ -282,9 +283,9 @@ export default function SessionMain({
           title={windows.find((x) => x.id === ctx.id)?.title}
           onClose={() => setCtx(null)}
           items={[
-            { label: "重命名", icon: <IconEdit />, hint: "双击", run: () => setRenaming(ctx.id) },
+            { label: tr("重命名", "Rename"), icon: <IconEdit />, hint: tr("双击", "Double-click"), run: () => setRenaming(ctx.id) },
             {
-              label: "复制目录路径",
+              label: tr("复制目录路径", "Copy folder path"),
               icon: <IconCopy size={14} />,
               run: () => {
                 const w = windows.find((x) => x.id === ctx.id);
@@ -292,7 +293,7 @@ export default function SessionMain({
               },
             },
             {
-              label: "在访达中打开",
+              label: tr("在访达中打开", "Reveal in Finder"),
               icon: <IconFolder size={14} />,
               run: () => {
                 const w = windows.find((x) => x.id === ctx.id);
@@ -300,9 +301,9 @@ export default function SessionMain({
               },
             },
             "sep",
-            { label: "关闭", icon: <IconClose size={14} />, hint: "⌘W", danger: true, run: () => onRequestClose(ctx.id) },
+            { label: tr("关闭", "Close"), icon: <IconClose size={14} />, hint: "⌘W", danger: true, run: () => onRequestClose(ctx.id) },
             {
-              label: "关闭其他会话",
+              label: tr("关闭其他会话", "Close other sessions"),
               danger: true,
               disabled: windows.length < 2,
               run: () => onRequestCloseOthers(ctx.id),
@@ -334,19 +335,19 @@ function DiffPane({ git }: { git: GitInfo | null }) {
   if (!git?.branch) {
     return (
       <div style={style}>
-        <span style={{ color: "var(--tm)" }}>这个目录不是一个 git 仓库。</span>
+        <span style={{ color: "var(--tm)" }}>{tr("这个目录不是一个 git 仓库。", "This folder is not a git repository.")}</span>
       </div>
     );
   }
   return (
     <div style={style}>
       <div style={{ marginBottom: 14, color: "var(--tm)" }}>
-        branch {git.branch} · {git.changes.length} 个文件 ·{" "}
+        branch {git.branch} · {tr(`${git.changes.length} 个文件`, `${git.changes.length} files`)} ·{" "}
         <span style={{ color: "var(--tg)" }}>+{git.totalAdd}</span>{" "}
         <span style={{ color: "var(--red, #c64545)" }}>−{git.totalDel}</span>
       </div>
       {git.changes.length === 0 ? (
-        <span style={{ color: "var(--tm)" }}>工作区干净。</span>
+        <span style={{ color: "var(--tm)" }}>{tr("工作区干净。", "Working tree clean.")}</span>
       ) : (
         git.changes.map((c) => (
           <div key={c.path} style={{ display: "flex", gap: 12 }}>

@@ -19,6 +19,7 @@
 
 const https = require("node:https");
 const http = require("node:http");
+const { L } = require("./i18n.cjs");
 
 /** 探测目标：每个代表一种可能失败的层 */
 const PROBES = {
@@ -109,7 +110,7 @@ function probe(name, { url, host }, timeout = 12000, ua = BROWSER_UA) {
 
     req.on("timeout", () => {
       req.destroy();
-      done({ ok: false, error: "超时" });
+      done({ ok: false, error: L("超时", "Timed out") });
     });
     req.on("error", (e) => done({ ok: false, error: e.code || e.message }));
     req.end();
@@ -157,14 +158,14 @@ function lookupIp() {
           try {
             resolve({ ok: true, ...JSON.parse(body) });
           } catch {
-            resolve({ ok: false, error: "返回格式不对" });
+            resolve({ ok: false, error: L("返回格式不对", "Unexpected response format") });
           }
         });
       }
     );
     req.on("timeout", () => {
       req.destroy();
-      resolve({ ok: false, error: "超时" });
+      resolve({ ok: false, error: L("超时", "Timed out") });
     });
     req.on("error", (e) => resolve({ ok: false, error: e.code || e.message }));
   });
@@ -226,24 +227,26 @@ async function diagnose() {
   const flaggedHosting = ipOk && (ip.hosting === true || /hosting|business|data ?cent/i.test(risk?.type || ""));
   const sources = ipOk
     ? [
-        `ip-api：${ip.proxy ? "代理" : ip.hosting ? "机房" : ip.mobile ? "移动网络" : "非机房"}`,
-        risk ? `proxycheck：${risk.type || "未知类型"} · 风险 ${risk.risk}/100${risk.proxy ? " · 标记为代理" : ""}` : "proxycheck：没查到",
-      ].join("；")
+        `ip-api${L("：", ": ")}${ip.proxy ? L("代理", "proxy") : ip.hosting ? L("机房", "datacenter") : ip.mobile ? L("移动网络", "mobile network") : L("非机房", "not datacenter")}`,
+        risk
+          ? `proxycheck${L("：", ": ")}${risk.type || L("未知类型", "unknown type")} · ${L("风险", "risk")} ${risk.risk}/100${risk.proxy ? L(" · 标记为代理", " · flagged as proxy") : ""}`
+          : `proxycheck${L("：没查到", ": no result")}`,
+      ].join(L("；", "; "))
     : "";
   layers.push({
     id: "network",
-    label: "本机直连出口",
+    label: L("本机直连出口", "Local direct exit"),
     status: !ipOk ? "unknown" : flaggedProxy ? "fail" : flaggedHosting ? "warn" : "ok",
     detail: ipOk
       ? `${ip.query} · ${ip.as || ip.isp || "?"} · ${ip.city || ""} ${ip.country || ""} · ${sources}`
-      : "查不到出口归属",
+      : L("查不到出口归属", "Unable to look up exit ownership"),
     note: ipOk
       ? flaggedProxy
-        ? "有数据源把这个 IP 标成了代理 / VPN，风控里分数会很差。"
+        ? L("有数据源把这个 IP 标成了代理 / VPN，风控里分数会很差。", "At least one data source flags this IP as a proxy / VPN, which scores poorly in risk control.")
         : flaggedHosting
-          ? "有数据源把这个 IP 归为机房 / 企业线路。"
-          : "两个数据源都没把它标成机房或代理。"
-      : "无法判定。",
+          ? L("有数据源把这个 IP 归为机房 / 企业线路。", "At least one data source classifies this IP as a datacenter / business line.")
+          : L("两个数据源都没把它标成机房或代理。", "Neither data source flags it as a datacenter or proxy.")
+      : L("无法判定。", "Unable to determine."),
   });
 
   /* ── 层 2：挑战（含 UA 对照实验） ── */
@@ -265,34 +268,48 @@ async function diagnose() {
     bootstrapBrowser.ok && !bootBrowserChallenge && bootCliChallenge;
 
   let challengeStatus = "ok";
-  let challengeNote = "没有观察到 Cloudflare 挑战页。";
+  let challengeNote = L("没有观察到 Cloudflare 挑战页。", "No Cloudflare challenge page observed.");
   if (!control.ok || control.error) {
     challengeStatus = "unknown";
-    challengeNote = `对照组请求失败（${control.error || "未知"}），无法区分是全网不通还是单站拦截。`;
+    challengeNote = L(
+      `对照组请求失败（${control.error || "未知"}），无法区分是全网不通还是单站拦截。`,
+      `The control request failed (${control.error || "unknown"}), so it is unclear whether the whole network is down or a single site is blocking.`,
+    );
   } else if (controlChallenge) {
     challengeStatus = "fail";
-    challengeNote = "连对照组都被挑战，说明整个出口在这个网络层被判为可疑。";
+    challengeNote = L(
+      "连对照组都被挑战，说明整个出口在这个网络层被判为可疑。",
+      "Even the control request was challenged, so the whole exit is treated as suspicious at this network layer.",
+    );
   } else if (uaMatters) {
     challengeStatus = "warn";
-    challengeNote =
+    challengeNote = L(
       "确认：拦的是 User-Agent，不是 IP 也不是 TLS 指纹。" +
-      "同一个请求换成浏览器 UA 就通了 —— 这正是 Claude Code 登录时 403 的成因。" +
-      "它自己的 UA 是 claude-cli/…，被 claude.ai 的 bot 规则直接挑战。";
+        "同一个请求换成浏览器 UA 就通了 —— 这正是 Claude Code 登录时 403 的成因。" +
+        "它自己的 UA 是 claude-cli/…，被 claude.ai 的 bot 规则直接挑战。",
+      "Confirmed: the block is on the User-Agent, not the IP or the TLS fingerprint. " +
+        "The same request passes with a browser UA, which is exactly why Claude Code sign-in gets a 403. " +
+        "Its own UA is claude-cli/..., which claude.ai's bot rules challenge directly.",
+    );
   } else if (claudeChallenge || authChallenge || tokenChallenge) {
     challengeStatus = "warn";
-    challengeNote =
+    challengeNote = L(
       "对照组正常，但 Claude 的域名返回了挑战页。通常由出口 IP 信誉或客户端指纹触发，" +
-      "与账号内容无关。用真实浏览器打开同一页面可对照。";
+        "与账号内容无关。用真实浏览器打开同一页面可对照。",
+      "The control request is fine, but Claude's domains returned a challenge page. This is usually triggered by exit IP reputation or the client fingerprint " +
+        "and is unrelated to the account. Open the same page in a real browser to compare.",
+    );
   }
+  const chal = L("(挑战)", "(challenged)");
   layers.push({
     id: "challenge",
-    label: "Bot 挑战",
+    label: L("Bot 挑战", "Bot challenge"),
     status: challengeStatus,
     detail: [
-      `对照 ${control.ok ? control.status : "-"}`,
-      `主站 ${claude.ok ? claude.status : "-"}${claudeChallenge ? "(挑战)" : ""}`,
-      `bootstrap[浏览器UA] ${bootstrapBrowser.ok ? bootstrapBrowser.status : "-"}${bootBrowserChallenge ? "(挑战)" : ""}`,
-      `bootstrap[CLI UA] ${bootstrapCli.ok ? bootstrapCli.status : "-"}${bootCliChallenge ? "(挑战)" : ""}`,
+      `${L("对照", "control")} ${control.ok ? control.status : "-"}`,
+      `${L("主站", "main site")} ${claude.ok ? claude.status : "-"}${claudeChallenge ? chal : ""}`,
+      `bootstrap[${L("浏览器UA", "browser UA")}] ${bootstrapBrowser.ok ? bootstrapBrowser.status : "-"}${bootBrowserChallenge ? chal : ""}`,
+      `bootstrap[CLI UA] ${bootstrapCli.ok ? bootstrapCli.status : "-"}${bootCliChallenge ? chal : ""}`,
     ].join(" · "),
     note: challengeNote,
   });
@@ -301,30 +318,36 @@ async function diagnose() {
   const hold = detectAccountHold(api) || detectAccountHold(token);
   layers.push({
     id: "account",
-    label: "账号状态",
+    label: L("账号状态", "Account status"),
     status: hold ? "fail" : api.ok ? "ok" : "unknown",
     detail: hold
-      ? `命中 ${hold}`
+      ? L(`命中 ${hold}`, `Matched ${hold}`)
       : api.ok
-        ? `推理端点返回 ${api.status}`
-        : `推理端点不可达（${api.error || "未知"}）`,
+        ? L(`推理端点返回 ${api.status}`, `Inference endpoint returned ${api.status}`)
+        : L(`推理端点不可达（${api.error || "未知"}）`, `Inference endpoint unreachable (${api.error || "unknown"})`),
     note: hold
-      ? "账号被限制。这一层换 IP、换浏览器、换指纹都无效，只能在账号侧处理。"
+      ? L(
+          "账号被限制。这一层换 IP、换浏览器、换指纹都无效，只能在账号侧处理。",
+          "The account is restricted. Changing IP, browser or fingerprint has no effect at this layer; it can only be resolved on the account side.",
+        )
       : api.ok && (api.status === 401 || api.status === 403)
-        ? "推理端点要鉴权，401/403 属于预期（这里没带 token）。不代表账号被限制。"
-        : "未观察到账号层限制。",
+        ? L(
+            "推理端点要鉴权，401/403 属于预期（这里没带 token）。不代表账号被限制。",
+            "The inference endpoint requires authentication, so 401/403 is expected here (no token is sent). It does not mean the account is restricted.",
+          )
+        : L("未观察到账号层限制。", "No account-level restriction observed."),
   });
 
   /* ── 层 4：用量 ── */
   const rl = detectRateLimit(api) || detectRateLimit(token);
   layers.push({
     id: "quota",
-    label: "用量额度",
+    label: L("用量额度", "Usage quota"),
     status: rl ? "warn" : "ok",
-    detail: rl ? `命中 ${rl}` : "未观察到用量限制",
+    detail: rl ? L(`命中 ${rl}`, `Matched ${rl}`) : L("未观察到用量限制", "No usage limit observed"),
     note: rl
-      ? "时间窗口额度用尽，等窗口重置即可，不是封号。"
-      : "未观察到限流。",
+      ? L("时间窗口额度用尽，等窗口重置即可，不是封号。", "The time-window quota is used up. Wait for the window to reset; this is not a ban.")
+      : L("未观察到限流。", "No rate limiting observed."),
   });
 
   /* ── 总结论 ──
@@ -338,16 +361,19 @@ async function diagnose() {
   const blocker = failed[0] || warned[0] || null;
 
   const headline = !blocker
-    ? "四层都通，Claude 能正常访问"
+    ? L("四层都通，Claude 能正常访问", "All four layers pass; Claude is reachable")
     : blocker.id === "challenge"
       ? uaMatters
-        ? "主因是 User-Agent 判定：CLI 自己的 UA 被 Claude 的 bot 规则挑战，浏览器 UA 则放行。"
-        : "主因在网络/挑战层：用真实浏览器对照一次即可确认。"
+        ? L(
+            "主因是 User-Agent 判定：CLI 自己的 UA 被 Claude 的 bot 规则挑战，浏览器 UA 则放行。",
+            "Main cause is User-Agent detection: the CLI's own UA is challenged by Claude's bot rules, while a browser UA passes.",
+          )
+        : L("主因在网络/挑战层：用真实浏览器对照一次即可确认。", "Main cause is the network / challenge layer: compare with a real browser to confirm.")
       : blocker.id === "account"
-        ? "主因在账号层：换网络与指纹都无效，需要账号侧处理。"
+        ? L("主因在账号层：换网络与指纹都无效，需要账号侧处理。", "Main cause is the account layer: changing network or fingerprint has no effect; it needs to be handled on the account side.")
         : blocker.id === "quota"
-          ? "主因在用量层：等窗口重置。"
-          : "主因在网络出口：先换一个出口再测。";
+          ? L("主因在用量层：等窗口重置。", "Main cause is the usage layer: wait for the window to reset.")
+          : L("主因在网络出口：先换一个出口再测。", "Main cause is the network exit: switch to a different exit and test again.");
 
   return {
     ok: true,
@@ -362,8 +388,8 @@ async function diagnose() {
       browser: bootstrapBrowser.ok ? bootstrapBrowser.status : null,
       cli: bootstrapCli.ok ? bootstrapCli.status : null,
       summary: uaMatters
-        ? "同一请求，浏览器 UA 通过、CLI UA 被挑战 —— 拦截点在 User-Agent。"
-        : "未能证明 UA 是决定因素（可能两种 UA 都被拦，或都能通过）。",
+        ? L("同一请求，浏览器 UA 通过、CLI UA 被挑战 —— 拦截点在 User-Agent。", "For the same request, the browser UA passes and the CLI UA is challenged; the block is on the User-Agent.")
+        : L("未能证明 UA 是决定因素（可能两种 UA 都被拦，或都能通过）。", "Could not show that the UA is the deciding factor (both UAs may be blocked, or both may pass)."),
     },
     headline,
     /**
@@ -371,10 +397,10 @@ async function diagnose() {
      * 把这句话返回给 UI，是为了防止把"能做的事"当成"正在做的事"。
      */
     unverified: [
-      "本模块只对照 User-Agent 与 HTTP 响应，不读取 JA3/JA4，也不判断服务端是否在用 TLS 指纹。",
-      "Canvas / WebGL / 字体 / 鼠标轨迹等浏览器指纹，本模块无法探测服务端是否采集。",
-      "账号内部判定逻辑不可见，只能从响应中的错误码反推。",
-      "本地 TLS 栈与真实 Chrome 不同，因此本模块的结论不能等同于「Chrome 会被怎样判定」。",
+      L("本模块只对照 User-Agent 与 HTTP 响应，不读取 JA3/JA4，也不判断服务端是否在用 TLS 指纹。", "This check only compares the User-Agent and HTTP responses. It does not read JA3/JA4 or determine whether the server uses TLS fingerprints."),
+      L("Canvas / WebGL / 字体 / 鼠标轨迹等浏览器指纹，本模块无法探测服务端是否采集。", "It cannot detect whether the server collects browser fingerprints such as Canvas / WebGL / fonts / mouse movement."),
+      L("账号内部判定逻辑不可见，只能从响应中的错误码反推。", "Internal account decision logic is not visible and can only be inferred from error codes in responses."),
+      L("本地 TLS 栈与真实 Chrome 不同，因此本模块的结论不能等同于「Chrome 会被怎样判定」。", "The local TLS stack differs from real Chrome, so these results do not equal how Chrome would be judged."),
     ],
   };
 }

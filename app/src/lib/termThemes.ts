@@ -1,4 +1,5 @@
 import type { ITheme } from "@xterm/xterm";
+import { tr } from "./i18n";
 
 /**
  * 终端配色。第一个「跟随应用」= 纸面 / 暖炭，随应用明暗切换；
@@ -60,8 +61,8 @@ const CHARCOAL: ITheme = {
 };
 
 export const TERM_THEMES: TermTheme[] = [
-  { id: "paper", name: "纸面", dark: false, theme: PAPER },
-  { id: "charcoal", name: "暖炭", dark: true, theme: CHARCOAL },
+  { id: "paper", get name() { return tr("纸面", "Paper"); }, dark: false, theme: PAPER },
+  { id: "charcoal", get name() { return tr("暖炭", "Charcoal"); }, dark: true, theme: CHARCOAL },
   {
     id: "pro",
     name: "Pro",

@@ -14,6 +14,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
+const { L } = require("./i18n.cjs");
 const { execFileSync } = require("node:child_process");
 
 const HOME = process.env.CLAUDE_BUDDY_HOME || os.homedir();
@@ -274,7 +275,7 @@ function survey() {
    */
   const orphans = [...services]
     .filter((s) => !claimedServices.has(s))
-    .map((s) => ({ service: s, reason: "没有对应的配置目录" }));
+    .map((s) => ({ service: s, reason: L("没有对应的配置目录", "No matching config directory") }));
 
   /**
    * 其他工具（codex-config-ui）临时建的 prof_* 不列出来：那是别的工具自己管的会话目录，
@@ -301,8 +302,11 @@ function survey() {
       services: orphans.map((o) => o.service),
       reason:
         disposable.length || orphans.length
-          ? `${disposable.length} 个空壳目录、${orphans.length} 个无人认领的凭据`
-          : "没有可清理的",
+          ? L(
+              `${disposable.length} 个空壳目录、${orphans.length} 个无人认领的凭据`,
+              `${disposable.length} empty directories, ${orphans.length} unclaimed credentials`,
+            )
+          : L("没有可清理的", "Nothing to clean up"),
     },
   };
 }
@@ -335,17 +339,17 @@ function deleteKeychain(service) {
     });
     return { ok: true };
   } catch {
-    return { ok: false, reason: "条目不存在或无权删除" };
+    return { ok: false, reason: L("条目不存在或无权删除", "Entry does not exist or cannot be deleted") };
   }
 }
 
 /** 从 codex-config-ui 的登记文件里摘掉一条记录 */
 function unregisterCodexProfile(profileName) {
   const src = SOURCES.find((s) => s.kind === "codex-profile");
-  if (!src?.registry) return { ok: false, reason: "没有登记文件" };
+  if (!src?.registry) return { ok: false, reason: L("没有登记文件", "No registry file") };
   try {
     const j = JSON.parse(fs.readFileSync(src.registry, "utf8"));
-    if (!Array.isArray(j.profiles)) return { ok: false, reason: "格式不认识" };
+    if (!Array.isArray(j.profiles)) return { ok: false, reason: L("格式不认识", "Unrecognized format") };
     const before = j.profiles.length;
     j.profiles = j.profiles.filter((p) => p.id !== profileName);
     if (j.profiles.length === before) return { ok: true, changed: false };
@@ -379,13 +383,13 @@ function purge({ accountIds = [], services = [], allowMainKeychain = false } = {
   for (const id of accountIds) {
     const a = byId.get(id);
     if (!a) {
-      failed.push({ id, reason: "不在体检结果里" });
+      failed.push({ id, reason: L("不在体检结果里", "Not in the checkup results") });
       continue;
     }
     if (a.kind === "codex-profile") {
       const r = unregisterCodexProfile(a.name);
       if (r.ok && r.changed) unregistered.push(a.name);
-      else if (!r.ok) failed.push({ id, reason: `摘登记失败：${r.reason}` });
+      else if (!r.ok) failed.push({ id, reason: L(`摘登记失败：${r.reason}`, `Failed to remove from registry: ${r.reason}`) });
     }
   }
 
@@ -395,11 +399,11 @@ function purge({ accountIds = [], services = [], allowMainKeychain = false } = {
     if (!a) continue;
     // 默认目录指向用户自己的主配置，永远不动
     if (a.kind === "default") {
-      failed.push({ id, reason: "默认目录是 ~/.claude，不提供删除" });
+      failed.push({ id, reason: L("默认目录是 ~/.claude，不提供删除", "The default directory is ~/.claude and cannot be deleted") });
       continue;
     }
     if (DRY_RUN) {
-      moved.push({ id, dest: `${TRASH_ROOT}/(演练，未移动)` });
+      moved.push({ id, dest: `${TRASH_ROOT}/${L("(演练，未移动)", "(dry run, not moved)")}` });
       continue;
     }
     const r = moveToTrash(a.path);
@@ -420,7 +424,7 @@ function purge({ accountIds = [], services = [], allowMainKeychain = false } = {
      * 所以要求显式打开 allowMainKeychain。
      */
     if (svc === KEYCHAIN_PREFIX && !allowMainKeychain) {
-      failed.push({ service: svc, reason: "主条目属于默认账号，需显式确认才能删除" });
+      failed.push({ service: svc, reason: L("主条目属于默认账号，需显式确认才能删除", "The main entry belongs to the default account and needs explicit confirmation to delete") });
       continue;
     }
     if (DRY_RUN) {

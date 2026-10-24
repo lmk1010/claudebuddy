@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { BuddyState } from "../lib/model";
 import { TERM_FONTS, TERM_THEMES, resolveTermTheme } from "../lib/termThemes";
+import { tr } from "../lib/i18n";
 
 type Patch = Partial<
   Pick<BuddyState, "terminalTheme" | "terminalFontFamily" | "terminalFontSize" | "terminalLineHeight" | "terminalPadding" | "cursorStyle">
@@ -49,7 +50,7 @@ export default function TermSettings({
   const lh = state.terminalLineHeight ?? 1.6;
   const pad = state.terminalPadding ?? "normal";
 
-  const themes = [{ id: "auto", name: "跟随应用" }, ...TERM_THEMES];
+  const themes = [{ id: "auto", name: tr("跟随应用", "Follow app") }, ...TERM_THEMES];
 
   return createPortal(
     <div
@@ -57,60 +58,60 @@ export default function TermSettings({
       className="tset"
       style={{ top: anchor.bottom + 8, right: Math.max(12, window.innerWidth - anchor.right) }}
       role="dialog"
-      aria-label="终端外观"
+      aria-label={tr("终端外观", "Terminal appearance")}
     >
       <div className="tset-sec">
         <div className="tset-row">
-          <span>字号</span>
+          <span>{tr("字号", "Size")}</span>
           <span className="tset-step">
-            <button onClick={() => onChange({ terminalFontSize: Math.max(10, size - 1) })} aria-label="减小">
+            <button onClick={() => onChange({ terminalFontSize: Math.max(10, size - 1) })} aria-label={tr("减小", "Decrease")}>
               −
             </button>
             <b>{size}</b>
-            <button onClick={() => onChange({ terminalFontSize: Math.min(22, size + 1) })} aria-label="增大">
+            <button onClick={() => onChange({ terminalFontSize: Math.min(22, size + 1) })} aria-label={tr("增大", "Increase")}>
               +
             </button>
           </span>
         </div>
         <div className="tset-row">
-          <span>行高</span>
+          <span>{tr("行高", "Line height")}</span>
           <Seg
             value={lh}
             opts={[
-              [1.3, "紧凑"],
-              [1.6, "标准"],
-              [1.9, "宽松"],
+              [1.3, tr("紧凑", "Compact")],
+              [1.6, tr("标准", "Standard")],
+              [1.9, tr("宽松", "Relaxed")],
             ]}
             onPick={(v) => onChange({ terminalLineHeight: v })}
           />
         </div>
         <div className="tset-row">
-          <span>边距</span>
+          <span>{tr("边距", "Padding")}</span>
           <Seg
             value={pad}
             opts={[
-              ["compact", "窄"],
-              ["normal", "标准"],
-              ["wide", "宽"],
+              ["compact", tr("窄", "Narrow")],
+              ["normal", tr("标准", "Standard")],
+              ["wide", tr("宽", "Wide")],
             ]}
             onPick={(v) => onChange({ terminalPadding: v as "compact" | "normal" | "wide" })}
           />
         </div>
         <div className="tset-row">
-          <span>光标</span>
+          <span>{tr("光标", "Cursor")}</span>
           <Seg
             value={state.cursorStyle}
             opts={[
-              ["bar", "竖线"],
-              ["block", "方块"],
-              ["underline", "下划线"],
+              ["bar", tr("竖线", "Bar")],
+              ["block", tr("方块", "Block")],
+              ["underline", tr("下划线", "Underline")],
             ]}
             onPick={(v) => onChange({ cursorStyle: v as BuddyState["cursorStyle"] })}
           />
         </div>
       </div>
 
-      <div className="tset-h">字体</div>
+      <div className="tset-h">{tr("字体", "Font")}</div>
       <div className="tset-fonts">
         {TERM_FONTS.map((f) => (
           <button
@@ -124,7 +125,7 @@ export default function TermSettings({
         ))}
       </div>
 
-      <div className="tset-h">配色</div>
+      <div className="tset-h">{tr("配色", "Theme")}</div>
       <div className="tset-themes">
         {themes.map((t) => {
           const th = resolveTermTheme(t.id);

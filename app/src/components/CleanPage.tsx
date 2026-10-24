@@ -4,6 +4,7 @@ import { tierLabel } from "../lib/model";
 import { ConfirmDialog } from "./Modal";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import Help from "./Help";
+import { tr } from "../lib/i18n";
 import { IconCheck, IconCopy, IconDots, IconFolder, IconKey, IconRefresh, IconSearch, IconTrash } from "./iconAliases";
 
 /**
@@ -23,18 +24,29 @@ type Item =
   | { key: string; type: "dir"; a: CleanupAccount }
   | { key: string; type: "orphan"; service: string; reason: string };
 
-const STATE: Record<CleanupAccount["state"], { text: string; tone: "ok" | "mid" | "bad" }> = {
-  ok: { text: "正常", tone: "ok" },
-  // 掉登录不等于该删：目录里可能存着大量对话，重新登录就能接着用
-  "signed-out": { text: "掉登录", tone: "mid" },
-  empty: { text: "空壳", tone: "bad" },
-};
+/** 函数而不是常量：文案要跟着当前语言走 */
+function stateOf(s: CleanupAccount["state"]): { text: string; tone: "ok" | "mid" | "bad" } {
+  switch (s) {
+    case "ok":
+      return { text: tr("正常", "OK"), tone: "ok" };
+    // 掉登录不等于该删：目录里可能存着大量对话，重新登录就能接着用
+    case "signed-out":
+      return { text: tr("掉登录", "Signed out"), tone: "mid" };
+    default:
+      return { text: tr("空壳", "Empty"), tone: "bad" };
+  }
+}
 
-const KIND: Record<CleanupAccount["kind"], string> = {
-  default: "默认目录",
-  "claude-dir": "配置目录",
-  "codex-profile": "其他工具",
-};
+function kindOf(k: CleanupAccount["kind"]): string {
+  switch (k) {
+    case "default":
+      return tr("默认目录", "Default folder");
+    case "claude-dir":
+      return tr("配置目录", "Config folder");
+    default:
+      return tr("其他工具", "Other tool");
+  }
+}
 
 function bytes(n: number) {
   if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
@@ -44,12 +56,12 @@ function bytes(n: number) {
 }
 
 function when(ts: number) {
-  if (!ts) return "从未";
+  if (!ts) return tr("从未", "Never");
   const days = Math.floor((Date.now() - ts) / 86400000);
-  if (days === 0) return "今天";
-  if (days === 1) return "昨天";
-  if (days < 30) return `${days} 天前`;
-  return new Date(ts).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+  if (days === 0) return tr("今天", "Today");
+  if (days === 1) return tr("昨天", "Yesterday");
+  if (days < 30) return tr(`${days} 天前`, `${days}d ago`);
+  return new Date(ts).toLocaleDateString(tr("zh-CN", "en-US"), { month: "numeric", day: "numeric" });
 }
 
 function shortPath(p: string) {
@@ -85,7 +97,7 @@ export default function CleanPage({
     setErr(null);
     try {
       const s = await window.claudeBuddy.cleanupSurvey();
-      if (!s.ok) setErr("主进程还没准备好，请用 npm run app 启动。");
+      if (!s.ok) setErr(tr("主进程还没准备好，请用 npm run app 启动。", "The main process is not ready. Start the app with npm run app."));
       else setSurvey(s);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -165,15 +177,15 @@ export default function CleanPage({
   const rowMenu = (it: Item): MenuItem[] =>
     it.type === "dir"
       ? [
-          { label: "在访达中打开", icon: <IconFolder size={14} />, run: () => void window.claudeBuddy.reveal(it.a.path) },
-          { label: "复制路径", icon: <IconCopy size={14} />, run: () => void navigator.clipboard.writeText(it.a.path).catch(() => {}) },
+          { label: tr("在访达中打开", "Show in Finder"), icon: <IconFolder size={14} />, run: () => void window.claudeBuddy.reveal(it.a.path) },
+          { label: tr("复制路径", "Copy path"), icon: <IconCopy size={14} />, run: () => void navigator.clipboard.writeText(it.a.path).catch(() => {}) },
           "sep",
-          { label: it.a.kind === "default" ? "清掉登录凭据…" : "清理…", icon: <IconTrash size={14} />, danger: true, run: () => setConfirm([it]) },
+          { label: it.a.kind === "default" ? tr("清掉登录凭据…", "Remove sign-in credentials…") : tr("清理…", "Clean up…"), icon: <IconTrash size={14} />, danger: true, run: () => setConfirm([it]) },
         ]
       : [
-          { label: "复制条目名", icon: <IconCopy size={14} />, run: () => void navigator.clipboard.writeText(it.service).catch(() => {}) },
+          { label: tr("复制条目名", "Copy entry name"), icon: <IconCopy size={14} />, run: () => void navigator.clipboard.writeText(it.service).catch(() => {}) },
           "sep",
-          { label: "删除这条凭据…", icon: <IconTrash size={14} />, danger: true, run: () => setConfirm([it]) },
+          { label: tr("删除这条凭据…", "Delete this credential…"), icon: <IconTrash size={14} />, danger: true, run: () => setConfirm([it]) },
         ];
 
   // 筛选条的滑块
@@ -185,10 +197,10 @@ export default function CleanPage({
   }, [filter, survey]);
 
   const FILTERS: { id: Filter; label: string }[] = [
-    { id: "all", label: "全部" },
-    { id: "clean", label: "建议清理" },
-    { id: "signed-out", label: "掉登录" },
-    { id: "ok", label: "正常" },
+    { id: "all", label: tr("全部", "All") },
+    { id: "clean", label: tr("建议清理", "Suggested") },
+    { id: "signed-out", label: tr("掉登录", "Signed out") },
+    { id: "ok", label: tr("正常", "OK") },
   ];
 
   return (
@@ -198,19 +210,22 @@ export default function CleanPage({
       <div className="sv cl">
         <div className="sv-h">
           <div>
-            <h1>清理本机</h1>
+            <h1>{tr("清理本机", "Clean up this Mac")}</h1>
             <p>
               {survey
-                ? `${survey.accounts.length} 个配置目录 · 共 ${bytes(totalSize)}${survey.orphans.length ? ` · ${survey.orphans.length} 条无人认领的凭据` : ""}`
+                ? tr(
+                    `${survey.accounts.length} 个配置目录 · 共 ${bytes(totalSize)}${survey.orphans.length ? ` · ${survey.orphans.length} 条无人认领的凭据` : ""}`,
+                    `${survey.accounts.length} config folders · ${bytes(totalSize)} total${survey.orphans.length ? ` · ${survey.orphans.length} unclaimed credentials` : ""}`,
+                  )
                 : busy
-                  ? "正在扫描这台电脑…"
-                  : "还没扫描"}
+                  ? tr("正在扫描这台电脑…", "Scanning this Mac…")
+                  : tr("还没扫描", "Not scanned yet")}
             </p>
           </div>
           <div className="pg-acts">
             <button className="btn" onClick={() => void load()} disabled={busy}>
               <IconRefresh />
-              {busy ? "扫描中…" : "重新扫描"}
+              {busy ? tr("扫描中…", "Scanning…") : tr("重新扫描", "Rescan")}
             </button>
             <button
               className="btn danger"
@@ -218,7 +233,7 @@ export default function CleanPage({
               onClick={() => setConfirm(selItems)}
             >
               <IconTrash />
-              {selItems.length ? `清理所选 ${selItems.length} 项` : "清理所选"}
+              {selItems.length ? tr(`清理所选 ${selItems.length} 项`, `Clean ${selItems.length} selected`) : tr("清理所选", "Clean selected")}
             </button>
           </div>
         </div>
@@ -238,19 +253,25 @@ export default function CleanPage({
               </button>
             ))}
           </div>
-          <Help title="会清掉什么？" wide>
-            <p>扫的是这台电脑上所有 Claude Code 的配置目录（本应用建的环境、别的工具建的 prof_* 等），以及 Keychain 里没有目录认领的凭据。</p>
+          <Help title={tr("会清掉什么？", "What gets removed?")} wide>
+            <p>{tr("扫的是这台电脑上所有 Claude Code 的配置目录（本应用建的环境、别的工具建的 prof_* 等），以及 Keychain 里没有目录认领的凭据。", "The scan covers every Claude Code config folder on this Mac (environments created by this app, prof_* folders from other tools, and so on), plus Keychain credentials that no folder claims.")}</p>
             <p>
-              <b>目录</b>会移到 <code>~/.claude-buddy-trash</code>，需要时能捞回来；<b>Keychain 凭据</b>删了就没了，要重新登录。
+              <b>{tr("目录", "Folders")}</b>
+              {tr("会移到 ", " are moved to ")}
+              <code>~/.claude-buddy-trash</code>
+              {tr("，需要时能捞回来；", " and can be recovered if needed; ")}
+              <b>{tr("Keychain 凭据", "Keychain credentials")}</b>
+              {tr("删了就没了，要重新登录。", " are gone once deleted and you must sign in again.")}
             </p>
             <p>
-              <b>默认目录</b>（~/.claude）不会被挪走，只清它的登录凭据。「建议清理」= 空壳目录和无人认领的凭据，放心清。
+              <b>{tr("默认目录", "The default folder")}</b>
+              {tr("（~/.claude）不会被挪走，只清它的登录凭据。「建议清理」= 空壳目录和无人认领的凭据，放心清。", " (~/.claude) is never moved; only its sign-in credentials are removed. \"Suggested\" means empty folders and unclaimed credentials, which are safe to clean.")}
             </p>
           </Help>
           <span className="sv-sp" />
           <label className="cl-q">
             <IconSearch size={13} />
-            <input value={q} placeholder="筛选邮箱或目录" onChange={(e) => setQ(e.target.value)} />
+            <input value={q} placeholder={tr("筛选邮箱或目录", "Filter by email or folder")} onChange={(e) => setQ(e.target.value)} />
           </label>
         </div>
 
@@ -260,21 +281,26 @@ export default function CleanPage({
           <div className="cl-done">
             <IconCheck size={14} />
             <span>
-              移走 {last.moved.length} 个目录 · 删除 {last.keychainDeleted.length} 条凭据
-              {last.failed.length ? ` · ${last.failed.length} 项没完成：${last.failed.map((f) => f.reason).join("；")}` : ""}
+              {tr(`移走 ${last.moved.length} 个目录 · 删除 ${last.keychainDeleted.length} 条凭据`, `Moved ${last.moved.length} folders · deleted ${last.keychainDeleted.length} credentials`)}
+              {last.failed.length
+                ? tr(
+                    ` · ${last.failed.length} 项没完成：${last.failed.map((f) => f.reason).join("；")}`,
+                    ` · ${last.failed.length} not completed: ${last.failed.map((f) => f.reason).join("; ")}`,
+                  )
+                : ""}
             </span>
             {last.moved.length > 0 && (
               <button className="det-k" onClick={() => void window.claudeBuddy.reveal(last.trashRoot)}>
-                打开回收目录
+                {tr("打开回收目录", "Open trash folder")}
               </button>
             )}
             {last.keychainDeleted.length > 0 && (
               <button className="btn pri" onClick={onRelogin}>
-                去重新登录 →
+                {tr("去重新登录 →", "Sign in again →")}
               </button>
             )}
             <button className="det-k" onClick={() => setLast(null)}>
-              知道了
+              {tr("知道了", "Got it")}
             </button>
           </div>
         )}
@@ -294,20 +320,20 @@ export default function CleanPage({
                     return n;
                   })
                 }
-                aria-label="全选"
+                aria-label={tr("全选", "Select all")}
               />
             </span>
-            <span className="cl-name">账号 / 目录</span>
-            <span className="cl-st">状态</span>
-            <span className="cl-num">大小</span>
-            <span className="cl-num">对话</span>
-            <span className="cl-num">最后活动</span>
+            <span className="cl-name">{tr("账号 / 目录", "Account / folder")}</span>
+            <span className="cl-st">{tr("状态", "Status")}</span>
+            <span className="cl-num">{tr("大小", "Size")}</span>
+            <span className="cl-num">{tr("对话", "Chats")}</span>
+            <span className="cl-num">{tr("最后活动", "Last active")}</span>
             <span className="cl-act" />
           </div>
 
           {shown.length === 0 ? (
             <div className="cl-empty">
-              {busy ? "正在扫描…" : filter === "clean" ? "没有需要清理的东西，这台电脑挺干净。" : "没有匹配的条目。"}
+              {busy ? tr("正在扫描…", "Scanning…") : filter === "clean" ? tr("没有需要清理的东西，这台电脑挺干净。", "Nothing to clean up. This Mac looks tidy.") : tr("没有匹配的条目。", "No matching items.")}
             </div>
           ) : (
             shown.map((it) => {
@@ -331,18 +357,18 @@ export default function CleanPage({
                         <span className="cl-nm">
                           <b>
                             {it.a.email ?? it.a.name}
-                            {busyDir(it.a.path) && <span className="cl-live">有会话在跑</span>}
+                            {busyDir(it.a.path) && <span className="cl-live">{tr("有会话在跑", "Session running")}</span>}
                           </b>
                           <small className="mono" title={it.a.path}>
                             {shortPath(it.a.path)}
                             {" · "}
-                            {KIND[it.a.kind]}
+                            {kindOf(it.a.kind)}
                             {it.a.tier ? ` · ${tierLabel(it.a.tier)}` : ""}
                           </small>
                         </span>
                       </span>
                       <span className="cl-st">
-                        <span className={`nr-tag ${STATE[it.a.state].tone}`}>{STATE[it.a.state].text}</span>
+                        <span className={`nr-tag ${stateOf(it.a.state).tone}`}>{stateOf(it.a.state).text}</span>
                       </span>
                       <span className="cl-num mono">{bytes(it.a.sizeBytes)}</span>
                       <span className="cl-num mono">{it.a.sessions || "—"}</span>
@@ -360,7 +386,7 @@ export default function CleanPage({
                         </span>
                       </span>
                       <span className="cl-st">
-                        <span className="nr-tag mid">无人认领</span>
+                        <span className="nr-tag mid">{tr("无人认领", "Unclaimed")}</span>
                       </span>
                       <span className="cl-num">—</span>
                       <span className="cl-num">—</span>
@@ -370,7 +396,7 @@ export default function CleanPage({
                   <span className="cl-act">
                     <button
                       className="mh-x cl-more"
-                      title="更多"
+                      title={tr("更多", "More")}
                       onClick={(e) => {
                         e.stopPropagation();
                         const r = e.currentTarget.getBoundingClientRect();
@@ -393,9 +419,9 @@ export default function CleanPage({
 
       {confirm && (
         <ConfirmDialog
-          title={`清理 ${confirm.length} 项？`}
+          title={tr(`清理 ${confirm.length} 项？`, `Clean up ${confirm.length} items?`)}
           danger
-          okLabel="清理"
+          okLabel={tr("清理", "Clean up")}
           body={<ConfirmBody list={confirm} busy={confirm.filter((it) => it.type === "dir" && busyDir(it.a.path)).length} />}
           onOk={() => void purge(confirm)}
           onClose={() => setConfirm(null)}
@@ -415,16 +441,19 @@ function ConfirmBody({ list, busy }: { list: Item[]; busy: number }) {
   const live = dirs.filter((it) => it.a.state === "ok");
   return (
     <div className="cl-confirm">
-      {moved.length > 0 && <p>· {moved.length} 个目录移到 ~/.claude-buddy-trash（能捞回），它们的 Keychain 凭据一并删除。</p>}
-      {def && <p>· 默认目录 ~/.claude 不挪走，只删掉它的登录凭据（{def.a.email ?? "当前账号"} 会掉登录）。</p>}
-      {orphans.length > 0 && <p>· 删除 {orphans.length} 条无人认领的 Keychain 凭据。</p>}
+      {moved.length > 0 && <p>{tr(`· ${moved.length} 个目录移到 ~/.claude-buddy-trash（能捞回），它们的 Keychain 凭据一并删除。`, `· ${moved.length} folders will be moved to ~/.claude-buddy-trash (recoverable), and their Keychain credentials deleted.`)}</p>}
+      {def && <p>{tr(`· 默认目录 ~/.claude 不挪走，只删掉它的登录凭据（${def.a.email ?? "当前账号"} 会掉登录）。`, `· The default folder ~/.claude stays in place; only its sign-in credentials are deleted (${def.a.email ?? "the current account"} will be signed out).`)}</p>}
+      {orphans.length > 0 && <p>{tr(`· 删除 ${orphans.length} 条无人认领的 Keychain 凭据。`, `· ${orphans.length} unclaimed Keychain credentials will be deleted.`)}</p>}
       {live.length > 0 && (
         <p className="warn">
-          其中 {live.length} 个是正常登录着的账号（{live.map((it) => it.a.email ?? it.a.name).join("、")}），清掉后要重新登录。
+          {tr(
+            `其中 ${live.length} 个是正常登录着的账号（${live.map((it) => it.a.email ?? it.a.name).join("、")}），清掉后要重新登录。`,
+            `${live.length} of these are accounts currently signed in (${live.map((it) => it.a.email ?? it.a.name).join(", ")}). You will need to sign in again after cleaning.`,
+          )}
         </p>
       )}
-      {busy > 0 && <p className="warn">其中 {busy} 个目录还有会话开着，清掉后那些会话会立刻掉登录，建议先关掉。</p>}
-      <p className="dim">Keychain 凭据删了不可恢复。</p>
+      {busy > 0 && <p className="warn">{tr(`其中 ${busy} 个目录还有会话开着，清掉后那些会话会立刻掉登录，建议先关掉。`, `${busy} of these folders still have open sessions, which will be signed out immediately. Close them first.`)}</p>}
+      <p className="dim">{tr("Keychain 凭据删了不可恢复。", "Deleted Keychain credentials cannot be recovered.")}</p>
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
 import Help, { Steps } from "./Help";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { NetScore } from "./NetReport";
+import { tr } from "../lib/i18n";
 
 interface Props {
   username: string;
@@ -91,11 +92,11 @@ export default function Home(p: Props) {
       run: () => p.onSetCwd(d),
     }));
     if (items.length) items.push("sep");
-    items.push({ label: "选择其他文件夹…", icon: <IconPlus size={14} />, run: p.onPickFolder });
-    menu.open({ clientX: r.left, clientY: r.bottom + 6, preventDefault: () => {}, stopPropagation: () => {} }, items, "在哪个目录里启动");
+    items.push({ label: tr("选择其他文件夹…", "Choose another folder…"), icon: <IconPlus size={14} />, run: p.onPickFolder });
+    menu.open({ clientX: r.left, clientY: r.bottom + 6, preventDefault: () => {}, stopPropagation: () => {} }, items, tr("在哪个目录里启动", "Folder to start in"));
   };
 
-  const blocked = !signedIn ?`「${acc?.label ?? "这个环境"}」还没登录` : null;
+  const blocked = !signedIn ? tr(`「${acc?.label ?? "这个环境"}」还没登录`, `"${acc?.label ?? "This environment"}" is not signed in`) : null;
   const submit = () => {
     if (blocked) return;
     p.onStart(text.trim());
@@ -106,10 +107,10 @@ export default function Home(p: Props) {
     <>
       <div className="wh">
         <span className="acts">
-          <button className="ib" title="搜索 ⌘K" onClick={p.onSearch}>
+          <button className="ib" title={tr("搜索 ⌘K", "Search ⌘K")} onClick={p.onSearch}>
             <IconSearch />
           </button>
-          <button className="ib" title="设置 ⌘," onClick={p.onSettings}>
+          <button className="ib" title={tr("设置 ⌘,", "Settings ⌘,")} onClick={p.onSettings}>
             <IconGear />
           </button>
         </span>
@@ -121,12 +122,12 @@ export default function Home(p: Props) {
             {/* 用自己的 App 图标（带 >_），跟 Claude 官方的火花区分开 */}
             <img className="greet-icon" src="./assets/app-icon.png" alt="" />
             <h1>
-              {greeting()}，{p.username || "本机用户"}
+              {greeting()}{tr("，", ", ")}{p.username || tr("本机用户", "there")}
             </h1>
           </div>
 
           <div className="mh-envs">
-            <div className="envtabs" ref={tabsRef} role="tablist" aria-label="环境">
+            <div className="envtabs" ref={tabsRef} role="tablist" aria-label={tr("环境", "Environment")}>
               {ind && <i className="envtabs-ind" style={{ transform: `translateX(${ind.left}px)`, width: ind.width }} />}
               {p.accounts.map((a) => {
                 const st = p.status[a.id]?.auth ?? a.auth;
@@ -140,7 +141,7 @@ export default function Home(p: Props) {
                     className={`envtab${on ? " on" : ""}`}
                     onClick={() => p.onSelectAccount(a.id)}
                     onDoubleClick={() => p.onEditAccount(a.id)}
-                    title={`~/${a.configDir} · ${AUTH_LABEL[st]}（双击编辑）`}
+                    title={`~/${a.configDir} · ${AUTH_LABEL[st]}${tr("（双击编辑）", " (double-click to edit)")}`}
                   >
                     <span className="av xs" style={{ background: a.tint }}>
                       {a.label.slice(0, 1)}
@@ -157,17 +158,17 @@ export default function Home(p: Props) {
                 );
               })}
             </div>
-            <button className="ib" title="新建环境" onClick={p.onCreateAccount}>
+            <button className="ib" title={tr("新建环境", "New environment")} onClick={p.onCreateAccount}>
               <IconPlus />
             </button>
-            <Help title="环境是什么？" wide>
-              <p>一个环境 = 一个独立的 Claude Code 配置目录。一个 Claude 账号放一个环境，登录凭据、对话记录、设备身份全分开。</p>
+            <Help title={tr("环境是什么？", "What is an environment?")} wide>
+              <p>{tr("一个环境 = 一个独立的 Claude Code 配置目录。一个 Claude 账号放一个环境，登录凭据、对话记录、设备身份全分开。", "An environment is an independent Claude Code config folder. Put one Claude account in each environment, so credentials, conversation history and device identity stay separate.")}</p>
               <Steps
                 items={[
-                  "上面选中哪个环境，新会话就开在哪个环境里",
-                  "名字后面挂着小钥匙的 = 还没登录（选中它再点「现在登录」）",
-                  "双击环境名能编辑：改名、登录、设代理、清痕迹",
-                  "点 + 新建一个环境，给另一个账号用",
+                  tr("上面选中哪个环境，新会话就开在哪个环境里", "New sessions start in whichever environment is selected above"),
+                  tr("名字后面挂着小钥匙的 = 还没登录（选中它再点「现在登录」）", "A small key after the name means not signed in (select it, then click \"Sign in now\")"),
+                  tr("双击环境名能编辑：改名、登录、设代理、清痕迹", "Double-click an environment name to edit it: rename, sign in, set a proxy, clear traces"),
+                  tr("点 + 新建一个环境，给另一个账号用", "Click + to create another environment for a different account"),
                 ]}
               />
             </Help>
@@ -180,7 +181,7 @@ export default function Home(p: Props) {
               {/* 没登录时不显示邮箱 —— 「未登录」旁边挂一个邮箱会让人以为状态读错了 */}
               {acc && signedIn && p.status[acc.id]?.email && <span>{p.status[acc.id]!.email}</span>}
               <button className="mh-edit" onClick={() => acc && p.onEditAccount(acc.id)}>
-                编辑环境
+                {tr("编辑环境", "Edit environment")}
               </button>
             </div>
 
@@ -190,7 +191,7 @@ export default function Home(p: Props) {
                 className="ph selectable"
                 value={text}
                 rows={2}
-                placeholder={`在「${acc?.label ?? "—"}」里启动 Claude Code，可以直接写第一句话…`}
+                placeholder={tr(`在「${acc?.label ?? "—"}」里启动 Claude Code，可以直接写第一句话…`, `Start Claude Code in "${acc?.label ?? "—"}". You can type a first message…`)}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -205,13 +206,13 @@ export default function Home(p: Props) {
                 <button
                   className="chip"
                   onClick={(e) => openDirMenu(e.currentTarget)}
-                  title="在哪个目录里启动"
+                  title={tr("在哪个目录里启动", "Folder to start in")}
                 >
                   <IconFolder />
-                  <span className="mono">{p.cwd ? shortenHome(p.cwd) : "选择目录…"}</span>
+                  <span className="mono">{p.cwd ? shortenHome(p.cwd) : tr("选择目录…", "Choose folder…")}</span>
                   <IconChevronDown size={11} />
                 </button>
-                <button className="chip" onClick={(e) => p.onPickPermission(e.currentTarget)} title="权限模式">
+                <button className="chip" onClick={(e) => p.onPickPermission(e.currentTarget)} title={tr("权限模式", "Permission mode")}>
                   <IconShield />
                   {PERMISSION_LABEL[p.permission]}
                   <IconChevronDown size={11} />
@@ -220,22 +221,22 @@ export default function Home(p: Props) {
                 <button
                   className="chip"
                   onClick={() => acc && p.onEditNetwork(acc.id)}
-                  title="这个环境的网络出口 · 点开查看体检、换线路"
+                  title={tr("这个环境的网络出口 · 点开查看体检、换线路", "This environment's network exit · click for health check and route switching")}
                 >
                   <IconGlobe size={13} />
-                  <span className="mono">{acc ? proxyLabel(acc.proxy) : "直连"}</span>
+                  <span className="mono">{acc ? proxyLabel(acc.proxy) : tr("直连", "Direct")}</span>
                   {acc && <NetScore accountId={acc.id} proxyKey={proxyLabel(acc.proxy)} />}
                 </button>
-                <button className="send" onClick={submit} disabled={Boolean(blocked)} title={blocked ?? "新建会话 ↵"}>
+                <button className="send" onClick={submit} disabled={Boolean(blocked)} title={blocked ?? tr("新建会话 ↵", "New session ↵")}>
                   <IconArrowUp />
                 </button>
               </div>
               {blocked && (
                 <div className="composer-hint">
-                  <span>{blocked}，登录后才能开会话</span>
+                  <span>{blocked}{tr("，登录后才能开会话", ". Sign in to start a session")}</span>
                   <button className="composer-fix" onClick={() => acc && p.onLogin(acc.id)}>
                     <IconKey size={12} />
-                    现在登录
+                    {tr("现在登录", "Sign in now")}
                   </button>
                 </div>
               )}
@@ -245,16 +246,16 @@ export default function Home(p: Props) {
               {p.recent[0] && (
                 <button className="chip" onClick={() => p.onQuickStart(p.recent[0])}>
                   <IconRefresh />
-                  继续 {p.recent[0].name}
+                  {tr("继续", "Continue")} {p.recent[0].name}
                 </button>
               )}
               <button className="chip" onClick={p.onQuickBlank}>
                 <IconTerminal />
-                空白终端
+                {tr("空白终端", "Blank terminal")}
               </button>
               <button className="chip" onClick={p.onQuickClone}>
                 <IconLayers />
-                从 Git 克隆
+                {tr("从 Git 克隆", "Clone from Git")}
               </button>
             </div>
           </div>

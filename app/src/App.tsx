@@ -11,6 +11,7 @@ import CleanPage from "./components/CleanPage";
 import NetTestPage from "./components/NetTestPage";
 import Guide from "./components/Guide";
 import { setLang, systemLang, tr } from "./lib/i18n";
+import { resetNetReports } from "./components/NetReport";
 import { browserLabel, loadBrowsers } from "./components/LoginButton";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
@@ -115,6 +116,36 @@ export default function App() {
   const [state, setState] = useState<BuddyState>(EMPTY_STATE);
   // 语言在渲染前定下来：下面所有子组件里的 tr() 读的都是这一次的值
   setLang(state.lang ?? systemLang());
+
+  /**
+   * 切语言时，把应用自己起的名字一起换掉：默认环境叫「默认 / Default」，
+   * 开在家目录的会话叫「主目录 / Home」。用户自己改过的名字不动。
+   */
+  const langNow = state.lang ?? systemLang();
+  useEffect(() => {
+    resetNetReports();
+    setState((s) => {
+      const accName = tr("默认", "Default");
+      const winName = tr("主目录", "Home");
+      let changed = false;
+      const accounts = s.accounts.map((a) => {
+        if (a.configDir === ".claude" && (a.label === "默认" || a.label === "Default") && a.label !== accName) {
+          changed = true;
+          return { ...a, label: accName };
+        }
+        return a;
+      });
+      const windows = s.windows.map((w) => {
+        if ((w.title === "主目录" || w.title === "Home") && w.title !== winName) {
+          changed = true;
+          return { ...w, title: winName };
+        }
+        return w;
+      });
+      return changed ? { ...s, accounts, windows } : s;
+    });
+    // 账号数变化 = 存档刚读进来，也要对一遍
+  }, [langNow, state.accounts.length]);
   const [ready, setReady] = useState(false);
   const [sysDark, setSysDark] = useState(false);
   const [forcedTheme, setForcedTheme] = useState<"light" | "dark" | null>(null);
@@ -220,7 +251,7 @@ export default function App() {
             ? raw.windows
                 .filter((w) => ids.has(w.accountId))
                 // 老会话：开在家目录、名字还是用户名的，改叫「主目录」
-                .map((w) => (w.cwd === i.home && w.title === prettyName(i.home) ? { ...w, title: "主目录" } : w))
+                .map((w) => (w.cwd === i.home && w.title === prettyName(i.home) ? { ...w, title: tr("主目录", "Home") } : w))
             : [];
         const keptActive = wins.some((w) => w.id === raw.activeWindowId);
         setState({
@@ -288,8 +319,8 @@ export default function App() {
     setInstalling(false);
     setCheckup(await window.claudeBuddy.checkupRecheck());
     setToast({
-      title: r.ok ? "装好了" : "安装失败",
-      body: r.ok ? "可以继续了" : "看下面的日志，或者自己在终端里装",
+      title: r.ok ? tr("装好了", "Installed") : tr("安装失败", "Install failed"),
+      body: r.ok ? tr("可以继续了", "You can continue") : tr("看下面的日志，或者自己在终端里装", "Check the log below, or install it yourself in a terminal"),
     });
   }, []);
 
@@ -374,7 +405,7 @@ export default function App() {
         ),
       }));
       setToast({
-        title: "终端画像已换",
+        title: tr("终端画像已换", "Terminal profile changed"),
         body: `${next.term} · ${next.lang} · ${next.tz}`,
       });
     },
@@ -474,7 +505,7 @@ export default function App() {
         delete n[accId];
         return n;
       });
-      setToast({ title: "登录成功", body: status[accId]?.email ?? "" });
+      setToast({ title: tr("登录成功", "Signed in"), body: status[accId]?.email ?? "" });
     }
   }, [status, loginTerm]);
 
@@ -567,7 +598,7 @@ export default function App() {
   // ── 建会话
   const spawnWindow = useCallback((account: Account, cwd: string, runsClaude: boolean) => {
     // 家目录的目录名就是用户名，几个会话全叫同一个名字 分不清 —— 直接叫「主目录」
-    const base = cwd === home ? "主目录" : prettyName(cwd);
+    const base = cwd === home ? tr("主目录", "Home") : prettyName(cwd);
     const win: ShellWindow = {
       id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       title: base,
@@ -672,7 +703,7 @@ export default function App() {
           ),
         1200,
       );
-      setToast({ title: `正在克隆 ${name}`, body: `到 ${prettyName(parent)} 下，完成后自动启动 Claude Code` });
+      setToast({ title: tr(`正在克隆 ${name}`, `Cloning ${name}`), body: tr(`到 ${prettyName(parent)} 下，完成后自动启动 Claude Code`, `Into ${prettyName(parent)}. Claude Code starts when it finishes`) });
     },
     [activeAccount, spawnWindow],
   );
@@ -703,9 +734,9 @@ export default function App() {
       const w = state.windows.find((x) => x.id === id);
       if (!w) return;
       setConfirm({
-        title: `关闭「${w.title}」？`,
-        body: "这个会话的终端进程会被结束，正在跑的命令会中断。对话记录还在环境目录里。",
-        okLabel: "关闭会话",
+        title: tr(`关闭「${w.title}」？`, `Close “${w.title}”?`),
+        body: tr("这个会话的终端进程会被结束，正在跑的命令会中断。对话记录还在环境目录里。", "This session's terminal process will end and any running command will be interrupted. The conversation history stays in the environment folder."),
+        okLabel: tr("关闭会话", "Close session"),
         onOk: () => closeWindow(id),
       });
     },
@@ -717,9 +748,9 @@ export default function App() {
       const rest = state.windows.filter((x) => x.id !== id);
       if (rest.length === 0) return;
       setConfirm({
-        title: `关闭其他 ${rest.length} 个会话？`,
-        body: "这些会话的终端进程都会被结束，正在跑的命令会中断。",
-        okLabel: `关闭 ${rest.length} 个`,
+        title: tr(`关闭其他 ${rest.length} 个会话？`, `Close ${rest.length} other sessions?`),
+        body: tr("这些会话的终端进程都会被结束，正在跑的命令会中断。", "These sessions' terminal processes will end and any running commands will be interrupted."),
+        okLabel: tr(`关闭 ${rest.length} 个`, `Close ${rest.length}`),
         onOk: () => {
           for (const w of rest) closeWindow(w.id);
           setState((s) => ({ ...s, activeWindowId: id }));
@@ -737,9 +768,9 @@ export default function App() {
     (ids: string[], what: string) => {
       if (ids.length === 0) return;
       setConfirm({
-        title: `关闭${what}？`,
-        body: "这些会话的终端进程都会被结束，正在跑的命令会中断。对话记录还在环境目录里。",
-        okLabel: `关闭 ${ids.length} 个`,
+        title: tr(`关闭${what}？`, `Close ${what}?`),
+        body: tr("这些会话的终端进程都会被结束，正在跑的命令会中断。对话记录还在环境目录里。", "These sessions' terminal processes will end and any running commands will be interrupted. Conversation history stays in the environment folder."),
+        okLabel: tr(`关闭 ${ids.length} 个`, `Close ${ids.length}`),
         onOk: () => ids.forEach(closeWindow),
       });
     },
@@ -748,7 +779,7 @@ export default function App() {
 
   const reveal = useCallback(async (p: string) => {
     const ok = await window.claudeBuddy.reveal(p);
-    if (!ok) setToast({ title: "打不开这个目录", body: "目录不存在，或者不在家目录下" });
+    if (!ok) setToast({ title: tr("打不开这个目录", "Can't open this folder"), body: tr("目录不存在，或者不在家目录下", "The folder doesn't exist or isn't under your home folder") });
   }, []);
 
   const patchAccount = useCallback((id: string, patch: Partial<Account>) => {
@@ -773,7 +804,7 @@ export default function App() {
         accounts: [...s.accounts, acc],
         activeAccountId: acc.id,
       }));
-      setToast({ title: `已创建 ${acc.label}`, body: `~/${acc.configDir} · 设备码与画像已独立分配` });
+      setToast({ title: tr(`已创建 ${acc.label}`, `Created ${acc.label}`), body: tr(`~/${acc.configDir} · 设备码与画像已独立分配`, `~/${acc.configDir} · Device ID and profile assigned separately`) });
       return acc;
     },
     [state.accounts],
@@ -782,7 +813,7 @@ export default function App() {
   const importDir = useCallback(
     (configDir: string, label: string) => {
       if (state.accounts.some((a) => a.configDir === configDir)) {
-        setToast({ title: "这个目录已经导入过了" });
+        setToast({ title: tr("这个目录已经导入过了", "This folder has already been imported") });
         return;
       }
       const acc: Account = {
@@ -791,11 +822,11 @@ export default function App() {
         label: label || configDir,
         configDir,
         tint: nextTint(state.accounts.map((a) => a.tint)),
-        note: "导入的已有环境",
+        note: tr("导入的已有环境", "Imported existing environment"),
       };
       setState((s) => ({ ...s, accounts: [...s.accounts, acc], activeAccountId: acc.id }));
       void refreshAccount(acc.id);
-      setToast({ title: `已导入 ${acc.label}`, body: `~/${acc.configDir}` });
+      setToast({ title: tr(`已导入 ${acc.label}`, `Imported ${acc.label}`), body: `~/${acc.configDir}` });
     },
     [state.accounts, refreshAccount],
   );
@@ -825,7 +856,7 @@ export default function App() {
       if (r.ok && r.termId) {
         setLoginTerm((m) => ({ ...m, [id]: r.termId! }));
       } else {
-        setToast({ title: "登录启动失败", body: "请确认已安装 claude CLI" });
+        setToast({ title: tr("登录启动失败", "Couldn't start sign-in"), body: tr("请确认已安装 claude CLI", "Make sure the claude CLI is installed") });
       }
     },
     [],
@@ -837,8 +868,8 @@ export default function App() {
         void loadBrowsers().then((list) =>
           setToast(
             browser === "copy"
-              ? { title: "登录链接已复制", body: "粘到任意浏览器打开，授权后这里会自动识别" }
-              : { title: `已在「${browserLabel(list, browser)}」打开授权页`, body: "在网页上点授权，回来会自动识别" },
+              ? { title: tr("登录链接已复制", "Sign-in link copied"), body: tr("粘到任意浏览器打开，授权后这里会自动识别", "Paste it into any browser. We'll detect it here once you authorize") }
+              : { title: tr(`已在「${browserLabel(list, browser)}」打开授权页`, `Opened the authorization page in ${browserLabel(list, browser)}`), body: tr("在网页上点授权，回来会自动识别", "Click authorize on the page, then come back. We'll detect it automatically") },
           ),
         );
       }),
@@ -857,8 +888,8 @@ export default function App() {
       });
       await refreshAccount(id);
       setToast({
-        title: r.ok ? "已退出登录" : "退出失败",
-        body: r.ok ? "凭据已从 Keychain 清除" : r.output.slice(0, 120),
+        title: r.ok ? tr("已退出登录", "Signed out") : tr("退出失败", "Sign-out failed"),
+        body: r.ok ? tr("凭据已从 Keychain 清除", "Credentials removed from Keychain") : r.output.slice(0, 120),
       });
     },
     [refreshAccount],
@@ -870,7 +901,7 @@ export default function App() {
       const r = await window.claudeBuddy.accountCheckExit(id);
       setChecking((c) => ({ ...c, [id]: false }));
       if (!r.ok || !r.ip) {
-        setToast({ title: "出口检测失败", body: r.reason ?? "网络不通或代理不可达" });
+        setToast({ title: tr("出口检测失败", "Exit check failed"), body: r.reason ?? tr("网络不通或代理不可达", "Network unreachable or proxy unavailable") });
         return;
       }
       const prev = state.accounts.find((a) => a.id === id)?.lastExitIp ?? null;
@@ -882,8 +913,8 @@ export default function App() {
         ),
       }));
       setToast({
-        title: `出口 IP ${r.ip}`,
-        body: prev && prev !== r.ip ? `注意：从 ${prev} 变了，频繁跳变本身是信号` : "已记录，跟这个账号绑定",
+        title: tr(`出口 IP ${r.ip}`, `Exit IP ${r.ip}`),
+        body: prev && prev !== r.ip ? tr(`注意：从 ${prev} 变了，频繁跳变本身是信号`, `Note: changed from ${prev}. Frequent changes are a signal in themselves`) : tr("已记录，跟这个账号绑定", "Saved and tied to this account"),
       });
     },
     [state.accounts],
@@ -895,13 +926,13 @@ export default function App() {
       const r = await window.claudeBuddy.accountRotateIdentity(id);
       setBusy((b) => ({ ...b, [id]: false }));
       if (!r.ok) {
-        setToast({ title: "轮换失败", body: r.reason });
+        setToast({ title: tr("轮换失败", "Rotation failed"), body: r.reason });
         return;
       }
       await refreshAccount(id);
       setToast({
-        title: "设备身份已轮换",
-        body: `新 userID ${r.userID?.slice(0, 12)}… · 账号本身没变`,
+        title: tr("设备身份已轮换", "Device identity rotated"),
+        body: tr(`新 userID ${r.userID?.slice(0, 12)}… · 账号本身没变`, `New userID ${r.userID?.slice(0, 12)}… · The account itself is unchanged`),
       });
     },
     [refreshAccount],
@@ -923,7 +954,7 @@ export default function App() {
 
   const copy = useCallback((text: string) => {
     void navigator.clipboard.writeText(text).catch(() => {});
-    setToast({ title: "已复制", body: text });
+    setToast({ title: tr("已复制", "Copied"), body: text });
   }, []);
 
   // ── 快捷键
@@ -1141,7 +1172,7 @@ export default function App() {
             }}
             onPickFolder={async () => {
               const cwd = await pickFolder();
-              if (cwd) setToast({ title: `已选择 ${prettyName(cwd)}` });
+              if (cwd) setToast({ title: tr(`已选择 ${prettyName(cwd)}`, `Selected ${prettyName(cwd)}`) });
             }}
             onSetCwd={(cwd) => update({ lastCwd: cwd })}
             onEditNetwork={(id) => setEditor({ id, section: "network" })}
@@ -1218,9 +1249,9 @@ export default function App() {
             onLogout={(id) => {
               const a = state.accounts.find((x) => x.id === id);
               setConfirm({
-                title: `退出「${a?.label ?? ""}」的登录？`,
-                body: "会从 Keychain 清掉这个环境的凭据，之后要重新授权。",
-                okLabel: "退出登录",
+                title: tr(`退出「${a?.label ?? ""}」的登录？`, `Sign out of “${a?.label ?? ""}”?`),
+                body: tr("会从 Keychain 清掉这个环境的凭据，之后要重新授权。", "This removes the environment's credentials from Keychain. You'll need to authorize again."),
+                okLabel: tr("退出登录", "Sign out"),
                 onOk: () => void logout(id),
               });
             }}
@@ -1275,7 +1306,7 @@ export default function App() {
               const r = await window.claudeBuddy.accountRemove(acc.id, purge);
               setBusy((b) => ({ ...b, [acc.id]: false }));
               if (!r.ok) {
-                setToast({ title: "没能删除", body: r.reason });
+                setToast({ title: tr("没能删除", "Couldn't delete"), body: r.reason });
                 return;
               }
               setState((s) => {
@@ -1289,8 +1320,8 @@ export default function App() {
               });
               setEditor(null);
               setToast({
-                title: `已移除 ${acc.label}`,
-                body: r.purged ? "磁盘目录也一起删了" : "目录保留在磁盘上",
+                title: tr(`已移除 ${acc.label}`, `Removed ${acc.label}`),
+                body: r.purged ? tr("磁盘目录也一起删了", "The folder on disk was deleted too") : tr("目录保留在磁盘上", "The folder was kept on disk"),
               });
             }}
             onClearTraces={async (keys) => {
@@ -1298,13 +1329,13 @@ export default function App() {
               const r = await window.claudeBuddy.accountClearTraces(drawerAccount.id, keys);
               setBusy((b) => ({ ...b, [drawerAccount.id]: false }));
               if (!r.ok) {
-                setToast({ title: "清理失败", body: r.reason ?? "" });
+                setToast({ title: tr("清理失败", "Cleanup failed"), body: r.reason ?? "" });
                 return;
               }
               await loadTraces(drawerAccount.id);
               setToast({
-                title: r.removed.length ? `清掉了 ${r.removed.length} 项` : "没有可清的项",
-                body: r.failed.length ? `${r.failed.length} 项被跳过` : "凭据和身份已保留",
+                title: r.removed.length ? tr(`清掉了 ${r.removed.length} 项`, `Removed ${r.removed.length} items`) : tr("没有可清的项", "Nothing to clean up"),
+                body: r.failed.length ? tr(`${r.failed.length} 项被跳过`, `${r.failed.length} skipped`) : tr("凭据和身份已保留", "Credentials and identity were kept"),
               });
             }}
           />
@@ -1370,7 +1401,7 @@ export default function App() {
 
         {!ptyOk && (
           <div className="browser-note">
-            浏览器预览模式 · 无 PTY，终端与登录不可用
+            {tr("浏览器预览模式 · 无 PTY，终端与登录不可用", "Browser preview · no PTY, terminal and sign-in unavailable")}
           </div>
         )}
       </div>
@@ -1418,7 +1449,7 @@ export default function App() {
           onSwitchAccount={(id) => {
             update({ activeAccountId: id });
             const a = state.accounts.find((x) => x.id === id);
-            if (a) setToast({ title: `已切到 ${a.label}`, body: `~/${a.configDir}` });
+            if (a) setToast({ title: tr(`已切到 ${a.label}`, `Switched to ${a.label}`), body: `~/${a.configDir}` });
           }}
           onOpenDiff={() => {
             update({ view: "session" });
@@ -1513,7 +1544,7 @@ export default function App() {
       {/* 展开侧栏按钮必须放在 DOM 最后：Electron 按 DOM 顺序合并拖拽区，
           放在前面会被后面顶栏的 -webkit-app-region: drag 盖掉，看得见却点不动 */}
       {!state.sidebarOpen && (
-        <button className="ib ws-open" title="展开侧栏 ⌘\\" onClick={() => update({ sidebarOpen: true })}>
+        <button className="ib ws-open" title={tr("展开侧栏 ⌘\\", "Show sidebar ⌘\\")} onClick={() => update({ sidebarOpen: true })}>
           <IconPanel />
         </button>
       )}
@@ -1651,12 +1682,12 @@ function MenuBody({
   if (menu.kind === "permission") {
     return (
       <div className="pop" ref={ref} style={style} data-dir={dir} role="menu">
-        <div className="pop-hint">权限模式决定 Claude Code 会问你多少</div>
+        <div className="pop-hint">{tr("权限模式决定 Claude Code 会问你多少", "Permission mode controls how often Claude Code asks you")}</div>
         {(
           [
-            ["default", "逐次确认", "每一步都先问你", IconShield],
-            ["acceptEdits", "自动接受编辑", "改文件不再逐次确认", IconAuto],
-            ["plan", "计划模式", "只出方案，不动文件", IconPlan],
+            ["default", tr("逐次确认", "Ask each time"), tr("每一步都先问你", "Asks before every step"), IconShield],
+            ["acceptEdits", tr("自动接受编辑", "Auto-accept edits"), tr("改文件不再逐次确认", "File edits no longer ask"), IconAuto],
+            ["plan", tr("计划模式", "Plan mode"), tr("只出方案，不动文件", "Plans only, no file changes"), IconPlan],
           ] as const
         ).map(([p, label, desc, Icon]) => (
           <button
@@ -1681,7 +1712,7 @@ function MenuBody({
   const cur = state.accounts.find((a) => a.id === state.activeAccountId) ?? state.accounts[0];
   return (
       <div className="pop pop-env" ref={ref} style={style} data-dir={dir} role="menu">
-        <div className="pop-hint">切换环境 · 新会话会建在选中的环境里</div>
+        <div className="pop-hint">{tr("切换环境 · 新会话会建在选中的环境里", "Switch environment · New sessions start in the selected one")}</div>
         {state.accounts.map((a) => {
           const on = a.id === state.activeAccountId;
           return (
@@ -1705,28 +1736,28 @@ function MenuBody({
         {cur && (
           <button className="pi" onClick={() => onEditAccount(cur.id)} role="menuitem">
             <IconGear size={15} />
-            <span className="pi-main">编辑「{cur.label}」…</span>
+            <span className="pi-main">{tr(`编辑「${cur.label}」…`, `Edit “${cur.label}”…`)}</span>
           </button>
         )}
         <button className="pi" onClick={onManageAccounts} role="menuitem">
           <IconAccounts size={15} />
-          <span className="pi-main">管理环境…</span>
+          <span className="pi-main">{tr("管理环境…", "Manage environments…")}</span>
         </button>
         <button className="pi" onClick={onOpenClean} role="menuitem">
           <IconTrash size={15} />
-          <span className="pi-main">清理本机…</span>
+          <span className="pi-main">{tr("清理本机…", "Clean up this Mac…")}</span>
         </button>
         <button className="pi" onClick={onGuide} role="menuitem">
           <IconAuto size={15} />
-          <span className="pi-main">新手引导</span>
+          <span className="pi-main">{tr("新手引导", "Onboarding")}</span>
         </button>
         <button className="pi" onClick={() => onOpenSettings("guide")} role="menuitem">
           <IconPlan size={15} />
-          <span className="pi-main">使用教程</span>
+          <span className="pi-main">{tr("使用教程", "Guide")}</span>
         </button>
         <button className="pi" onClick={() => onOpenSettings()} role="menuitem">
           <IconSettings size={15} />
-          <span className="pi-main">设置…</span>
+          <span className="pi-main">{tr("设置…", "Settings…")}</span>
           <small>⌘,</small>
         </button>
       </div>
@@ -1743,16 +1774,16 @@ function CloneDialog({ onClose, onClone }: { onClose: () => void; onClone: (url:
   const [url, setUrl] = useState("");
   const ok = /^(https?:\/\/|git@|ssh:\/\/)\S+$/.test(url.trim());
   return (
-    <Modal onClose={onClose} className="dlg-sm" label="从 Git 克隆">
+    <Modal onClose={onClose} className="dlg-sm" label={tr("从 Git 克隆", "Clone from Git")}>
       {(close) => (
         <>
           <div className="dlg-h">
-            <h2>从 Git 克隆</h2>
-            <button className="ib" title="关闭 esc" onClick={close}>
+            <h2>{tr("从 Git 克隆", "Clone from Git")}</h2>
+            <button className="ib" title={tr("关闭 esc", "Close esc")} onClick={close}>
               <IconClose />
             </button>
           </div>
-          <p>粘贴仓库地址，下一步选放在哪个目录下。克隆完成后会在仓库里直接启动 Claude Code。</p>
+          <p>{tr("粘贴仓库地址，下一步选放在哪个目录下。克隆完成后会在仓库里直接启动 Claude Code。", "Paste the repository URL, then choose which folder to clone into. Claude Code starts in the repo when cloning finishes.")}</p>
           <input
             className="dlg-in mono selectable"
             autoFocus
@@ -1765,10 +1796,10 @@ function CloneDialog({ onClose, onClone }: { onClose: () => void; onClone: (url:
           />
           <div className="dlg-acts">
             <button className="btn ghost" onClick={close}>
-              取消
+              {tr("取消", "Cancel")}
             </button>
             <button className="btn pri" disabled={!ok} onClick={() => onClone(url.trim())}>
-              选择目录并克隆
+              {tr("选择目录并克隆", "Choose folder and clone")}
             </button>
           </div>
         </>

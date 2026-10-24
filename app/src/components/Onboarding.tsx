@@ -6,6 +6,7 @@ import LoginButton from "./LoginButton";
 import Art from "./Art";
 import IpBadge from "./IpBadge";
 import { IconCopy, IconRefresh } from "./iconAliases";
+import { tr } from "../lib/i18n";
 
 /**
  * 首次引导 —— 三步。
@@ -21,15 +22,27 @@ import { IconCopy, IconRefresh } from "./iconAliases";
  */
 
 const TITLE: Record<number, string> = {
-  1: "先检查一下",
-  2: "建环境并登录",
-  3: "设置网络出口",
+  get 1() {
+    return tr("先检查一下", "Quick check");
+  },
+  get 2() {
+    return tr("建环境并登录", "Create an environment and sign in");
+  },
+  get 3() {
+    return tr("设置网络出口", "Set up network exit");
+  },
 };
 
 const STEP_NAME: Record<number, string> = {
-  1: "检查电脑",
-  2: "建环境 + 登录",
-  3: "网络出口",
+  get 1() {
+    return tr("检查电脑", "Check your Mac");
+  },
+  get 2() {
+    return tr("建环境 + 登录", "Environment + sign in");
+  },
+  get 3() {
+    return tr("网络出口", "Network exit");
+  },
 };
 
 interface Props {
@@ -98,18 +111,18 @@ export default function Onboarding(p: Props) {
       <div className="ob">
         <div className="ob-copy ob-alone">
           <button className="ob-back" onClick={() => setShowInstall(false)}>
-            ← 返回检查
+            {tr("← 返回检查", "← Back to check")}
           </button>
-          <h1 style={{ fontSize: 30 }}>安装 Claude Code</h1>
-          <p>装好这一样，剩下的都在这里点。</p>
+          <h1 style={{ fontSize: 30 }}>{tr("安装 Claude Code", "Install Claude Code")}</h1>
+          <p>{tr("装好这一样，剩下的都在这里点。", "Install this one thing and do the rest right here.")}</p>
 
           <div className="inst-opts">
             <div className="inst-opt">
               <div className="inst-opt-t">
-                <b>让我来装</b>
-                <span className="inst-tag">推荐</span>
+                <b>{tr("让我来装", "Install it for me")}</b>
+                <span className="inst-tag">{tr("推荐", "Recommended")}</span>
               </div>
-              <small>运行官方命令，不用开终端</small>
+              <small>{tr("运行官方命令，不用开终端", "Runs the official command, no Terminal needed")}</small>
               <button
                 className="btn pri"
                 onClick={() => {
@@ -118,20 +131,20 @@ export default function Onboarding(p: Props) {
                 }}
                 disabled={installing || p.installing}
               >
-                {installing || p.installing ? "正在安装…" : "一键安装"}
+                {installing || p.installing ? tr("正在安装…", "Installing…") : tr("一键安装", "Install")}
               </button>
             </div>
 
             <div className="inst-opt">
               <div className="inst-opt-t">
-                <b>或者自己在终端跑</b>
+                <b>{tr("或者自己在终端跑", "Or run it in Terminal")}</b>
               </div>
-              <small>装完回来点「重新检查」</small>
+              <small>{tr("装完回来点「重新检查」", "When done, come back and click “Check again”")}</small>
               <div className="inst-cmd">
                 <code className="selectable">npm install -g @anthropic-ai/claude-code</code>
                 <button
                   className="inst-copy"
-                  title="复制"
+                  title={tr("复制", "Copy")}
                   onClick={() => p.onCopyCmd("npm install -g @anthropic-ai/claude-code")}
                 >
                   <IconCopy size={12} />
@@ -143,7 +156,7 @@ export default function Onboarding(p: Props) {
           {(installing || p.installing) && (
             <div className="inst-progress">
               <span className="spinner" />
-              <span>正在下载，网速慢要等一两分钟</span>
+              <span>{tr("正在下载，网速慢要等一两分钟", "Downloading. This can take a minute or two on a slow connection")}</span>
             </div>
           )}
 
@@ -153,7 +166,7 @@ export default function Onboarding(p: Props) {
 
           <div className="ob-acts" style={{ marginTop: 18 }}>
             <button className="btn" onClick={p.onRunCheckup} disabled={p.checkingUp}>
-              装好了，重新检查
+              {tr("装好了，重新检查", "Installed, check again")}
             </button>
           </div>
         </div>
@@ -166,7 +179,7 @@ export default function Onboarding(p: Props) {
       {/* 从设置里重新打开引导的人，随时能回去，不用硬走完三步 */}
       {p.onExit && (
         <button className="ob-exit" onClick={p.onExit}>
-          返回应用
+          {tr("返回应用", "Back to app")}
         </button>
       )}
       <div className="ob-art">
@@ -189,7 +202,7 @@ export default function Onboarding(p: Props) {
         {/* ═══ 1 检查电脑 ═══ */}
         {step === 1 && (
           <>
-            <p>{p.checkingUp ? "正在检查…" : blocked ? "还差一样东西。" : "都没问题。"}</p>
+            <p>{p.checkingUp ? tr("正在检查…", "Checking…") : blocked ? tr("还差一样东西。", "One thing is missing.") : tr("都没问题。", "All good.")}</p>
 
             <div className="ck">
               {(p.checkup?.items ?? []).map((item) => (
@@ -208,10 +221,10 @@ export default function Onboarding(p: Props) {
               ))}
               {!p.checkup && !p.checkingUp && (
                 <div className="ck-item">
-                  <span className="ck-name">还没检查</span>
+                  <span className="ck-name">{tr("还没检查", "Not checked yet")}</span>
                   <button className="btn" style={{ marginLeft: "auto" }} onClick={p.onRunCheckup}>
                     <IconRefresh />
-                    重新检查
+                    {tr("重新检查", "Check again")}
                   </button>
                 </div>
               )}
@@ -223,8 +236,8 @@ export default function Onboarding(p: Props) {
                   <Cross />
                 </span>
                 <span className="inst-entry-body">
-                  <b>还差 Claude Code</b>
-                  <small>点这里去安装，装完自动回来</small>
+                  <b>{tr("还差 Claude Code", "Claude Code is missing")}</b>
+                  <small>{tr("点这里去安装，装完自动回来", "Click to install. You'll return here automatically")}</small>
                 </span>
                 <span className="inst-entry-go">→</span>
               </button>
@@ -236,14 +249,17 @@ export default function Onboarding(p: Props) {
         {step === 2 && (
           <>
             <p>
-              起个名字就行 —— 设备码、终端画像这些软件自己分配好，每个环境互不重样。
+              {tr(
+                "起个名字就行 —— 设备码、终端画像这些软件自己分配好，每个环境互不重样。",
+                "Just pick a name. Device IDs and terminal profiles are assigned for you, and each environment gets its own.",
+              )}
             </p>
 
             <div className="ob-row">
               <input
                 className="ob-input"
                 value={newLabel}
-                placeholder="给这个环境起个名字"
+                placeholder={tr("给这个环境起个名字", "Name this environment")}
                 onChange={(e) => setNewLabel(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newLabel.trim()) {
@@ -262,7 +278,7 @@ export default function Onboarding(p: Props) {
                   setNewLabel("");
                 }}
               >
-                新建
+                {tr("新建", "Create")}
               </button>
             </div>
 
@@ -273,23 +289,23 @@ export default function Onboarding(p: Props) {
                 if (!scanned) setScanned(await p.onOpenFolderScan());
               }}
             >
-              <span>或者，用电脑上已有的</span>
-              <span className="ob-alt-go">{openScan ? "收起" : "查看 →"}</span>
+              <span>{tr("或者，用电脑上已有的", "Or use one already on this Mac")}</span>
+              <span className="ob-alt-go">{openScan ? tr("收起", "Hide") : tr("查看 →", "View →")}</span>
             </button>
 
             {openScan && (
               <div className="ob-scan">
                 {!scanned ? (
-                  <div className="in-cap">扫描中…</div>
+                  <div className="in-cap">{tr("扫描中…", "Scanning…")}</div>
                 ) : scanned.length === 0 ? (
-                  <div className="in-cap">没找到已有环境。</div>
+                  <div className="in-cap">{tr("没找到已有环境。", "No existing environments found.")}</div>
                 ) : (
                   scanned.map((d) => (
                     <button
                       key={d.configDir}
                       className="ob-item"
                       onClick={() => {
-                        p.onImportDir(d.configDir, d.configDir.replace(/^\.claude-?/, "") || "导入");
+                        p.onImportDir(d.configDir, d.configDir.replace(/^\.claude-?/, "") || tr("导入", "Imported"));
                         setScanned(null);
                         setOpenScan(false);
                       }}
@@ -297,10 +313,10 @@ export default function Onboarding(p: Props) {
                       <span className="ob-item-main">
                         <b>~/{d.configDir}</b>
                         <small>
-                          {d.email ?? "没登录过"} · {d.sessions} 个对话
+                          {d.email ?? tr("没登录过", "Never signed in")} · {tr(`${d.sessions} 个对话`, `${d.sessions} sessions`)}
                         </small>
                       </span>
-                      <span className="ob-item-add">用它</span>
+                      <span className="ob-item-add">{tr("用它", "Use")}</span>
                     </button>
                   ))
                 )}
@@ -309,7 +325,7 @@ export default function Onboarding(p: Props) {
 
             {p.accounts.length > 0 && (
               <>
-                <div className="ob-label">选中的环境</div>
+                <div className="ob-label">{tr("选中的环境", "Selected environment")}</div>
                 <div className="ob-pick">
                   {p.accounts.map((a) => (
                     <button
@@ -326,7 +342,7 @@ export default function Onboarding(p: Props) {
                           ~/{a.configDir} · {a.terminal?.term ?? ""}
                         </small>
                       </span>
-                      {p.activeAccount?.id === a.id && <span className="ob-item-add">已选</span>}
+                      {p.activeAccount?.id === a.id && <span className="ob-item-add">{tr("已选", "Selected")}</span>}
                     </button>
                   ))}
                 </div>
@@ -341,7 +357,7 @@ export default function Onboarding(p: Props) {
                       <Tick />
                     </span>
                     <div>
-                      <b>已登录</b>
+                      <b>{tr("已登录", "Signed in")}</b>
                       <small>{st?.email ?? ""}</small>
                     </div>
                   </div>
@@ -351,7 +367,7 @@ export default function Onboarding(p: Props) {
                       account={p.activeAccount!}
                       busy={p.busy}
                       waiting={Boolean(p.loginTermId)}
-                      label="登录 Claude"
+                      label={tr("登录 Claude", "Sign in to Claude")}
                       onLogin={(b: string) => p.onLogin(p.activeAccount!.id, b)}
                     />
                   </div>
@@ -367,13 +383,16 @@ export default function Onboarding(p: Props) {
         {step === 3 && p.activeAccount && (
           <>
             <p>
-              已经自动找过本机代理了。选一个用，或者保持直连。
+              {tr(
+                "已经自动找过本机代理了。选一个用，或者保持直连。",
+                "Local proxies have been detected. Pick one, or stay on a direct connection.",
+              )}
             </p>
 
             {p.scanningProxy && !p.proxyCandidates ? (
               <div className="ob-wait" style={{ marginTop: 8 }}>
                 <span className="spinner" />
-                正在检测本机代理…
+                {tr("正在检测本机代理…", "Detecting local proxies…")}
               </div>
             ) : (
               <div className="proxy-list">
@@ -384,9 +403,9 @@ export default function Onboarding(p: Props) {
                 >
                   <span className="proxy-dot ok" />
                   <span className="proxy-item-main">
-                    <b>不用代理</b>
+                    <b>{tr("不用代理", "No proxy")}</b>
                     <small>
-                      本机出口 {p.directIp ?? "读不到"}
+                      {tr("本机出口", "Local exit")} {p.directIp ?? tr("读不到", "Unavailable")}
                     </small>
                     {p.directIp && (
                       <small>
@@ -394,7 +413,7 @@ export default function Onboarding(p: Props) {
                       </small>
                     )}
                   </span>
-                  {!hasProxy ? <span className="proxy-used">使用中</span> : null}
+                  {!hasProxy ? <span className="proxy-used">{tr("使用中", "In use")}</span> : null}
                 </button>
 
                 {(p.proxyCandidates ?? [])
@@ -421,7 +440,7 @@ export default function Onboarding(p: Props) {
                           </b>
                           <small>
                             {c.label}
-                            {c.ip ? ` · 出口 ${c.ip}` : ""}
+                            {c.ip ? tr(` · 出口 ${c.ip}`, ` · Exit ${c.ip}`) : ""}
                           </small>
                           {c.ip && (
                             <small>
@@ -429,14 +448,17 @@ export default function Onboarding(p: Props) {
                             </small>
                           )}
                         </span>
-                        {used ? <span className="proxy-used">使用中</span> : null}
+                        {used ? <span className="proxy-used">{tr("使用中", "In use")}</span> : null}
                       </button>
                     );
                   })}
 
                 {(p.proxyCandidates ?? []).filter((c) => c.ok).length === 0 && !p.scanningProxy && (
                   <div className="in-cap" style={{ padding: "8px 2px" }}>
-                    没找到能用的代理。如果有代理地址，点下面手动填。
+                    {tr(
+                      "没找到能用的代理。如果有代理地址，点下面手动填。",
+                      "No working proxy found. If you have a proxy address, enter it manually below.",
+                    )}
                   </div>
                 )}
               </div>
@@ -445,7 +467,7 @@ export default function Onboarding(p: Props) {
             {/* 手动配置收进二级，不占主界面 */}
             {!showManualProxy ? (
               <button className="ob-alt" onClick={() => setShowManualProxy(true)}>
-                <span>手动填代理地址</span>
+                <span>{tr("手动填代理地址", "Enter proxy address manually")}</span>
                 <span className="ob-alt-go">→</span>
               </button>
             ) : (
@@ -459,7 +481,7 @@ export default function Onboarding(p: Props) {
                   />
                   <input
                     className="ob-input ob-port"
-                    placeholder="端口"
+                    placeholder={tr("端口", "Port")}
                     value={manual.port}
                     onChange={(e) =>
                       setManual({ ...manual, port: e.target.value.replace(/\D/g, "") })
@@ -479,17 +501,22 @@ export default function Onboarding(p: Props) {
                       setShowManualProxy(false);
                     }}
                   >
-                    用这个
+                    {tr("用这个", "Use this")}
                   </button>
                 </div>
-                <div className="in-cap">端口不知道的话，在代理软件设置里看「HTTP 代理端口」。</div>
+                <div className="in-cap">
+                  {tr(
+                    "端口不知道的话，在代理软件设置里看「HTTP 代理端口」。",
+                    "Not sure about the port? Check “HTTP proxy port” in your proxy app's settings.",
+                  )}
+                </div>
               </div>
             )}
 
             <div className="proxy-current">
-              <span>这个环境的出口</span>
+              <span>{tr("这个环境的出口", "This environment's exit")}</span>
               <b className="mono">
-                {hasProxy ? `${px!.protocol}://${px!.host}:${px!.port}` : "直连"}
+                {hasProxy ? `${px!.protocol}://${px!.host}:${px!.port}` : tr("直连", "Direct")}
               </b>
               {ip ? (
                 <span className="proxy-ip">
@@ -498,7 +525,7 @@ export default function Onboarding(p: Props) {
                 </span>
               ) : (
                 <button className="proxy-check" onClick={() => p.onCheckExit(p.activeAccount!.id)}>
-                  测一下
+                  {tr("测一下", "Test")}
                 </button>
               )}
             </div>
@@ -509,7 +536,7 @@ export default function Onboarding(p: Props) {
         <div className="ob-acts" style={{ marginTop: 24 }}>
           {step > 1 && (
             <button className="btn ghost" onClick={() => setStep(step - 1)}>
-              上一步
+              {tr("上一步", "Back")}
             </button>
           )}
 
@@ -518,9 +545,9 @@ export default function Onboarding(p: Props) {
               className={blocked ? "btn" : "btn pri"}
               disabled={blocked || p.checkingUp}
               onClick={() => setStep(2)}
-              title={blocked ? "先把上面的问题解决" : undefined}
+              title={blocked ? tr("先把上面的问题解决", "Fix the issue above first") : undefined}
             >
-              {blocked ? "先装 Claude Code" : "下一步"}
+              {blocked ? tr("先装 Claude Code", "Install Claude Code first") : tr("下一步", "Continue")}
             </button>
           )}
 
@@ -529,24 +556,24 @@ export default function Onboarding(p: Props) {
               className={loggedIn ? "btn pri" : "btn"}
               disabled={!p.activeAccount}
               onClick={() => setStep(3)}
-              title={!loggedIn ? "可以先跳过，之后再登录" : undefined}
+              title={!loggedIn ? tr("可以先跳过，之后再登录", "You can skip and sign in later") : undefined}
             >
-              {loggedIn ? "下一步" : p.activeAccount ? "跳过登录" : "先建环境"}
+              {loggedIn ? tr("下一步", "Continue") : p.activeAccount ? tr("跳过登录", "Skip sign-in") : tr("先建环境", "Create an environment first")}
             </button>
           )}
 
           {step === 3 && (
             <button className="btn pri" onClick={p.onFinish}>
               <Tick />
-              开始使用
+              {tr("开始使用", "Get started")}
             </button>
           )}
         </div>
 
         <div className="ob-foot">
-          {step === 1 && "只检查本机环境，不上传任何东西"}
-          {step === 2 && "每个环境的凭证、对话、设备码都是分开的"}
-          {step === 3 && "以后在「环境」里随时能改"}
+          {step === 1 && tr("只检查本机环境，不上传任何东西", "Only checks this Mac. Nothing is uploaded")}
+          {step === 2 && tr("每个环境的凭证、对话、设备码都是分开的", "Each environment keeps its own credentials, sessions and device ID")}
+          {step === 3 && tr("以后在「环境」里随时能改", "You can change this anytime in Environments")}
         </div>
       </div>
     </div>

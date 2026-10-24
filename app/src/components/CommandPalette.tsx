@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { tr } from "../lib/i18n";
 import type { Account, ShellWindow, View } from "../lib/model";
 import type { SettingsCat } from "./Settings";
 import {
@@ -73,32 +74,32 @@ export default function CommandPalette({
         id: `w-${w.id}`,
         icon: IconTerminal,
         title: `${w.title} · ${w.cwd}`,
-        hint: "会话",
+        hint: tr("会话", "Session"),
         run: () => onOpenWindow(w.id),
       });
     }
     out.push(
-      { id: "new", icon: IconPlus, title: "新建会话", keys: ["⌘", "N"], run: onNew },
-      { id: "clone", icon: IconLayers, title: "从 Git 克隆", run: onClone },
-      { id: "panel", icon: IconPanel, title: "折叠右栏", keys: ["⌘", "B"], run: onTogglePanel },
-      { id: "side", icon: IconPanel, title: "折叠侧栏", keys: ["⌘", "\\"], run: onToggleSidebar },
-      { id: "diff", icon: IconFile, title: "查看本次改动", keys: ["⌘", "D"], run: onOpenDiff },
-      { id: "home", icon: IconTerminal, title: "回到首页", run: () => onNav("home") },
-      { id: "sessions", icon: IconTerminal, title: "会话总览", run: () => onNav("sessions") },
-      { id: "acc", icon: IconKey, title: "管理环境", run: () => onNav("accounts") },
-      { id: "set", icon: IconGear, title: "打开设置", keys: ["⌘", ","], run: () => onSettings("general") },
-      { id: "clean", icon: IconGear, title: "清理本机（登录痕迹、空壳目录）", hint: "设置", run: () => onSettings("clean") },
-      { id: "net", icon: IconGear, title: "网络测试（延迟、DNS、IPv6）", run: () => onNav("network") },
-      { id: "guide", icon: IconGear, title: "使用教程（每个页面怎么用、结果怎么看）", hint: "设置", run: () => onSettings("guide") },
-      { id: "about", icon: IconGear, title: "关于 ClaudeBuddy", hint: "设置", run: () => onSettings("about") },
+      { id: "new", icon: IconPlus, title: tr("新建会话", "New session"), keys: ["⌘", "N"], run: onNew },
+      { id: "clone", icon: IconLayers, title: tr("从 Git 克隆", "Clone from Git"), run: onClone },
+      { id: "panel", icon: IconPanel, title: tr("折叠右栏", "Hide right panel"), keys: ["⌘", "B"], run: onTogglePanel },
+      { id: "side", icon: IconPanel, title: tr("折叠侧栏", "Hide sidebar"), keys: ["⌘", "\\"], run: onToggleSidebar },
+      { id: "diff", icon: IconFile, title: tr("查看本次改动", "View changes"), keys: ["⌘", "D"], run: onOpenDiff },
+      { id: "home", icon: IconTerminal, title: tr("回到首页", "Go to Home"), run: () => onNav("home") },
+      { id: "sessions", icon: IconTerminal, title: tr("会话总览", "All sessions"), run: () => onNav("sessions") },
+      { id: "acc", icon: IconKey, title: tr("管理环境", "Manage environments"), run: () => onNav("accounts") },
+      { id: "set", icon: IconGear, title: tr("打开设置", "Open Settings"), keys: ["⌘", ","], run: () => onSettings("general") },
+      { id: "clean", icon: IconGear, title: tr("清理本机（登录痕迹、空壳目录）", "Clean up this Mac (sign-in traces, empty folders)"), hint: tr("设置", "Settings"), run: () => onSettings("clean") },
+      { id: "net", icon: IconGear, title: tr("网络测试（延迟、DNS、IPv6）", "Network test (latency, DNS, IPv6)"), run: () => onNav("network") },
+      { id: "guide", icon: IconGear, title: tr("使用教程（每个页面怎么用、结果怎么看）", "Guide (how each page works, how to read results)"), hint: tr("设置", "Settings"), run: () => onSettings("guide") },
+      { id: "about", icon: IconGear, title: tr("关于 ClaudeBuddy", "About ClaudeBuddy"), hint: tr("设置", "Settings"), run: () => onSettings("about") },
     );
     // 账号直接可搜：切环境是最常用的动作
     for (const a of accounts) {
       out.push({
         id: `a-${a.id}`,
         icon: IconKey,
-        title: `切到 ${a.label}（~/${a.configDir}）`,
-        hint: "环境",
+        title: tr(`切到 ${a.label}（~/${a.configDir}）`, `Switch to ${a.label} (~/${a.configDir})`),
+        hint: tr("环境", "Environment"),
         run: () => onSwitchAccount(a.id),
       });
     }
@@ -124,13 +125,13 @@ export default function CommandPalette({
   return (
     <>
       <div className="ov" onClick={onClose} />
-      <div className="pal" role="dialog" aria-label="命令面板">
+      <div className="pal" role="dialog" aria-label={tr("命令面板", "Command palette")}>
         <div className="pal-in">
           <IconSearch size={17} />
           <input
             ref={inputRef}
             value={q}
-            placeholder="搜索会话、操作…"
+            placeholder={tr("搜索会话、操作…", "Search sessions and actions…")}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
@@ -156,12 +157,12 @@ export default function CommandPalette({
 
         <div className="pal-g">
           <div className="gl">
-            <span>结果</span>
+            <span>{tr("结果", "Results")}</span>
             <span>{filtered.length}</span>
           </div>
           {filtered.length === 0 ? (
             <div style={{ padding: "10px", fontSize: 12.5, color: "var(--t4)" }}>
-              没有匹配项
+              {tr("没有匹配项", "No matches")}
             </div>
           ) : (
             filtered.map((i, idx) => (
@@ -191,10 +192,10 @@ export default function CommandPalette({
         <div className="pal-f">
           <span>
             <span className="kbd">↑</span>
-            <span className="kbd">↓</span>选择
+            <span className="kbd">↓</span>{tr("选择", "Select")}
           </span>
           <span>
-            <span className="kbd">↵</span>打开
+            <span className="kbd">↵</span>{tr("打开", "Open")}
           </span>
         </div>
       </div>

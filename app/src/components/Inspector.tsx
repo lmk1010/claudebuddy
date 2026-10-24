@@ -13,6 +13,7 @@ import {
   riskOf,
 } from "../lib/model";
 import type { SessionUsage } from "../lib/bridge";
+import { tr } from "../lib/i18n";
 import {
   IconClose,
   IconCode,
@@ -76,8 +77,8 @@ export default function Inspector({
   return (
     <aside className="insp">
       <div className="in-h">
-        <span>本次会话</span>
-        <button className="ib" title="收起检查器 ⌘B" onClick={onClose}>
+        <span>{tr("本次会话", "This session")}</span>
+        <button className="ib" title={tr("收起检查器 ⌘B", "Hide inspector ⌘B")} onClick={onClose}>
           <IconClose />
         </button>
       </div>
@@ -92,12 +93,12 @@ export default function Inspector({
 
       <section className="in-s">
         <div className="in-k">
-          <span>节奏看护</span>
+          <span>{tr("节奏看护", "Pace guard")}</span>
           <span className={`pill ${RISK_PILL[risk]}`}>{RISK_LABEL[risk]}</span>
         </div>
         <div className="in-fig">
           <span className="fig">{stats?.perMinute ?? 0}</span>
-          <span className="unit">次 / 分钟</span>
+          <span className="unit">{tr("次 / 分钟", "per minute")}</span>
         </div>
 
         <div className="spark">
@@ -114,14 +115,14 @@ export default function Inspector({
         </div>
 
         <div className="in-cap">
-          间隔中位数 <b>{stats?.medianGap ? `${stats.medianGap.toFixed(1)}s` : "—"}</b> · 本小时{" "}
-          <b>{stats?.lastHour ?? 0}</b> 次
+          {tr("间隔中位数", "Median gap")} <b>{stats?.medianGap ? `${stats.medianGap.toFixed(1)}s` : "—"}</b> · {tr("本小时", "This hour")}{" "}
+          <b>{stats?.lastHour ?? 0}</b>{tr(" 次", "")}
         </div>
       </section>
 
       <section className="in-s">
         <div className="in-k">
-          <span>上下文</span>
+          <span>{tr("上下文", "Context")}</span>
           <b className="mono">{usage ? `${contextPct(usage.input)}%` : "—"}</b>
         </div>
         <div className="ctx">
@@ -130,19 +131,19 @@ export default function Inspector({
         <div className="in-cap">
           {usage ? (
             <>
-              本轮 <b>{fmtTokens(usage.input)}</b> / 1M tokens
+              {tr("本轮", "This turn")} <b>{fmtTokens(usage.input)}</b> / 1M tokens
               {usage.model ? ` · ${shortModel(usage.model)}` : ""}
             </>
           ) : (
-            <>还没有读到用量记录（这个会话还没产生 API 调用）</>
+            <>{tr("还没有读到用量记录（这个会话还没产生 API 调用）", "No usage data yet (this session hasn't made any API calls)")}</>
           )}
         </div>
       </section>
 
       <section className="in-s">
         <div className="in-k">
-          <span>本次改动</span>
-          <span className="mono">{git?.changes.length ?? 0} 个文件</span>
+          <span>{tr("本次改动", "Changes")}</span>
+          <span className="mono">{tr(`${git?.changes.length ?? 0} 个文件`, `${git?.changes.length ?? 0} files`)}</span>
         </div>
 
         {(git?.changes ?? []).slice(0, 4).map((c) => (
@@ -163,13 +164,13 @@ export default function Inspector({
 
         {!git || git.changes.length === 0 ? (
           <div className="in-cap" style={{ padding: "2px 0 6px" }}>
-            工作区没有未提交的改动。
+            {tr("工作区没有未提交的改动。", "No uncommitted changes in the workspace.")}
           </div>
         ) : null}
 
         <button className="in-btn" onClick={onShowDiff} disabled={!git?.branch}>
           <IconCode size={13} />
-          查看全部改动
+          {tr("查看全部改动", "View all changes")}
           <span className="kbd">⌘D</span>
         </button>
       </section>
@@ -177,20 +178,20 @@ export default function Inspector({
       {/* 环境：这个会话到底从哪儿出去、以谁的身份 */}
       <section className="in-s">
         <div className="in-k">
-          <span>运行环境</span>
+          <span>{tr("运行环境", "Runtime")}</span>
           <span className="mono">{win?.runsClaude ? "claude" : "shell"}</span>
         </div>
         <div className="in-meta-inline">
           <div>
-            <span>账号</span>
+            <span>{tr("账号", "Account")}</span>
             <b>{accountLabel}</b>
           </div>
           <div>
-            <span>出口</span>
-            <b className="mono">{proxy ? proxyLabel(proxy) : "直连"}</b>
+            <span>{tr("出口", "Exit")}</span>
+            <b className="mono">{proxy ? proxyLabel(proxy) : tr("直连", "Direct")}</b>
           </div>
           <div>
-            <span>目录</span>
+            <span>{tr("目录", "Folder")}</span>
             <b className="mono" title={win?.cwd} style={{ cursor: "pointer" }}
                onClick={() => win && onCopy(win.cwd)}>
               {win?.cwd ? shorten(win.cwd) : "—"}
@@ -202,7 +203,7 @@ export default function Inspector({
 
       <section className="in-s" style={{ borderBottom: "none" }}>
         <div className="in-k">
-          <span>会话</span>
+          <span>{tr("会话", "Session")}</span>
           <span className="mono">
             {stats
               ? fmtDuration(stats.sessionSeconds)
@@ -213,18 +214,18 @@ export default function Inspector({
         </div>
         <div className="in-meta-inline">
           <div>
-            <span>项目</span>
+            <span>{tr("项目", "Project")}</span>
             <b>{win?.title ?? "—"}</b>
           </div>
           <div>
-            <span>分支</span>
+            <span>{tr("分支", "Branch")}</span>
             <b className="mono">{win?.branch ?? "—"}</b>
           </div>
           <div>
-            <span>启动于</span>
+            <span>{tr("启动于", "Started")}</span>
             <b className="mono">
               {win
-                ? new Date(win.startedAt).toLocaleTimeString("zh-CN", {
+                ? new Date(win.startedAt).toLocaleTimeString(tr("zh-CN", "en-US"), {
                     hour: "2-digit",
                     minute: "2-digit",
                   })
@@ -237,15 +238,15 @@ export default function Inspector({
       <section className="in-meta">
         <div>
           <span>
-            <IconKey size={11} /> 账号
+            <IconKey size={11} /> {tr("账号", "Account")}
           </span>
           <b className="mono">{accountEmail ?? accountLabel}</b>
         </div>
         <div>
           <span>
-            <IconGlobe size={11} /> 出口
+            <IconGlobe size={11} /> {tr("出口", "Exit")}
           </span>
-          <b className="mono">{proxy ? proxyLabel(proxy) : "直连"}</b>
+          <b className="mono">{proxy ? proxyLabel(proxy) : tr("直连", "Direct")}</b>
         </div>
       </section>
     </aside>
@@ -257,12 +258,14 @@ export function InspectorEmpty() {
   return (
     <aside className="insp">
       <div className="in-h">
-        <span>本次会话</span>
+        <span>{tr("本次会话", "This session")}</span>
       </div>
       <div className="empty-note">
-        <b>还没有活动会话</b>
-        在主页选一个目录，或从左侧挑一个历史会话。这里会显示它的节奏、上下文、
-        改动，以及它从哪个出口、以谁的身份在跑。
+        <b>{tr("还没有活动会话", "No active session")}</b>
+        {tr(
+          "在主页选一个目录，或从左侧挑一个历史会话。这里会显示它的节奏、上下文、改动，以及它从哪个出口、以谁的身份在跑。",
+          "Pick a folder on Home, or choose a past session from the left. Its pace, context, changes, exit and identity will show up here.",
+        )}
       </div>
     </aside>
   );

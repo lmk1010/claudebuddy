@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { tr } from "../lib/i18n";
 
 /**
  * 「这是什么？」小问号 —— 悬停或点击弹出一张说明卡。
@@ -33,7 +34,7 @@ export default function Help({ title, children, wide }: { title: string; childre
         ref={btn}
         type="button"
         className={`help${show ? " on" : ""}`}
-        aria-label={`说明：${title}`}
+        aria-label={tr(`说明：${title}`, `About: ${title}`)}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => !pinned && setOpen(false)}
         onClick={(e) => {

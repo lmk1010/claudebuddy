@@ -11,15 +11,16 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
+const { L } = require("./i18n.cjs");
 
 const SUPPORT = path.join(os.homedir(), "Library", "Application Support");
 
 /** Chromium 系：数据目录里的 Local State 记着全部用户资料 */
 const CHROMIUM = [
-  { key: "chrome", name: "Chrome", app: "Google Chrome", data: "Google/Chrome", privFlag: "--incognito", privName: "无痕窗口" },
-  { key: "edge", name: "Edge", app: "Microsoft Edge", data: "Microsoft Edge", privFlag: "--inprivate", privName: "InPrivate 窗口" },
-  { key: "brave", name: "Brave", app: "Brave Browser", data: "BraveSoftware/Brave-Browser", privFlag: "--incognito", privName: "无痕窗口" },
-  { key: "chromium", name: "Chromium", app: "Chromium", data: "Chromium", privFlag: "--incognito", privName: "无痕窗口" },
+  { key: "chrome", name: "Chrome", app: "Google Chrome", data: "Google/Chrome", privFlag: "--incognito", get privName() { return L("无痕窗口", "Incognito window"); } },
+  { key: "edge", name: "Edge", app: "Microsoft Edge", data: "Microsoft Edge", privFlag: "--inprivate", get privName() { return L("InPrivate 窗口", "InPrivate window"); } },
+  { key: "brave", name: "Brave", app: "Brave Browser", data: "BraveSoftware/Brave-Browser", privFlag: "--incognito", get privName() { return L("无痕窗口", "Incognito window"); } },
+  { key: "chromium", name: "Chromium", app: "Chromium", data: "Chromium", privFlag: "--incognito", get privName() { return L("无痕窗口", "Incognito window"); } },
 ];
 
 function appInstalled(app) {
@@ -46,7 +47,7 @@ function chromiumProfiles(b) {
  * @returns {{ id: string, label: string, sub: string, group: string, private?: boolean }[]}
  */
 function list() {
-  const out = [{ id: "system", label: "系统默认浏览器", sub: "", group: "default" }];
+  const out = [{ id: "system", label: L("系统默认浏览器", "System default browser"), sub: "", group: "default" }];
   const privs = [];
   for (const b of CHROMIUM) {
     if (!appInstalled(b.app)) continue;
@@ -56,16 +57,16 @@ function list() {
     } else {
       for (const p of profiles) out.push({ id: `${b.key}:${p.dir}`, label: `${b.name} · ${p.name}`, sub: p.email, group: "browser" });
     }
-    privs.push({ id: `${b.key}:private`, label: `${b.name} ${b.privName}`, sub: "不带任何已登录的账号", group: "private", private: true });
+    privs.push({ id: `${b.key}:private`, label: `${b.name} ${b.privName}`, sub: L("不带任何已登录的账号", "No signed-in accounts"), group: "private", private: true });
   }
   if (appInstalled("Firefox")) {
     out.push({ id: "firefox", label: "Firefox", sub: "", group: "browser" });
-    privs.push({ id: "firefox:private", label: "Firefox 隐私窗口", sub: "不带任何已登录的账号", group: "private", private: true });
+    privs.push({ id: "firefox:private", label: L("Firefox 隐私窗口", "Firefox private window"), sub: L("不带任何已登录的账号", "No signed-in accounts"), group: "private", private: true });
   }
   if (appInstalled("Arc")) out.push({ id: "arc", label: "Arc", sub: "", group: "browser" });
   if (fs.existsSync("/Applications/Safari.app")) out.push({ id: "safari", label: "Safari", sub: "", group: "browser" });
   out.push(...privs);
-  out.push({ id: "copy", label: "复制登录链接", sub: "自己粘到任意浏览器", group: "copy" });
+  out.push({ id: "copy", label: L("复制登录链接", "Copy sign-in link"), sub: L("自己粘到任意浏览器", "Paste it into any browser yourself"), group: "copy" });
   return out;
 }
 

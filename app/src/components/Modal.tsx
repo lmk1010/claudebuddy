@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { tr } from "../lib/i18n";
 
 /**
  * 弹窗外壳 —— 遮罩盖住整扇窗（包括侧栏），进出都有动画。
@@ -107,7 +108,7 @@ export function ConfirmDialog({
           <p>{body}</p>
           <div className="confirm-acts">
             <button className="btn ghost" onClick={close}>
-              取消
+              {tr("取消", "Cancel")}
             </button>
             <button
               ref={okRef}

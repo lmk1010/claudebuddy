@@ -16,6 +16,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const crypto = require("node:crypto");
 const { execFile, spawnSync } = require("node:child_process");
+const { L } = require("./i18n.cjs");
 
 const HOME = process.env.CLAUDE_BUDDY_HOME || os.homedir();
 
@@ -405,18 +406,18 @@ function dirSize(dir, budget) {
  * 清理时按 key 查回 path，两边用同一张表，避免"界面能勾但清不掉"。
  */
 const TRACE_ITEMS = [
-  { key: "projects", label: "对话记录", path: "projects", critical: true },
-  { key: "fileHistory", label: "文件历史快照", path: "file-history", critical: true },
-  { key: "history", label: "输入历史", path: "history.jsonl", critical: true },
-  { key: "telemetry", label: "遥测事件", path: "telemetry", critical: true },
-  { key: "stats", label: "行为画像", path: "stats-cache.json", critical: false },
-  { key: "identity", label: "身份文件", path: ".claude.json", critical: true },
-  { key: "credentials", label: "登录凭据", path: "credentials.json", critical: true },
-  { key: "uploads", label: "上传文件", path: "uploads", critical: false },
-  { key: "pasteCache", label: "粘贴缓存", path: "paste-cache", critical: false },
-  { key: "backups", label: "配置备份", path: "backups", critical: false },
-  { key: "shellSnapshots", label: "shell 快照", path: "shell-snapshots", critical: false },
-  { key: "plugins", label: "插件", path: "plugins", critical: false },
+  { key: "projects", get label() { return L("对话记录", "Conversation history"); }, path: "projects", critical: true },
+  { key: "fileHistory", get label() { return L("文件历史快照", "File history snapshots"); }, path: "file-history", critical: true },
+  { key: "history", get label() { return L("输入历史", "Input history"); }, path: "history.jsonl", critical: true },
+  { key: "telemetry", get label() { return L("遥测事件", "Telemetry events"); }, path: "telemetry", critical: true },
+  { key: "stats", get label() { return L("行为画像", "Usage profile"); }, path: "stats-cache.json", critical: false },
+  { key: "identity", get label() { return L("身份文件", "Identity file"); }, path: ".claude.json", critical: true },
+  { key: "credentials", get label() { return L("登录凭据", "Sign-in credentials"); }, path: "credentials.json", critical: true },
+  { key: "uploads", get label() { return L("上传文件", "Uploaded files"); }, path: "uploads", critical: false },
+  { key: "pasteCache", get label() { return L("粘贴缓存", "Paste cache"); }, path: "paste-cache", critical: false },
+  { key: "backups", get label() { return L("配置备份", "Config backups"); }, path: "backups", critical: false },
+  { key: "shellSnapshots", get label() { return L("shell 快照", "Shell snapshots"); }, path: "shell-snapshots", critical: false },
+  { key: "plugins", get label() { return L("插件", "Plugins"); }, path: "plugins", critical: false },
 ];
 
 function inspectTraces(account) {
@@ -530,7 +531,7 @@ function writeCredential(account, full) {
 async function refreshTokenIfNeeded(account, { force = false } = {}) {
   const full = readCredential(account);
   if (!full || !full.claudeAiOauth) {
-    return { ok: false, reason: "没有可读的凭据" };
+    return { ok: false, reason: L("没有可读的凭据", "No readable credentials") };
   }
   const o = full.claudeAiOauth;
   const exp = Number(o.expiresAt || 0);
@@ -539,7 +540,7 @@ async function refreshTokenIfNeeded(account, { force = false } = {}) {
     return { ok: true, refreshed: false, expiresAt: exp };
   }
   if (!o.refreshToken) {
-    return { ok: false, reason: "没有 refresh token，需要重新登录" };
+    return { ok: false, reason: L("没有 refresh token，需要重新登录", "No refresh token; sign in again") };
   }
 
   const body = JSON.stringify({
@@ -570,14 +571,14 @@ async function refreshTokenIfNeeded(account, { force = false } = {}) {
           try {
             resolve({ ok: true, data: JSON.parse(buf) });
           } catch {
-            resolve({ ok: false, reason: "返回不是 JSON" });
+            resolve({ ok: false, reason: L("返回不是 JSON", "Response is not JSON") });
           }
         });
       }
     );
     req.on("timeout", () => {
       req.destroy();
-      resolve({ ok: false, reason: "超时" });
+      resolve({ ok: false, reason: L("超时", "Timed out") });
     });
     req.on("error", (e) => resolve({ ok: false, reason: String(e.code || e.message) }));
     req.end(body);
@@ -598,7 +599,7 @@ async function refreshTokenIfNeeded(account, { force = false } = {}) {
   full.claudeAiOauth = o;
 
   const written = writeCredential(account, full);
-  return { ok: written, refreshed: true, expiresAt: o.expiresAt, error: written ? undefined : "写入 Keychain 失败" };
+  return { ok: written, refreshed: true, expiresAt: o.expiresAt, error: written ? undefined : L("写入 Keychain 失败", "Failed to write to Keychain") };
 }
 
 /**
@@ -622,18 +623,18 @@ function clearTraces(account, keys, { includeCredentials = false } = {}) {
   for (const key of keys || []) {
     const item = byKey.get(key);
     if (!item) {
-      failed.push({ key, reason: "不在可清理范围内" });
+      failed.push({ key, reason: L("不在可清理范围内", "Not in the cleanable scope") });
       continue;
     }
     if (!includeCredentials && (item.key === "credentials" || item.key === "identity")) {
-      failed.push({ key, reason: "删了会掉登录，已跳过" });
+      failed.push({ key, reason: L("删了会掉登录，已跳过", "Deleting it would sign you out; skipped") });
       continue;
     }
 
     const target = path.join(dir, item.path);
     // 双保险：解析后的路径必须还在配置目录里
     if (!path.resolve(target).startsWith(path.resolve(dir) + path.sep)) {
-      failed.push({ key, reason: "路径越界" });
+      failed.push({ key, reason: L("路径越界", "Path is out of bounds") });
       continue;
     }
 
@@ -744,7 +745,7 @@ function listSessions(account, limit = 50) {
         id: f.replace(/\.jsonl$/, ""),
         cwd: decodeProjectDir(d.name) || d.name,
         project: path.basename(decodeProjectDir(d.name) || d.name),
-        title: title || "（无标题会话）",
+        title: title || L("（无标题会话）", "(Untitled session)"),
         sizeBytes: st.size,
         lastActive: st.mtimeMs,
       });
@@ -783,10 +784,10 @@ function removeAccountDir(account) {
   const dir = configDirOf(account);
   // 默认环境是用户自己的 ~/.claude，绝不允许从这里删
   if (account.configDir === ".claude") {
-    return { ok: false, reason: "默认环境指向 ~/.claude，不提供删除" };
+    return { ok: false, reason: L("默认环境指向 ~/.claude，不提供删除", "The default environment points to ~/.claude and cannot be deleted") };
   }
   if (!/^\.claude(-[a-z0-9-]+)?$/.test(account.configDir)) {
-    return { ok: false, reason: "目录名不合规" };
+    return { ok: false, reason: L("目录名不合规", "Invalid directory name") };
   }
   try {
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });

@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { ShellWindow } from "../lib/model";
 import { resolveTermTheme } from "../lib/termThemes";
+import { tr } from "../lib/i18n";
 
 /**
  * 一个窗口的终端视图。
@@ -99,7 +100,7 @@ export default function TerminalView({
     });
     const offExit = window.claudeBuddy.onTermExit((p) => {
       if (p.id !== win.id) return;
-      term.write(`\r\n\x1b[38;5;244m[进程已退出，代码 ${p.exitCode}]\x1b[0m\r\n`);
+      term.write(`\r\n\x1b[38;5;244m[${tr(`进程已退出，代码 ${p.exitCode}`, `Process exited, code ${p.exitCode}`)}]\x1b[0m\r\n`);
     });
 
     const dims = { cols: term.cols, rows: term.rows };
@@ -115,7 +116,7 @@ export default function TerminalView({
       .then((r) => {
         if (!r.ok) {
           term.write(
-            `\x1b[38;5;173m启动失败：${r.error ?? "未知错误"}\x1b[0m\r\n`,
+            `\x1b[38;5;173m${tr("启动失败", "Failed to start")}: ${r.error ?? tr("未知错误", "Unknown error")}\x1b[0m\r\n`,
           );
         }
       });

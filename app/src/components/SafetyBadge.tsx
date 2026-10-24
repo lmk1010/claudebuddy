@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Account, AccountStatusSnapshot } from "../lib/model";
+import { tr } from "../lib/i18n";
 
 /**
  * 安全状态 —— 一个始终可见的"可信环境"指示器。
@@ -50,7 +51,7 @@ export function assessSafety(
   if (!account) {
     return {
       level: "warn",
-      issues: [{ key: "no-account", text: "还没有环境", fix: "先建一个", level: "warn" }],
+      issues: [{ key: "no-account", text: tr("还没有环境", "No environment yet"), fix: tr("先建一个", "Create one first"), level: "warn" }],
       passed: 0,
       total,
     };
@@ -60,11 +61,11 @@ export function assessSafety(
   const auth = status?.auth ?? account.auth;
   if (auth === "signedIn") passed++;
   else if (auth === "suspended")
-    issues.push({ key: "auth", text: "账号已被挂起", fix: "换一个账号", level: "danger" });
+    issues.push({ key: "auth", text: tr("账号已被挂起", "Account suspended"), fix: tr("换一个账号", "Switch to another account"), level: "danger" });
   else if (auth === "expired")
-    issues.push({ key: "auth", text: "登录凭据已失效", fix: "重新登录", level: "danger" });
+    issues.push({ key: "auth", text: tr("登录凭据已失效", "Sign-in expired"), fix: tr("重新登录", "Sign in again"), level: "danger" });
   else
-    issues.push({ key: "auth", text: "这个环境还没登录", fix: "去登录", level: "warn" });
+    issues.push({ key: "auth", text: tr("这个环境还没登录", "This environment isn't signed in"), fix: tr("去登录", "Sign in"), level: "warn" });
 
   // ② 出口已配置
   const hasProxy = account.proxy.protocol !== "none";
@@ -72,8 +73,8 @@ export function assessSafety(
   else
     issues.push({
       key: "proxy",
-      text: "走的是直连，出口 IP 和本机一样",
-      fix: "配一个代理",
+      text: tr("走的是直连，出口 IP 和本机一样", "Direct connection; exit IP matches this Mac"),
+      fix: tr("配一个代理", "Set up a proxy"),
       level: "warn",
     });
 
@@ -82,8 +83,8 @@ export function assessSafety(
   if (exitIp && last && exitIp !== last) {
     issues.push({
       key: "ip",
-      text: `出口 IP 从 ${last} 变成 ${exitIp}`,
-      fix: "确认是不是你主动换的",
+      text: tr(`出口 IP 从 ${last} 变成 ${exitIp}`, `Exit IP changed from ${last} to ${exitIp}`),
+      fix: tr("确认是不是你主动换的", "Check that you changed it on purpose"),
       level: "warn",
     });
   } else {
@@ -95,8 +96,8 @@ export function assessSafety(
   else
     issues.push({
       key: "identity",
-      text: "还没生成独立设备码",
-      fix: "首次启动后自动生成",
+      text: tr("还没生成独立设备码", "No device ID generated yet"),
+      fix: tr("首次启动后自动生成", "Generated automatically on first launch"),
       level: "warn",
     });
 
@@ -110,9 +111,9 @@ export function assessSafety(
 }
 
 const LABEL: Record<SafetyLevel, string> = {
-  safe: "环境就绪",
-  warn: "有需要注意的",
-  danger: "需要处理",
+  get safe() { return tr("环境就绪", "Environment ready"); },
+  get warn() { return tr("有需要注意的", "Needs attention"); },
+  get danger() { return tr("需要处理", "Action required"); },
 };
 
 /**
@@ -142,7 +143,7 @@ export default function SafetyBadge({
     <button
       className={`safe safe-${report.level}${breathe ? " breathe" : ""}`}
       onClick={onToggle}
-      title={report.issues.map((i) => i.text).join("；") || "全部检查通过"}
+      title={report.issues.map((i) => i.text).join("；") || tr("全部检查通过", "All checks passed")}
     >
       <span className="safe-dot">
         <i />
@@ -151,8 +152,8 @@ export default function SafetyBadge({
         <b>{LABEL[report.level]}</b>
         <small>
           {report.level === "safe"
-            ? `${report.passed}/${report.total} 项通过`
-            : `${report.issues.length} 项待处理`}
+            ? tr(`${report.passed}/${report.total} 项通过`, `${report.passed}/${report.total} passed`)
+            : tr(`${report.issues.length} 项待处理`, `${report.issues.length} to resolve`)}
         </small>
       </span>
       {onToggle && (
@@ -172,7 +173,7 @@ export function SafetyDetails({ report }: { report: SafetyReport }) {
     return (
       <div className="safe-detail">
         <div className="safe-ok">
-          <span>目录、出口、设备码、终端画像都已就位。</span>
+          <span>{tr("目录、出口、设备码、终端画像都已就位。", "Folder, exit, device ID and terminal profile are all in place.")}</span>
         </div>
       </div>
     );

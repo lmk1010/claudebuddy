@@ -10,6 +10,7 @@ import IpBadge from "./IpBadge";
 import NetReportCard from "./NetReport";
 import LoginButton from "./LoginButton";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
+import { tr } from "../lib/i18n";
 import type { ProxyCandidate } from "../lib/bridge";
 import {
   IconCheck,
@@ -60,42 +61,51 @@ export default function Accounts(p: Props) {
   const envMenu = (a: Account): MenuItem[] => {
     const signedIn = (p.status[a.id]?.auth ?? a.auth) === "signedIn";
     return [
-      { label: "编辑…", icon: <IconGear size={14} />, hint: "↵", run: () => p.onOpenDetail(a) },
+      { label: tr("编辑…", "Edit…"), icon: <IconGear size={14} />, hint: "↵", run: () => p.onOpenDetail(a) },
       {
-        label: "设为当前环境",
+        label: tr("设为当前环境", "Set as current environment"),
         icon: <IconCheck size={14} />,
         disabled: a.id === p.activeId,
         run: () => p.onSetActive(a.id),
       },
-      { label: "在这个环境新建会话", icon: <IconTerminal size={14} />, run: () => p.onNewIn(a.id) },
+      { label: tr("在这个环境新建会话", "New session in this environment"), icon: <IconTerminal size={14} />, run: () => p.onNewIn(a.id) },
       "sep",
       signedIn
-        ? { label: "退出登录", icon: <IconKey size={14} />, run: () => p.onLogout(a.id) }
-        : { label: "登录…", icon: <IconKey size={14} />, run: () => p.onLogin(a.id) },
-      { label: "网络出口…", icon: <IconGlobe size={14} />, run: () => p.onOpenDetail(a, "network") },
-      { label: "检测出口 IP", icon: <IconRefresh size={14} />, run: () => p.onCheckExit(a.id) },
+        ? { label: tr("退出登录", "Sign out"), icon: <IconKey size={14} />, run: () => p.onLogout(a.id) }
+        : { label: tr("登录…", "Sign in…"), icon: <IconKey size={14} />, run: () => p.onLogin(a.id) },
+      { label: tr("网络出口…", "Network exit…"), icon: <IconGlobe size={14} />, run: () => p.onOpenDetail(a, "network") },
+      { label: tr("检测出口 IP", "Check exit IP"), icon: <IconRefresh size={14} />, run: () => p.onCheckExit(a.id) },
       "sep",
-      { label: "复制配置目录路径", icon: <IconCopy size={14} />, run: () => p.onCopy(`~/${a.configDir}`) },
-      { label: "在访达中打开目录", icon: <IconFile size={14} />, run: () => p.onReveal(`~/${a.configDir}`) },
+      { label: tr("复制配置目录路径", "Copy config directory path"), icon: <IconCopy size={14} />, run: () => p.onCopy(`~/${a.configDir}`) },
+      { label: tr("在访达中打开目录", "Show in Finder"), icon: <IconFile size={14} />, run: () => p.onReveal(`~/${a.configDir}`) },
       "sep",
-      { label: "删除环境…", icon: <IconTrash size={14} />, danger: true, run: () => p.onOpenDetail(a, "clean") },
+      { label: tr("删除环境…", "Delete environment…"), icon: <IconTrash size={14} />, danger: true, run: () => p.onOpenDetail(a, "clean") },
     ];
   };
   return (
     <div className="pg">
       <div className="pg-h">
         <div>
-          <h1>环境</h1>
-          <p>{p.accounts.length} 个环境 · 全部本机存储 · 每个独立目录、独立出口</p>
+          <h1>{tr("环境", "Environments")}</h1>
+          <p>
+            {tr(
+              `${p.accounts.length} 个环境 · 全部本机存储 · 每个独立目录、独立出口`,
+              `${p.accounts.length} environments · Stored locally · Each with its own directory and exit`,
+            )}
+          </p>
         </div>
         <div className="pg-acts">
-          <button className="btn" onClick={p.onScanImport} title="导入本机已有的 ~/.claude* 目录">
+          <button
+            className="btn"
+            onClick={p.onScanImport}
+            title={tr("导入本机已有的 ~/.claude* 目录", "Import existing ~/.claude* directories on this Mac")}
+          >
             <IconRefresh />
-            导入
+            {tr("导入", "Import")}
           </button>
           <button className="btn pri" onClick={p.onCreate}>
             <IconPlus />
-            新建环境
+            {tr("新建环境", "New environment")}
           </button>
         </div>
       </div>
@@ -103,14 +113,16 @@ export default function Accounts(p: Props) {
       {!p.bannerDismissed && (
         <div className="banner">
           <div>
-            <b>每个环境一间屋子</b>
+            <b>{tr("每个环境一间屋子", "One room per environment")}</b>
             <p>
-              凭据、对话记录、file-history 全落在各自的配置目录里。切环境就是换一间屋子，
-              不会串号，也不用反复登录。
+              {tr(
+                "凭据、对话记录、file-history 全落在各自的配置目录里。切环境就是换一间屋子，不会串号，也不用反复登录。",
+                "Credentials, conversation history and file-history all live in each environment's own config directory. Switching environments is like walking into another room: no mixed-up accounts, no repeated sign-ins.",
+              )}
             </p>
           </div>
           <Art name="isolation" />
-          <button className="banner-x" title="不再显示" onClick={p.onDismissBanner}>
+          <button className="banner-x" title={tr("不再显示", "Don't show again")} onClick={p.onDismissBanner}>
             <IconClose size={13} />
           </button>
         </div>
@@ -128,7 +140,7 @@ export default function Accounts(p: Props) {
               className={`ar${on ? " on" : ""}`}
               onClick={() => p.onOpenDetail(a)}
               onContextMenu={(e) => menu.open(e, envMenu(a), a.label)}
-              title="点开编辑 · 右键更多"
+              title={tr("点开编辑 · 右键更多", "Click to edit · Right-click for more")}
             >
               <span className="av" style={{ background: a.tint }}>
                 {a.label.slice(0, 1)}
@@ -136,7 +148,7 @@ export default function Accounts(p: Props) {
               <span className="an">
                 <b>
                   {a.label}
-                  {on && <em className="ar-cur">当前</em>}
+                  {on && <em className="ar-cur">{tr("当前", "Current")}</em>}
                 </b>
                 <small>
                   <span className="mono">~/{a.configDir}</span>
@@ -144,14 +156,14 @@ export default function Accounts(p: Props) {
                 </small>
               </span>
               <span className="as" title={proxyLabel(a.proxy)}>
-                {a.proxy.protocol === "none" ? "直连" : a.proxy.protocol.toUpperCase()}
+                {a.proxy.protocol === "none" ? tr("直连", "Direct") : a.proxy.protocol.toUpperCase()}
               </span>
-              <span className="as">{n > 0 ? `${n} 个会话` : relTime(a.lastUsedAt)}</span>
+              <span className="as">{n > 0 ? tr(`${n} 个会话`, `${n} sessions`) : relTime(a.lastUsedAt)}</span>
               <span className={`pill ${AUTH_PILL[auth]}`}>{AUTH_LABEL[auth]}</span>
               <span
                 className="ar-more"
                 role="button"
-                title="更多"
+                title={tr("更多", "More")}
                 onClick={(e) => {
                   e.stopPropagation();
                   const r = e.currentTarget.getBoundingClientRect();
@@ -164,7 +176,12 @@ export default function Accounts(p: Props) {
           );
         })}
       </div>
-      <div className="pg-foot">点一行编辑：登录、网络出口、设备身份、痕迹清理都在里面。右键或「⋯」有更多操作。</div>
+      <div className="pg-foot">
+        {tr(
+          "点一行编辑：登录、网络出口、设备身份、痕迹清理都在里面。右键或「⋯」有更多操作。",
+          "Click a row to edit: sign-in, network exit, device identity and trace cleanup are all inside. Right-click or use “⋯” for more.",
+        )}
+      </div>
       {menu.node}
     </div>
   );
@@ -186,27 +203,41 @@ export function CreateEnvDialog({
   const dup = existing.includes(v);
   const ok = Boolean(v) && !dup;
   return (
-    <Modal onClose={onClose} className="dlg-sm" label="新建环境">
+    <Modal onClose={onClose} className="dlg-sm" label={tr("新建环境", "New environment")}>
       {(close) => (
         <>
           <div className="dlg-h">
-            <h2>新建环境</h2>
-            <button className="ib" title="关闭 esc" onClick={close}>
+            <h2>{tr("新建环境", "New environment")}</h2>
+            <button className="ib" title={tr("关闭 esc", "Close esc")} onClick={close}>
               <IconClose />
             </button>
           </div>
-          <p>环境 = 一个独立的 Claude Code 配置目录。一个 Claude 账号放一个环境，互相不串号、不用反复登录。</p>
+          <p>
+            {tr(
+              "环境 = 一个独立的 Claude Code 配置目录。一个 Claude 账号放一个环境，互相不串号、不用反复登录。",
+              "An environment is a separate Claude Code config directory. Use one environment per Claude account so accounts never mix and you don't have to sign in repeatedly.",
+            )}
+          </p>
           <div className="dlg-guide">
             <Steps
               items={[
                 <>
-                  <b>起个名字</b>，比如账号的用途或邮箱前缀（主力、工作…）
+                  <b>{tr("起个名字", "Pick a name")}</b>
+                  {tr("，比如账号的用途或邮箱前缀（主力、工作…）", ", such as the account's purpose or email prefix (Main, Work…)")}
                 </>,
                 <>
-                  <b>登录授权</b>：建好会自动打开编辑页，点「登录」在浏览器里授权
+                  <b>{tr("登录授权", "Sign in")}</b>
+                  {tr(
+                    "：建好会自动打开编辑页，点「登录」在浏览器里授权",
+                    ": the editor opens after creation. Click “Sign in” to authorize in your browser",
+                  )}
                 </>,
                 <>
-                  <b>网络出口（可选）</b>：用梯子的话点「自动探测」选一个，多个号建议各走各的
+                  <b>{tr("网络出口（可选）", "Network exit (optional)")}</b>
+                  {tr(
+                    "：用梯子的话点「自动探测」选一个，多个号建议各走各的",
+                    ": if you use a proxy, click “Auto-detect” and pick one. With multiple accounts, give each its own",
+                  )}
                 </>,
               ]}
             />
@@ -215,7 +246,7 @@ export function CreateEnvDialog({
             className="dlg-in"
             autoFocus
             value={name}
-            placeholder="名字，例如 主力 / 工作"
+            placeholder={tr("名字，例如 主力 / 工作", "Name, e.g. Main / Work")}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && ok && !e.nativeEvent.isComposing) {
@@ -224,10 +255,10 @@ export function CreateEnvDialog({
               }
             }}
           />
-          <div className="dlg-err">{dup ? "已经有同名环境了" : " "}</div>
+          <div className="dlg-err">{dup ? tr("已经有同名环境了", "An environment with this name already exists") : " "}</div>
           <div className="dlg-acts">
             <button className="btn ghost" onClick={close}>
-              取消
+              {tr("取消", "Cancel")}
             </button>
             <button
               className="btn pri"
@@ -237,7 +268,7 @@ export function CreateEnvDialog({
                 close();
               }}
             >
-              创建并编辑
+              {tr("创建并编辑", "Create and edit")}
             </button>
           </div>
         </>
@@ -260,18 +291,23 @@ export function ImportDialog({
   onClose: () => void;
 }) {
   return (
-    <Modal onClose={onClose} className="dlg-md" label="导入已有环境">
+    <Modal onClose={onClose} className="dlg-md" label={tr("导入已有环境", "Import existing environments")}>
       {(close) => (
         <>
           <div className="dlg-h">
-            <h2>导入已有环境</h2>
-            <button className="ib" title="关闭 esc" onClick={close}>
+            <h2>{tr("导入已有环境", "Import existing environments")}</h2>
+            <button className="ib" title={tr("关闭 esc", "Close esc")} onClick={close}>
               <IconClose />
             </button>
           </div>
-          <p>本机扫到的 Claude Code 配置目录。导入只是登记，不会动目录里的任何东西。</p>
+          <p>
+            {tr(
+              "本机扫到的 Claude Code 配置目录。导入只是登记，不会动目录里的任何东西。",
+              "Claude Code config directories found on this Mac. Importing only registers them and doesn't change anything inside.",
+            )}
+          </p>
           {list.length === 0 ? (
-            <div className="imp-empty">没有找到可导入的目录。</div>
+            <div className="imp-empty">{tr("没有找到可导入的目录。", "No directories found to import.")}</div>
           ) : (
             <div className="imp-list">
               {list.map((d) => {
@@ -281,17 +317,17 @@ export function ImportDialog({
                     <span className="imp-main">
                       <b className="mono">~/{d.configDir}</b>
                       <small>
-                        {d.email ?? "未登录"}
-                        {d.tier ? ` · ${tierLabel(d.tier)}` : ""} · {d.sessions} 个会话 · {fmtSize(d.sizeBytes)}
+                        {d.email ?? tr("未登录", "Signed out")}
+                        {d.tier ? ` · ${tierLabel(d.tier)}` : ""} · {tr(`${d.sessions} 个会话`, `${d.sessions} sessions`)} · {fmtSize(d.sizeBytes)}
                         {d.lastActive ? ` · ${relTime(d.lastActive)}` : ""}
                       </small>
                     </span>
                     <button
                       className={`btn${done ? " ghost" : ""}`}
                       disabled={done}
-                      onClick={() => onImport(d.configDir, d.configDir.replace(/^\.claude-?/, "") || "个人")}
+                      onClick={() => onImport(d.configDir, d.configDir.replace(/^\.claude-?/, "") || tr("个人", "Personal"))}
                     >
-                      {done ? "已导入" : "导入"}
+                      {done ? tr("已导入", "Imported") : tr("导入", "Import")}
                     </button>
                   </div>
                 );
@@ -300,7 +336,7 @@ export function ImportDialog({
           )}
           <div className="dlg-acts">
             <button className="btn ghost" onClick={close}>
-              完成
+              {tr("完成", "Done")}
             </button>
           </div>
         </>
@@ -318,11 +354,65 @@ export type EnvSection = "general" | "network" | "fingerprint" | "sessions" | "c
  * 之前七项（身份、画像、痕迹、删除各占一格）太碎，同一件事要在两三个菜单里找。
  */
 const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof IconGear }[] = [
-  { id: "general", label: "通用", desc: "名字、标识色和登录", icon: IconGear },
-  { id: "network", label: "网络出口", desc: "这个环境走哪条线路出去，以及 Claude 看到的出口质量", icon: IconGlobe },
-  { id: "fingerprint", label: "设备指纹", desc: "设备 ID、终端类型、语言、时区 —— 都会随请求上报", icon: IconShield },
-  { id: "sessions", label: "历史会话", desc: "这个环境跑过的会话，点一条在原目录里接着开", icon: IconClock },
-  { id: "clean", label: "清理", desc: "这个环境在磁盘和 Keychain 里留下的东西，以及删除环境", icon: IconTrash },
+  {
+    id: "general",
+    get label() {
+      return tr("通用", "General");
+    },
+    get desc() {
+      return tr("名字、标识色和登录", "Name, color and sign-in");
+    },
+    icon: IconGear,
+  },
+  {
+    id: "network",
+    get label() {
+      return tr("网络出口", "Network exit");
+    },
+    get desc() {
+      return tr(
+        "这个环境走哪条线路出去，以及 Claude 看到的出口质量",
+        "Which route this environment uses, and the exit quality Claude sees",
+      );
+    },
+    icon: IconGlobe,
+  },
+  {
+    id: "fingerprint",
+    get label() {
+      return tr("设备指纹", "Device fingerprint");
+    },
+    get desc() {
+      return tr(
+        "设备 ID、终端类型、语言、时区 —— 都会随请求上报",
+        "Device ID, terminal type, language and time zone, all reported with requests",
+      );
+    },
+    icon: IconShield,
+  },
+  {
+    id: "sessions",
+    get label() {
+      return tr("历史会话", "Session history");
+    },
+    get desc() {
+      return tr("这个环境跑过的会话，点一条在原目录里接着开", "Sessions run in this environment. Click one to resume it in its original directory");
+    },
+    icon: IconClock,
+  },
+  {
+    id: "clean",
+    get label() {
+      return tr("清理", "Clean up");
+    },
+    get desc() {
+      return tr(
+        "这个环境在磁盘和 Keychain 里留下的东西，以及删除环境",
+        "What this environment left on disk and in Keychain, and deleting the environment",
+      );
+    },
+    icon: IconTrash,
+  },
 ];
 
 /**
@@ -419,7 +509,7 @@ export function EnvModal({
   const meta = SECTIONS.find((s) => s.id === sec) ?? SECTIONS[0];
 
   return (
-    <Modal onClose={onClose} className="em" label={`编辑 ${account.label}`}>
+    <Modal onClose={onClose} className="em" label={tr(`编辑 ${account.label}`, `Edit ${account.label}`)}>
       {(close) => (
         <>
           <aside className="em-side">
@@ -444,7 +534,7 @@ export function EnvModal({
                 >
                   <s.icon size={15} />
                   <span>{s.label}</span>
-                  {s.id === "general" && auth !== "signedIn" && <em className="em-badge" title="还没登录" />}
+                  {s.id === "general" && auth !== "signedIn" && <em className="em-badge" title={tr("还没登录", "Not signed in yet")} />}
                 </button>
               ))}
             </div>
@@ -460,7 +550,7 @@ export function EnvModal({
                 <h2>{meta.label}</h2>
                 <p>{meta.desc}</p>
               </div>
-              <button className="ib" title="关闭 esc" onClick={close}>
+              <button className="ib" title={tr("关闭 esc", "Close esc")} onClick={close}>
                 <IconClose />
               </button>
             </div>
@@ -501,59 +591,81 @@ export function EnvModal({
               {sec === "fingerprint" && (
                 <>
                   <div className="em-sub">
-                    <span>设备身份</span>
+                    <span>{tr("设备身份", "Device identity")}</span>
                   </div>
                   <div className="em-card">
-                    <Row title="userID" desc="遥测里的 device_id">
-                      <code className="em-code">{status?.identity.userID ? `${status.identity.userID.slice(0, 18)}…` : "尚未生成"}</code>
-                    </Row>
-                    <Row title="machineID" desc="第一次启动 Claude Code 时生成">
+                    <Row title="userID" desc={tr("遥测里的 device_id", "The device_id in telemetry")}>
                       <code className="em-code">
-                        {status?.identity.machineID ? `${status.identity.machineID.slice(0, 18)}…` : "尚未生成"}
+                        {status?.identity.userID ? `${status.identity.userID.slice(0, 18)}…` : tr("尚未生成", "Not generated yet")}
+                      </code>
+                    </Row>
+                    <Row title="machineID" desc={tr("第一次启动 Claude Code 时生成", "Generated the first time Claude Code starts")}>
+                      <code className="em-code">
+                        {status?.identity.machineID ? `${status.identity.machineID.slice(0, 18)}…` : tr("尚未生成", "Not generated yet")}
                       </code>
                     </Row>
                     <Row
-                      title="轮换设备身份"
-                      desc="重置这台机器的画像，账号本身不变"
+                      title={tr("轮换设备身份", "Rotate device identity")}
+                      desc={tr("重置这台机器的画像，账号本身不变", "Resets this machine's profile. The account itself is unchanged")}
                       tip={
-                        <Help title="什么时候需要轮换？">
-                          <p>Claude Code 会生成一串 userID 当作「这台设备」上报。几个号用同一串，看起来就是同一台机器。</p>
-                          <p>新建的环境本来就各自独立，一般不用动。只有从别处拷过来的目录、或者怀疑被关联时才点。轮换不会掉登录。</p>
+                        <Help title={tr("什么时候需要轮换？", "When should I rotate?")}>
+                          <p>
+                            {tr(
+                              "Claude Code 会生成一串 userID 当作「这台设备」上报。几个号用同一串，看起来就是同一台机器。",
+                              "Claude Code generates a userID and reports it as “this device”. If several accounts share one, they look like the same machine.",
+                            )}
+                          </p>
+                          <p>
+                            {tr(
+                              "新建的环境本来就各自独立，一般不用动。只有从别处拷过来的目录、或者怀疑被关联时才点。轮换不会掉登录。",
+                              "New environments are already independent, so you usually don't need this. Use it only for directories copied from elsewhere, or if you suspect accounts are linked. Rotating won't sign you out.",
+                            )}
+                          </p>
                         </Help>
                       }
                     >
                       <button className="btn" onClick={onRotate} disabled={busy}>
                         <IconShield />
-                        {busy ? "处理中…" : "轮换"}
+                        {busy ? tr("处理中…", "Working…") : tr("轮换", "Rotate")}
                       </button>
                     </Row>
                   </div>
                   <div className="em-sub">
-                    <span>终端画像</span>
+                    <span>{tr("终端画像", "Terminal profile")}</span>
                   </div>
                   <div className="em-card">
-                    <Row title="终端类型" desc="TERM / TERM_PROGRAM">
+                    <Row title={tr("终端类型", "Terminal type")} desc="TERM / TERM_PROGRAM">
                       <code className="em-code">{account.terminal?.term ?? "—"}</code>
                     </Row>
-                    <Row title="语言" desc="LANG">
+                    <Row title={tr("语言", "Language")} desc="LANG">
                       <code className="em-code">{account.terminal?.lang ?? "—"}</code>
                     </Row>
-                    <Row title="时区" desc="TZ">
+                    <Row title={tr("时区", "Time zone")} desc="TZ">
                       <code className="em-code">{account.terminal?.tz ?? "—"}</code>
                     </Row>
                     <Row
-                      title="和其他环境拉开差距"
-                      desc="换一组跟现有环境都不重样的画像"
+                      title={tr("和其他环境拉开差距", "Differentiate from other environments")}
+                      desc={tr("换一组跟现有环境都不重样的画像", "Pick a profile that differs from all existing environments")}
                       tip={
-                        <Help title="终端画像是什么？">
-                          <p>终端类型、语言、时区会随请求上报。几个环境一模一样，就少了一层区分。</p>
-                          <p>点「换一组」会自动挑一组跟其他环境都不重复的值，下次开会话生效。不影响你实际使用。</p>
+                        <Help title={tr("终端画像是什么？", "What is a terminal profile?")}>
+                          <p>
+                            {tr(
+                              "终端类型、语言、时区会随请求上报。几个环境一模一样，就少了一层区分。",
+                              "Terminal type, language and time zone are reported with requests. If several environments are identical, they're harder to tell apart.",
+                            )}
+                          </p>
+                          <p>
+                            {tr(
+                              "点「换一组」会自动挑一组跟其他环境都不重复的值，下次开会话生效。不影响你实际使用。",
+                              "Click “Shuffle” to pick values no other environment uses. It takes effect for the next session and doesn't affect how you work.",
+                            )}
+                          </p>
                         </Help>
                       }
                     >
                       <button className="btn" onClick={onDiversify}>
                         <IconRefresh />
-                        换一组
+                        {tr("换一组", "Shuffle")}
                       </button>
                     </Row>
                   </div>
@@ -561,7 +673,7 @@ export function EnvModal({
                   {similar && (
                     <div className="sim">
                       <div className="sim-head">
-                        <span>与「{similar.otherLabel}」的对比</span>
+                        <span>{tr(`与「${similar.otherLabel}」的对比`, `Compared with “${similar.otherLabel}”`)}</span>
                         <span
                           className={`sim-score${similar.report.isolationScore >= 60 ? " good" : similar.report.isolationScore >= 30 ? " mid" : " low"}`}
                         >
@@ -572,7 +684,10 @@ export function EnvModal({
                         <i style={{ width: `${similar.report.isolationScore}%` }} />
                       </div>
                       <div className="sim-cap">
-                        能拉开的 {similar.report.movableTotal} 项里，已经拉开 {similar.report.movableDiffered} 项
+                        {tr(
+                          `能拉开的 ${similar.report.movableTotal} 项里，已经拉开 ${similar.report.movableDiffered} 项`,
+                          `${similar.report.movableDiffered} of ${similar.report.movableTotal} adjustable items already differ`,
+                        )}
                       </div>
                       <div className="sim-axes">
                         {similar.report.axes.map((ax) => (
@@ -582,7 +697,7 @@ export function EnvModal({
                               {ax.label}
                             </span>
                             <span className="sim-ax-vals mono">
-                              {ax.fixed ? "同机，改不掉" : ax.differs ? "已不同" : "相同"}
+                              {ax.fixed ? tr("同机，改不掉", "Same machine, can't change") : ax.differs ? tr("已不同", "Different") : tr("相同", "Same")}
                             </span>
                           </div>
                         ))}
@@ -590,7 +705,10 @@ export function EnvModal({
                     </div>
                   )}
                   <div className="em-note">
-                    轮换换不掉账号 UUID、uname 画像、仓库哈希和出口 IP —— 这些不在本地，改不了也不假装能改。
+                    {tr(
+                      "轮换换不掉账号 UUID、uname 画像、仓库哈希和出口 IP —— 这些不在本地，改不了也不假装能改。",
+                      "Rotation can't change the account UUID, uname profile, repo hash or exit IP. These aren't local, so they can't be changed, and we won't pretend otherwise.",
+                    )}
                   </div>
                 </>
               )}
@@ -598,13 +716,13 @@ export function EnvModal({
               {sec === "sessions" && (
                 <>
                   <div className="em-bar">
-                    <span>{sessions ? `${sessions.length} 个会话` : "读取中…"}</span>
+                    <span>{sessions ? tr(`${sessions.length} 个会话`, `${sessions.length} sessions`) : tr("读取中…", "Loading…")}</span>
                     <button className="det-k" onClick={onLoadSessions}>
-                      刷新
+                      {tr("刷新", "Refresh")}
                     </button>
                   </div>
                   {sessions && sessions.length === 0 ? (
-                    <div className="em-empty">这个环境还没有历史会话。</div>
+                    <div className="em-empty">{tr("这个环境还没有历史会话。", "This environment has no session history yet.")}</div>
                   ) : (
                     <div className="em-card">
                       {(sessions ?? []).slice(0, 30).map((s) => (
@@ -641,7 +759,7 @@ export function EnvModal({
                     onClearTraces={onClearTraces}
                   />
                   <div className="em-sub">
-                    <span>删除环境</span>
+                    <span>{tr("删除环境", "Delete environment")}</span>
                   </div>
                   <DangerSection account={account} canRemove={canRemove} busy={busy} onRemove={onRemove} />
                 </>
@@ -716,22 +834,31 @@ function GeneralSection({
   const steps: { done: boolean; title: string; desc: string; act: string; run: () => void }[] = [
     {
       done: signedIn,
-      title: "登录 Claude 账号",
+      title: tr("登录 Claude 账号", "Sign in to Claude"),
       desc: signedIn
-        ? `已登录 ${status?.email ?? ""}`
+        ? tr(`已登录 ${status?.email ?? ""}`, `Signed in as ${status?.email ?? ""}`)
         : status?.email
-          ? `上次登录的是 ${status.email}，凭据已不在，需要重新授权`
-          : "点「登录」会打开浏览器，在网页上点授权，回来就自动识别",
-      act: status?.email ? "重新登录" : "登录",
+          ? tr(
+              `上次登录的是 ${status.email}，凭据已不在，需要重新授权`,
+              `Last signed in as ${status.email}. Credentials are gone, so you need to authorize again`,
+            )
+          : tr(
+              "点「登录」会打开浏览器，在网页上点授权，回来就自动识别",
+              "Click “Sign in” to open your browser, authorize there, and come back. It's detected automatically",
+            ),
+      act: status?.email ? tr("重新登录", "Sign in again") : tr("登录", "Sign in"),
       run: () => onLogin(),
     },
     {
       done: netDone,
-      title: "配网络出口",
+      title: tr("配网络出口", "Set up network exit"),
       desc: netDone
-        ? `${proxyLabel(account.proxy)}${ipKnown ? ` · 出口 ${exitIp ?? account.lastExitIp}` : ""}`
-        : "多个号最好各走各的线路。用梯子的话点进去「自动探测」，不用梯子选「直连」",
-      act: "去设置",
+        ? `${proxyLabel(account.proxy)}${ipKnown ? tr(` · 出口 ${exitIp ?? account.lastExitIp}`, ` · Exit ${exitIp ?? account.lastExitIp}`) : ""}`
+        : tr(
+            "多个号最好各走各的线路。用梯子的话点进去「自动探测」，不用梯子选「直连」",
+            "With multiple accounts, give each its own route. If you use a proxy, open it and click “Auto-detect”. Otherwise choose “Direct”",
+          ),
+      act: tr("去设置", "Set up"),
       run: () => onGo("network"),
     },
   ];
@@ -742,7 +869,7 @@ function GeneralSection({
       {doneN < steps.length && (
         <div className="em-guide">
           <div className="em-guide-h">
-            <b>把这个环境配好</b>
+            <b>{tr("把这个环境配好", "Finish setting up this environment")}</b>
             <span>
               {doneN}/{steps.length}
             </span>
@@ -785,7 +912,7 @@ function GeneralSection({
       )}
 
       <div className="em-card">
-        <Row title="名字" desc="只在本机显示，随时能改">
+        <Row title={tr("名字", "Name")} desc={tr("只在本机显示，随时能改", "Only shown on this Mac. You can change it anytime")}>
           <input
             className="em-in"
             value={name}
@@ -796,7 +923,7 @@ function GeneralSection({
             }}
           />
         </Row>
-        <Row title="标识色" desc="侧栏、页签上用它区分环境">
+        <Row title={tr("标识色", "Color")} desc={tr("侧栏、页签上用它区分环境", "Used to tell environments apart in the sidebar and tabs")}>
           <span className="em-tints">
             {ACCOUNT_TINTS.map((t) => (
               <button
@@ -809,52 +936,62 @@ function GeneralSection({
             ))}
           </span>
         </Row>
-        <Row title="配置目录" desc="CLAUDE_CONFIG_DIR，凭据和记录都在这里">
+        <Row title={tr("配置目录", "Config directory")} desc={tr("CLAUDE_CONFIG_DIR，凭据和记录都在这里", "CLAUDE_CONFIG_DIR. Credentials and history live here")}>
           <code className="em-code">~/{account.configDir}</code>
         </Row>
       </div>
 
       <div className="em-sub">
-        <span>登录</span>
+        <span>{tr("登录", "Sign-in")}</span>
         <button className="det-k" onClick={onRefresh}>
-          刷新状态
+          {tr("刷新状态", "Refresh status")}
         </button>
       </div>
       <div className="em-card">
         {/* 没登录但有档案 = 登录过、凭据没了。邮箱照样显示，但明说是「上次」，
             不然「未登录」旁边挂一个邮箱，看着像状态读错了 */}
         <Row
-          title="账号"
+          title={tr("账号", "Account")}
           desc={
             signedIn
-              ? "已授权，凭据在 Keychain"
+              ? tr("已授权，凭据在 Keychain", "Authorized. Credentials are in Keychain")
               : status?.email
-                ? "上次登录的账号。凭据已不在 Keychain，要重新授权"
-                : "这个环境还没有登录过"
+                ? tr(
+                    "上次登录的账号。凭据已不在 Keychain，要重新授权",
+                    "The account last signed in. Credentials are no longer in Keychain, so you need to authorize again",
+                  )
+                : tr("这个环境还没有登录过", "This environment has never been signed in")
           }
         >
           <span className={`em-val${signedIn ? "" : " dim"}`}>
-            {status?.email ?? (auth === "unknown" ? "读不到状态" : "未登录")}
+            {status?.email ?? (auth === "unknown" ? tr("读不到状态", "Status unavailable") : tr("未登录", "Signed out"))}
           </span>
         </Row>
         {signedIn && status?.tier && (
-          <Row title="订阅">
+          <Row title={tr("订阅", "Plan")}>
             <span className="em-val">{tierLabel(status.tier)}</span>
           </Row>
         )}
-        <Row title={signedIn ? "退出登录" : "登录授权"} desc={signedIn ? "从 Keychain 清掉这个环境的凭据" : "打开浏览器授权，完成后自动识别"}>
+        <Row
+          title={signedIn ? tr("退出登录", "Sign out") : tr("登录授权", "Sign in")}
+          desc={
+            signedIn
+              ? tr("从 Keychain 清掉这个环境的凭据", "Removes this environment's credentials from Keychain")
+              : tr("打开浏览器授权，完成后自动识别", "Authorize in your browser. It's detected automatically")
+          }
+        >
           {!signedIn ? (
             <LoginButton account={account} busy={busy} waiting={Boolean(loginTermId)} onLogin={onLogin} />
           ) : (
             <button className="btn" onClick={onLogout} disabled={busy}>
-              退出登录
+              {tr("退出登录", "Sign out")}
             </button>
           )}
         </Row>
-        <Row title="打开终端" desc="在这个环境里起一个 Claude Code">
+        <Row title={tr("打开终端", "Open Terminal")} desc={tr("在这个环境里起一个 Claude Code", "Start Claude Code in this environment")}>
           <button className="btn" onClick={onOpenTerminal}>
             <IconTerminal />
-            打开
+            {tr("打开", "Open")}
           </button>
         </Row>
       </div>
@@ -862,7 +999,10 @@ function GeneralSection({
       {auth === "suspended" && (
         <div className="det-warn">
           <IconWarning size={13} />
-          这个账号处于挂起状态。风控在 API 请求、OAuth 回调、Token 刷新三处都判定，换本地凭据绕不过去。
+          {tr(
+            "这个账号处于挂起状态。风控在 API 请求、OAuth 回调、Token 刷新三处都判定，换本地凭据绕不过去。",
+            "This account is suspended. The risk check applies to API requests, OAuth callbacks and token refresh, so swapping local credentials won't get around it.",
+          )}
         </div>
       )}
 
@@ -897,7 +1037,7 @@ function NetworkSection({
   return (
     <>
       <div className="em-sub">
-        <span>出口体检</span>
+        <span>{tr("出口体检", "Exit check")}</span>
       </div>
       <NetReportCard
         accountId={account.id}
@@ -909,21 +1049,25 @@ function NetworkSection({
       />
 
       <div className="em-sub">
-        <span>线路</span>
+        <span>{tr("线路", "Route")}</span>
         {configured && (
           <button className="det-k" onClick={() => void discover()} disabled={scanning}>
-            {scanning ? "探测中…" : "探测本机代理"}
+            {scanning ? tr("探测中…", "Detecting…") : tr("探测本机代理", "Detect local proxies")}
           </button>
         )}
       </div>
       {!configured && (
         <div className="em-tipbox">
           <span>
-            <b>不知道该填什么？</b>点「自动探测」，会把本机正在跑的代理（Clash、V2RayN、Surge 等）都找出来，并实测每个能不能通、出口 IP 是多少，挑一个点「用这个」就行。
+            <b>{tr("不知道该填什么？", "Not sure what to enter?")}</b>
+            {tr(
+              "点「自动探测」，会把本机正在跑的代理（Clash、V2RayN、Surge 等）都找出来，并实测每个能不能通、出口 IP 是多少，挑一个点「用这个」就行。",
+              "Click “Auto-detect” to find the proxies running on this Mac (Clash, V2RayN, Surge and more), test whether each one works and what its exit IP is, then pick one and click “Use this”.",
+            )}
           </span>
           <button className="btn pri" onClick={() => void discover()} disabled={scanning}>
             <IconRefresh />
-            {scanning ? "探测中…" : scan ? "重新探测" : "自动探测"}
+            {scanning ? tr("探测中…", "Detecting…") : scan ? tr("重新探测", "Detect again") : tr("自动探测", "Auto-detect")}
           </button>
         </div>
       )}
@@ -932,7 +1076,10 @@ function NetworkSection({
         <div className="em-card em-scan">
           {scan.length === 0 ? (
             <div className="em-empty" style={{ border: 0 }}>
-              没找到本机代理。没开梯子的话就选「直连」；开了还找不到，到下面手动填端口。
+              {tr(
+                "没找到本机代理。没开梯子的话就选「直连」；开了还找不到，到下面手动填端口。",
+                "No local proxy found. If you don't use a proxy, choose “Direct”. If you do and it isn't found, enter the port manually below.",
+              )}
             </div>
           ) : (
             scan.map((c) => {
@@ -943,12 +1090,12 @@ function NetworkSection({
                     <b>
                       {c.label}
                       <span className={`pill ${c.ok ? "p-ok" : "p-idle"}`} style={{ marginLeft: 8 }}>
-                        {c.ok ? "能通" : "不通"}
+                        {c.ok ? tr("能通", "Reachable") : tr("不通", "Unreachable")}
                       </span>
                     </b>
                     <small className="mono">
                       {c.protocol}://{c.host}:{c.port}
-                      {c.ip ? ` · 出口 ${c.ip}` : c.reason ? ` · ${c.reason}` : ""}
+                      {c.ip ? tr(` · 出口 ${c.ip}`, ` · Exit ${c.ip}`) : c.reason ? ` · ${c.reason}` : ""}
                     </small>
                     {c.ip && (
                       <small>
@@ -964,7 +1111,7 @@ function NetworkSection({
                         onSetProxy({ protocol: c.protocol, host: c.host, port: c.port, noProxy: "localhost,127.0.0.1,::1" })
                       }
                     >
-                      {cur ? "正在用" : "用这个"}
+                      {cur ? tr("正在用", "In use") : tr("用这个", "Use this")}
                     </button>
                   </span>
                 </div>
@@ -976,22 +1123,33 @@ function NetworkSection({
 
       <div className="em-card">
         <Row
-          title="出口方式"
-          desc="直连，或者走本机的代理"
+          title={tr("出口方式", "Exit method")}
+          desc={tr("直连，或者走本机的代理", "Direct, or through a local proxy")}
           tip={
-            <Help title="直连还是代理？" wide>
+            <Help title={tr("直连还是代理？", "Direct or proxy?")} wide>
               <p>
-                <b>直连</b>：用你电脑当前的网络直接出去。没开梯子、或者开了「全局/TUN 模式」时选这个。
+                <b>{tr("直连", "Direct")}</b>
+                {tr(
+                  "：用你电脑当前的网络直接出去。没开梯子、或者开了「全局/TUN 模式」时选这个。",
+                  ": goes out through your Mac's current network. Choose this if you don't use a proxy, or if you use global / TUN mode.",
+                )}
               </p>
               <p>
-                <b>SOCKS5 / HTTP</b>：只让这个环境走指定的代理端口，别的程序不受影响。多个号各走各的线路，靠的就是这个。
+                <b>SOCKS5 / HTTP</b>
+                {tr(
+                  "：只让这个环境走指定的代理端口，别的程序不受影响。多个号各走各的线路，靠的就是这个。",
+                  ": sends only this environment through the given proxy port, leaving other apps alone. This is how multiple accounts each get their own route.",
+                )}
               </p>
-              <p>常见端口：</p>
+              <p>{tr("常见端口：", "Common ports:")}</p>
               <Steps
                 items={[
-                  "Clash / Clash Verge：HTTP 7890，SOCKS5 7891（混合端口 7890 两种都行）",
-                  "V2RayN：SOCKS5 10808，HTTP 10809",
-                  "Surge / ShadowRocket Mac：HTTP 6152，SOCKS5 6153",
+                  tr(
+                    "Clash / Clash Verge：HTTP 7890，SOCKS5 7891（混合端口 7890 两种都行）",
+                    "Clash / Clash Verge: HTTP 7890, SOCKS5 7891 (mixed port 7890 supports both)",
+                  ),
+                  tr("V2RayN：SOCKS5 10808，HTTP 10809", "V2RayN: SOCKS5 10808, HTTP 10809"),
+                  tr("Surge / ShadowRocket Mac：HTTP 6152，SOCKS5 6153", "Surge / Shadowrocket for Mac: HTTP 6152, SOCKS5 6153"),
                 ]}
               />
             </Help>
@@ -999,7 +1157,7 @@ function NetworkSection({
         >
           <div className="seg">
             <button className={p.protocol === "none" ? "on" : ""} onClick={() => onSetProxy({ protocol: "none", host: "", port: 0 })}>
-              直连
+              {tr("直连", "Direct")}
             </button>
             <button
               className={p.protocol === "socks5" ? "on" : ""}
@@ -1030,7 +1188,7 @@ function NetworkSection({
           </div>
         </Row>
         {p.protocol !== "none" && (
-          <Row title="代理地址" desc="主机和端口，失焦后保存">
+          <Row title={tr("代理地址", "Proxy address")} desc={tr("主机和端口，失焦后保存", "Host and port. Saved when you leave the field")}>
             <span className="em-proxy" key={p.protocol}>
               <input
                 className="em-in"
@@ -1041,7 +1199,7 @@ function NetworkSection({
               <input
                 className="em-in em-port"
                 defaultValue={p.port || ""}
-                placeholder="端口"
+                placeholder={tr("端口", "Port")}
                 onBlur={(e) => onSetProxy({ ...p, port: Number(e.target.value.replace(/\D/g, "")) || 0 })}
               />
             </span>
@@ -1075,18 +1233,30 @@ function TracesSection({
     <>
       <div className="em-bar">
         <span className="em-bar-t">
-          {traces ? `${existing.length} 项 · 勾选要清掉的` : "统计中…"}
-          <Help title="清痕迹会清掉什么？">
-            <p>对话记录、文件快照、缓存、日志这类东西，清掉后这个环境就像刚用过一次。</p>
-            <p>登录凭据和设备身份锁着不让勾 —— 清了等于掉登录。要彻底清空一个号，去「删除环境」连目录一起删。</p>
+          {traces
+            ? tr(`${existing.length} 项 · 勾选要清掉的`, `${existing.length} items · Select what to clean up`)
+            : tr("统计中…", "Counting…")}
+          <Help title={tr("清痕迹会清掉什么？", "What does cleaning traces remove?")}>
+            <p>
+              {tr(
+                "对话记录、文件快照、缓存、日志这类东西，清掉后这个环境就像刚用过一次。",
+                "Conversation history, file snapshots, caches and logs. After cleaning, the environment looks like it was only used once.",
+              )}
+            </p>
+            <p>
+              {tr(
+                "登录凭据和设备身份锁着不让勾 —— 清了等于掉登录。要彻底清空一个号，去「删除环境」连目录一起删。",
+                "Credentials and device identity are locked because removing them signs you out. To wipe an account completely, use “Delete environment” and delete its directory too.",
+              )}
+            </p>
           </Help>
         </span>
         <button className="det-k" onClick={onLoadTraces}>
-          重新统计
+          {tr("重新统计", "Recount")}
         </button>
       </div>
       {traces && existing.length === 0 ? (
-        <div className="em-empty">这个环境还没有留下痕迹。</div>
+        <div className="em-empty">{tr("这个环境还没有留下痕迹。", "This environment has left no traces yet.")}</div>
       ) : (
         <div className="em-card">
           {existing.map((t) => {
@@ -1103,7 +1273,7 @@ function TracesSection({
                 />
                 <span className="em-trace-n">
                   {t.label}
-                  {locked && <small>保留 · 删了会掉登录</small>}
+                  {locked && <small>{tr("保留 · 删了会掉登录", "Kept · Removing it signs you out")}</small>}
                 </span>
                 <span className="mono">{fmtSize(t.size)}</span>
               </label>
@@ -1114,7 +1284,7 @@ function TracesSection({
       {clearable.length > 0 && (
         <div className="em-acts">
           <button className="det-k" onClick={() => setPicked(picked.length === clearable.length ? [] : clearable.map((t) => t.key))}>
-            {picked.length === clearable.length ? "全不选" : "全选可清项"}
+            {picked.length === clearable.length ? tr("全不选", "Deselect all") : tr("全选可清项", "Select all")}
           </button>
           <button
             className="btn pri"
@@ -1124,7 +1294,11 @@ function TracesSection({
               setPicked([]);
             }}
           >
-            {busy ? "清理中…" : picked.length ? `清掉这 ${picked.length} 项` : "清理"}
+            {busy
+              ? tr("清理中…", "Cleaning up…")
+              : picked.length
+                ? tr(`清掉这 ${picked.length} 项`, `Clean up ${picked.length} items`)
+                : tr("清理", "Clean up")}
           </button>
         </div>
       )}
@@ -1132,12 +1306,12 @@ function TracesSection({
       <div className="em-sub">
         <span>Keychain</span>
         <button className="det-k" onClick={onLoadKeychain}>
-          {keychain ? "刷新" : "读取"}
+          {keychain ? tr("刷新", "Refresh") : tr("读取", "Load")}
         </button>
       </div>
       {keychain ? (
         keychain.length === 0 ? (
-          <div className="em-empty">没有找到 Claude Code 的 Keychain 条目。</div>
+          <div className="em-empty">{tr("没有找到 Claude Code 的 Keychain 条目。", "No Claude Code Keychain entries found.")}</div>
         ) : (
           <div className="em-card">
             {keychain.map((k) => (
@@ -1149,7 +1323,7 @@ function TracesSection({
           </div>
         )
       ) : (
-        <div className="em-empty">列出本机所有 Claude Code 的 Keychain 条目。</div>
+        <div className="em-empty">{tr("列出本机所有 Claude Code 的 Keychain 条目。", "List all Claude Code Keychain entries on this Mac.")}</div>
       )}
     </>
   );
@@ -1175,12 +1349,22 @@ function DangerSection({
   return (
     <>
       <div className="em-card">
-        <Row title="仅从列表移除" desc="磁盘目录保留，之后还能用「导入」加回来">
+        <Row
+          title={tr("仅从列表移除", "Remove from list only")}
+          desc={tr("磁盘目录保留，之后还能用「导入」加回来", "Keeps the directory on disk. You can add it back later with “Import”")}
+        >
           <input type="radio" name="purge" checked={!purge} onChange={() => setPurge(false)} />
         </Row>
         <Row
-          title="连磁盘目录一起删"
-          desc={isHome ? "这是你原本的 ~/.claude，不能删目录" : `~/${account.configDir} 会被永久删除，凭据和记录全没了`}
+          title={tr("连磁盘目录一起删", "Also delete the directory on disk")}
+          desc={
+            isHome
+              ? tr("这是你原本的 ~/.claude，不能删目录", "This is your original ~/.claude. Its directory can't be deleted")
+              : tr(
+                  `~/${account.configDir} 会被永久删除，凭据和记录全没了`,
+                  `~/${account.configDir} will be permanently deleted, including credentials and history`,
+                )
+          }
         >
           <input type="radio" name="purge" checked={purge} disabled={isHome} onChange={() => setPurge(true)} />
         </Row>
@@ -1188,17 +1372,17 @@ function DangerSection({
 
       {needType && (
         <div className="em-confirm">
-          <span>输入环境名「{account.label}」确认永久删除</span>
+          <span>{tr(`输入环境名「${account.label}」确认永久删除`, `Type the environment name “${account.label}” to confirm permanent deletion`)}</span>
           <input className="em-in" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={account.label} />
         </div>
       )}
 
-      {!canRemove && <div className="em-note">这是最后一个环境，至少要留一个。</div>}
+      {!canRemove && <div className="em-note">{tr("这是最后一个环境，至少要留一个。", "This is the last environment. At least one must remain.")}</div>}
 
       <div className="em-acts">
         <button className="btn danger" disabled={!ok || busy} onClick={() => onRemove(purge)}>
           <IconTrash size={13} />
-          {busy ? "处理中…" : purge ? "删除目录并移除" : "从列表移除"}
+          {busy ? tr("处理中…", "Working…") : purge ? tr("删除目录并移除", "Delete directory and remove") : tr("从列表移除", "Remove from list")}
         </button>
       </div>
     </>

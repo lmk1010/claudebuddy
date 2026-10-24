@@ -35,25 +35,25 @@ export type CatItem = { id: SettingsCat; label: string; icon: typeof IconSetting
  */
 export const SETTINGS_GROUPS: { title: string; items: CatItem[] }[] = [
   {
-    title: "常规",
+    get title() { return tr("常规", "General"); },
     items: [
-      { id: "general", label: "通用", icon: IconSettings },
-      { id: "appearance", label: "外观", icon: IconSun },
-      { id: "terminal", label: "终端", icon: IconTerminal },
-      { id: "keys", label: "快捷键", icon: IconGrid },
+      { id: "general", get label() { return tr("通用", "General"); }, icon: IconSettings },
+      { id: "appearance", get label() { return tr("外观", "Appearance"); }, icon: IconSun },
+      { id: "terminal", get label() { return tr("终端", "Terminal"); }, icon: IconTerminal },
+      { id: "keys", get label() { return tr("快捷键", "Shortcuts"); }, icon: IconGrid },
     ],
   },
   {
-    title: "本机",
+    get title() { return tr("本机", "This Mac"); },
     items: [
-      { id: "clean", label: "清理本机", icon: IconTrash },
+      { id: "clean", get label() { return tr("清理本机", "Clean up this Mac"); }, icon: IconTrash },
     ],
   },
   {
-    title: "其他",
+    get title() { return tr("其他", "Other"); },
     items: [
-      { id: "guide", label: "使用教程", icon: IconFile },
-      { id: "about", label: "关于", icon: IconInfo },
+      { id: "guide", get label() { return tr("使用教程", "Guide"); }, icon: IconFile },
+      { id: "about", get label() { return tr("关于", "About"); }, icon: IconInfo },
     ],
   },
 ];
@@ -71,7 +71,7 @@ export default function Settings({ state, update, cat }: Props) {
         <div className="st-body" key={cat}>
           {cat === "general" && (
             <>
-              <h1>通用</h1>
+              <h1>{tr("通用", "General")}</h1>
               <Row title="语言 / Language" desc={tr("界面文字的语言，立即生效", "Interface language, applies instantly")}>
                 <Seg
                   value={state.lang ?? systemLang()}
@@ -82,33 +82,33 @@ export default function Settings({ state, update, cat }: Props) {
                   onChange={(v) => update({ lang: v })}
                 />
               </Row>
-              <Row title="启动时恢复上次的会话" desc="关掉后每次打开都回到首页">
+              <Row title={tr("启动时恢复上次的会话", "Restore last sessions on launch")} desc={tr("关掉后每次打开都回到首页", "When off, the app always opens on the home page")}>
                 <Toggle on={state.restoreSessions} onChange={(v) => update({ restoreSessions: v })} />
               </Row>
               <Row
-                title="节奏看护"
-                desc="请求太密时在状态栏提醒你，不打断输入"
+                title={tr("节奏看护", "Pace guard")}
+                desc={tr("请求太密时在状态栏提醒你，不打断输入", "Warns in the status bar when requests come too fast, without interrupting typing")}
                 tip={
-                  <Help title="为什么要看节奏？">
-                    <p>一次导致封号的会话是 10.4 小时 / 1168 次请求，间隔中位数 6.7 秒。</p>
-                    <p>阈值不是官方限制（那在服务端，看不到），而是「看起来不像人在用」的经验边界。</p>
+                  <Help title={tr("为什么要看节奏？", "Why watch the pace?")}>
+                    <p>{tr("一次导致封号的会话是 10.4 小时 / 1168 次请求，间隔中位数 6.7 秒。", "One session that led to a ban ran 10.4 hours with 1168 requests, a median gap of 6.7 seconds.")}</p>
+                    <p>{tr("阈值不是官方限制（那在服务端，看不到），而是「看起来不像人在用」的经验边界。", "The threshold is not an official limit (that lives on the server and is invisible to us). It is a rule of thumb for what looks unlike a human.")}</p>
                   </Help>
                 }
               >
                 <Toggle on={state.rhythmGuard} onChange={(v) => update({ rhythmGuard: v })} />
               </Row>
               {state.rhythmGuard && (
-                <Row title="提醒阈值" desc="每分钟请求数超过它就标为「偏快」">
+                <Row title={tr("提醒阈值", "Alert threshold")} desc={tr("每分钟请求数超过它就标为「偏快」", "Requests per minute above this are flagged as too fast")}>
                   <Seg
                     value={state.rhythmThreshold}
-                    options={[6, 12, 18].map((n) => ({ v: n, l: `${n} 次/分` }))}
+                    options={[6, 12, 18].map((n) => ({ v: n, l: tr(`${n} 次/分`, `${n}/min`) }))}
                     onChange={(v) => update({ rhythmThreshold: v })}
                   />
                 </Row>
               )}
-              <Row title="新手引导" desc="检查电脑 → 建环境登录 → 配网络。不会动已有的环境和会话，随时能返回">
+              <Row title={tr("新手引导", "Onboarding")} desc={tr("检查电脑 → 建环境登录 → 配网络。不会动已有的环境和会话，随时能返回", "Check your Mac, create an environment and sign in, set up the network. Existing environments and sessions are untouched, and you can leave anytime")}>
                 <button className="btn" onClick={() => update({ onboarded: false })}>
-                  重新开始
+                  {tr("重新开始", "Start over")}
                 </button>
               </Row>
             </>
@@ -116,24 +116,24 @@ export default function Settings({ state, update, cat }: Props) {
 
           {cat === "appearance" && (
             <>
-              <h1>外观</h1>
-              <Row title="主题" desc="终端跟着主题换成同色系纸面 / 暖炭">
+              <h1>{tr("外观", "Appearance")}</h1>
+              <Row title={tr("主题", "Theme")} desc={tr("终端跟着主题换成同色系纸面 / 暖炭", "The terminal follows the theme, using a matching paper or warm charcoal palette")}>
                 <Seg
                   value={state.theme}
                   options={(["light", "dark", "system"] as ThemeMode[]).map((t) => ({
                     v: t,
-                    l: t === "light" ? "浅色" : t === "dark" ? "深色" : "跟随系统",
+                    l: t === "light" ? tr("浅色", "Light") : t === "dark" ? tr("深色", "Dark") : tr("跟随系统", "System"),
                   }))}
                   onChange={(v) => update({ theme: v })}
                 />
               </Row>
-              <Row title="界面字号" desc="只影响侧栏和面板，不影响终端">
+              <Row title={tr("界面字号", "Interface font size")} desc={tr("只影响侧栏和面板，不影响终端", "Affects the sidebar and panels, not the terminal")}>
                 <Seg
                   value={[0.92, 1, 1.08].find((v) => Math.abs(state.uiScale - v) < 0.01) ?? 1}
                   options={[
-                    { v: 0.92, l: "小" },
-                    { v: 1, l: "中" },
-                    { v: 1.08, l: "大" },
+                    { v: 0.92, l: tr("小", "Small") },
+                    { v: 1, l: tr("中", "Medium") },
+                    { v: 1.08, l: tr("大", "Large") },
                   ]}
                   onChange={(v) => update({ uiScale: v })}
                 />
@@ -143,32 +143,32 @@ export default function Settings({ state, update, cat }: Props) {
 
           {cat === "terminal" && (
             <>
-              <h1>终端</h1>
-              <Row title="字号" desc="只影响终端里的等宽文本">
+              <h1>{tr("终端", "Terminal")}</h1>
+              <Row title={tr("字号", "Font size")} desc={tr("只影响终端里的等宽文本", "Affects monospaced text in the terminal only")}>
                 <Seg
                   value={state.terminalFontSize}
                   options={[12, 13, 14, 15].map((s) => ({ v: s, l: String(s) }))}
                   onChange={(v) => update({ terminalFontSize: v })}
                 />
               </Row>
-              <Row title="光标样式">
+              <Row title={tr("光标样式", "Cursor style")}>
                 <Seg
                   value={state.cursorStyle}
                   options={[
-                    { v: "block" as const, l: "方块" },
-                    { v: "bar" as const, l: "竖线" },
-                    { v: "underline" as const, l: "下划线" },
+                    { v: "block" as const, l: tr("方块", "Block") },
+                    { v: "bar" as const, l: tr("竖线", "Bar") },
+                    { v: "underline" as const, l: tr("下划线", "Underline") },
                   ]}
                   onChange={(v) => update({ cursorStyle: v })}
                 />
               </Row>
-              <Row title="光标闪烁">
+              <Row title={tr("光标闪烁", "Cursor blink")}>
                 <Toggle on={state.cursorBlink} onChange={(v) => update({ cursorBlink: v })} />
               </Row>
-              <Row title="选中即复制" desc="跟 iTerm2 的习惯一致">
+              <Row title={tr("选中即复制", "Copy on select")} desc={tr("跟 iTerm2 的习惯一致", "Matches iTerm2 behavior")}>
                 <Toggle on={state.copyOnSelect} onChange={(v) => update({ copyOnSelect: v })} />
               </Row>
-              <Row title="配色、字体、行高、边距" desc="在会话顶栏右上角的「Aa」里改，边改边看效果">
+              <Row title={tr("配色、字体、行高、边距", "Colors, font, line height, padding")} desc={tr("在会话顶栏右上角的「Aa」里改，边改边看效果", "Change them under \"Aa\" at the top right of a session, with a live preview")}>
                 <span className="kbd">Aa</span>
               </Row>
             </>
@@ -176,15 +176,15 @@ export default function Settings({ state, update, cat }: Props) {
 
           {cat === "keys" && (
             <>
-              <h1>快捷键</h1>
+              <h1>{tr("快捷键", "Shortcuts")}</h1>
               {[
-                ["⌘ N", "回首页新建会话"],
-                ["⌘ T", "在当前环境和目录再开一个"],
-                ["⌘ W", "关闭当前会话"],
-                ["⌘ B", "展开 / 收起右栏"],
-                ["⌘ K", "命令面板"],
-                ["⌘ ,", "设置"],
-                ["⌘ D", "查看本次改动"],
+                ["⌘ N", tr("回首页新建会话", "New session from the home page")],
+                ["⌘ T", tr("在当前环境和目录再开一个", "Open another in the current environment and folder")],
+                ["⌘ W", tr("关闭当前会话", "Close current session")],
+                ["⌘ B", tr("展开 / 收起右栏", "Show / hide right panel")],
+                ["⌘ K", tr("命令面板", "Command palette")],
+                ["⌘ ,", tr("设置", "Settings")],
+                ["⌘ D", tr("查看本次改动", "View changes in this session")],
               ].map(([k, d]) => (
                 <Row key={k} title={d}>
                   <span className="kbd">{k}</span>

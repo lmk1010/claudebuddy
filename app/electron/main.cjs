@@ -28,6 +28,7 @@ const {
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const { L } = require("./i18n.cjs");
 const os = require("node:os");
 const { execFile } = require("node:child_process");
 const browsersModule = require("./browsers.cjs");
@@ -110,16 +111,16 @@ function syncAccounts(list) {
  */
 function resolveAccount(input) {
   const id = typeof input === "string" ? input : input && input.id;
-  if (!id) throw new Error("账号参数不合法");
+  if (!id) throw new Error(L("账号参数不合法", "Invalid account parameter"));
   const found = acct.findAccount(id);
-  if (!found) throw new Error(`未知账号：${id}`);
+  if (!found) throw new Error(L(`未知账号：${id}`, `Unknown account: ${id}`));
   return found;
 }
 
 // ─────────────────────────────────────────── PTY
 
 function spawnTerm(opts) {
-  if (!pty) throw new Error("node-pty 不可用");
+  if (!pty) throw new Error(L("node-pty 不可用", "node-pty is unavailable"));
 
   const { id, account, cwd, cols, rows, command } = opts;
   // 渲染层只允许传配置文件里的账号 id，不许自造 configDir ——
@@ -463,9 +464,9 @@ ipcMain.handle("app:info", () => ({
   username: (() => {
     try {
       const u = os.userInfo().username;
-      return u ? u.charAt(0).toUpperCase() + u.slice(1) : "本机用户";
+      return u ? u.charAt(0).toUpperCase() + u.slice(1) : L("本机用户", "Local user");
     } catch {
-      return "本机用户";
+      return L("本机用户", "Local user");
     }
   })(),
   version: app.getVersion(),
@@ -919,7 +920,7 @@ const nettestModule = require("./nettest.cjs");
 ipcMain.handle("net:test", async (_e, { id, rounds } = {}) => {
   const a = id ? resolveAccount(id) : null;
   const proxy = a ? acct.proxyOrNothing(a) : null;
-  const r = await nettestModule.run({ proxy, label: a ? a.label : "本机直连", rounds });
+  const r = await nettestModule.run({ proxy, label: a ? a.label : L("本机直连", "Local direct"), rounds });
   const [direct, route, v6] = await Promise.all([
     r.exits.direct ? lookupIpInfo(r.exits.direct) : null,
     r.exits.route ? lookupIpInfo(r.exits.route) : null,
@@ -1000,7 +1001,10 @@ ipcMain.handle("browsers:list", () => browsersModule.list());
 
 /** 界面语言：主进程里给人看的文字跟着切 */
 ipcMain.handle("app:setLang", (_e, l) => {
-  require("./i18n.cjs").setLang(l);
+  const i18n = require("./i18n.cjs");
+  const changed = i18n.getLang() !== (l === "en" ? "en" : "zh");
+  i18n.setLang(l);
+  if (changed) buildAppMenu();
   return true;
 });
 
@@ -1156,7 +1160,7 @@ ipcMain.handle("account:clearTraces", async (_e, { id, keys, includeCredentials 
   // 这个账号还有窗口在跑就先拒绝，否则文件正在被写
   for (const meta of activity.values()) {
     if (meta.accountId === id) {
-      return { ok: false, removed: [], failed: [], reason: "这个环境还有终端在跑，先关掉" };
+      return { ok: false, removed: [], failed: [], reason: L("这个环境还有终端在跑，先关掉", "This environment still has a running terminal; close it first") };
     }
   }
   try {
@@ -1209,7 +1213,7 @@ ipcMain.handle("account:sessions", async (_e, { id }) => {
         id: f.replace(/\.jsonl$/, ""),
         project: d.name,
         cwd: decodeProjectDir(d.name) ?? d.name,
-        title: readSessionTitle(fp) ?? "（没有开头消息）",
+        title: readSessionTitle(fp) ?? L("（没有开头消息）", "(No opening message)"),
         lastActive: st.mtimeMs,
         sizeBytes: st.size,
       });
@@ -1281,25 +1285,25 @@ ipcMain.handle("account:remove", async (_e, { id, purge }) => {
 
   for (const meta of activity.values()) {
     if (meta.accountId === id) {
-      return { ok: false, reason: "这个环境还有终端在跑，先关掉" };
+      return { ok: false, reason: L("这个环境还有终端在跑，先关掉", "This environment still has a running terminal; close it first") };
     }
   }
 
   // 接管来的默认环境（~/.claude）不允许连目录删 —— 那是用户原本的 Claude Code
   if (purge) {
     if (a.configDir === ".claude") {
-      return { ok: false, reason: "这是你原本的 ~/.claude，不能删" };
+      return { ok: false, reason: L("这是你原本的 ~/.claude，不能删", "This is your original ~/.claude and cannot be deleted") };
     }
     const dir = acct.configDirOf(a);
     const home = acct.HOME;
     const resolved = path.resolve(dir);
     if (!resolved.startsWith(path.resolve(home) + path.sep) || !acct.CONFIG_DIR_RE.test(a.configDir)) {
-      return { ok: false, reason: "路径不在允许范围内" };
+      return { ok: false, reason: L("路径不在允许范围内", "Path is not in the allowed scope") };
     }
     try {
       fs.rmSync(resolved, { recursive: true, force: true });
     } catch (err) {
-      return { ok: false, reason: `删目录失败：${err?.message || err}` };
+      return { ok: false, reason: L(`删目录失败：${err?.message || err}`, `Failed to delete directory: ${err?.message || err}`) };
     }
   }
 
@@ -1310,7 +1314,7 @@ ipcMain.handle("account:remove", async (_e, { id, purge }) => {
 ipcMain.handle("account:checkExit", async (_e, { id }) => {
   const a = resolveAccount(id);
   const r = await acct.checkExitIp(a);
-  if (!r) return { ok: false, ip: null, reason: "检测失败：代理不可达或网络不通" };
+  if (!r) return { ok: false, ip: null, reason: L("检测失败：代理不可达或网络不通", "Check failed: proxy unreachable or no network") };
   return { ok: true, ...r };
 });
 
@@ -1320,7 +1324,7 @@ ipcMain.handle("account:rotateIdentity", async (_e, { id }) => {
   // 有活着的窗口就拒绝 —— 否则会被运行中的进程写回去
   for (const meta of activity.values()) {
     if (meta.accountId === id) {
-      return { ok: false, reason: "该账号还有运行中的终端，先关掉再轮换" };
+      return { ok: false, reason: L("该账号还有运行中的终端，先关掉再轮换", "This account still has a running terminal; close it before rotating") };
     }
   }
   try {
@@ -1442,8 +1446,11 @@ ipcMain.handle("ip:info", async (_e, ip) => lookupIpInfo(ip));
 
 async function lookupIpInfo(ip) {
   if (typeof ip !== "string" || !/^[0-9a-fA-F:.]{3,45}$/.test(ip)) return null;
-  if (ipInfoCache.has(ip)) return ipInfoCache.get(ip);
-  const url = `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,timezone,isp,org,as,mobile,proxy,hosting&lang=zh-CN`;
+  // 城市、国家名按界面语言要：缓存也按语言分开
+  const lang = require("./i18n.cjs").getLang() === "en" ? "en" : "zh-CN";
+  const key = `${lang}:${ip}`;
+  if (ipInfoCache.has(key)) return ipInfoCache.get(key);
+  const url = `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,timezone,isp,org,as,mobile,proxy,hosting&lang=${lang}`;
   const raw = await new Promise((resolve) => {
     execFile("curl", ["-sS", "--max-time", "6", url], { timeout: 8000 }, (err, out) => resolve(err ? null : out));
   });
@@ -1465,7 +1472,7 @@ async function lookupIpInfo(ip) {
       proxy: Boolean(j.proxy),
       hosting: Boolean(j.hosting),
     };
-    ipInfoCache.set(ip, info);
+    ipInfoCache.set(key, info);
     return info;
   } catch {
     return null;
@@ -1519,7 +1526,7 @@ ipcMain.handle("account:netReport", async (_e, { id }) => {
   }
   let ip = tr.ip || null;
   if (!ip) ip = (await acct.checkExitIp(a))?.ip ?? null;
-  if (!ip) return { ok: false, reason: "拿不到出口 IP：代理不可达或网络不通" };
+  if (!ip) return { ok: false, reason: L("拿不到出口 IP：代理不可达或网络不通", "Unable to get the exit IP: proxy unreachable or no network") };
 
   const [info, risk] = await Promise.all([
     lookupIpInfo(ip),
@@ -1539,12 +1546,12 @@ ipcMain.handle("account:netReport", async (_e, { id }) => {
   const flags = [];
   if (risk?.proxy || info?.proxy) {
     score = Math.min(score, 30);
-    flags.push("被标记为代理 / VPN");
+    flags.push(L("被标记为代理 / VPN", "Flagged as proxy / VPN"));
   }
   const hosting = Boolean(info?.hosting) || /hosting|business|data ?cent/i.test(risk?.type || "");
   if (hosting) {
     score -= 15;
-    flags.push("机房 IP");
+    flags.push(L("机房 IP", "Datacenter IP"));
   }
   score = Math.max(0, Math.min(100, Math.round(score)));
 
@@ -2018,6 +2025,16 @@ app.whenReady().then(() => {
     }
   });
 
+  buildAppMenu();
+  createWindow();
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+/** 应用菜单。切语言时重建一次，否则「编辑 / 窗口」要等下次启动才换 */
+function buildAppMenu() {
   if (process.platform === "darwin") {
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
@@ -2033,7 +2050,7 @@ app.whenReady().then(() => {
           ],
         },
         {
-          label: "编辑",
+          label: L("编辑", "Edit"),
           submenu: [
             { role: "undo" },
             { role: "redo" },
@@ -2045,7 +2062,7 @@ app.whenReady().then(() => {
           ],
         },
         {
-          label: "窗口",
+          label: L("窗口", "Window"),
           submenu: [
             { role: "minimize" },
             { role: "zoom" },
@@ -2056,12 +2073,7 @@ app.whenReady().then(() => {
       ]),
     );
   }
-  createWindow();
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
+}
 
 app.on("window-all-closed", () => {
   console.log("[claude-buddy] 所有窗口已关闭，准备退出");

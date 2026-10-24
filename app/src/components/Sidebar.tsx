@@ -17,6 +17,7 @@ import {
 import { useContextMenu } from "./ContextMenu";
 import { IconEdit, RenameInput } from "./Rename";
 import { SETTINGS_GROUPS, type SettingsCat } from "./Settings";
+import { tr } from "../lib/i18n";
 
 interface Props {
   /** 是否展开。收起时不卸载，只把宽度收到 0 —— 这样能过渡 */
@@ -103,11 +104,11 @@ export default function Sidebar({
   const accById = new Map(accounts.map((a) => [a.id, a]));
 
   const nav: { icon: typeof IconTerminal; label: string; view: View; count?: string }[] = [
-    { icon: IconSparkle, label: "首页", view: "home" },
-    { icon: IconTerminal, label: "会话", view: "sessions", count: sessions.length ? String(sessions.length) : "" },
-    { icon: IconKey, label: "环境", view: "accounts", count: accounts.length ? String(accounts.length) : "" },
+    { icon: IconSparkle, label: tr("首页", "Home"), view: "home" },
+    { icon: IconTerminal, label: tr("会话", "Sessions"), view: "sessions", count: sessions.length ? String(sessions.length) : "" },
+    { icon: IconKey, label: tr("环境", "Environments"), view: "accounts", count: accounts.length ? String(accounts.length) : "" },
     // 设置不占主导航（左下角账号菜单、⌘, 都能进）；这里放更常用的「网络」
-    { icon: IconGlobe, label: "网络", view: "network" },
+    { icon: IconGlobe, label: tr("网络", "Network"), view: "network" },
   ];
 
   return (
@@ -126,7 +127,7 @@ export default function Sidebar({
       {/* 设计稿 168：红绿灯让位条 —— 24 高、左右 6 内距、下 14 间隔 */}
       <div className="lights">
         <span className="sp">
-          <button className="ib" title="收起侧栏 ⌘\" onClick={onToggleSidebar}>
+          <button className="ib" title={tr("收起侧栏 ⌘\\", "Hide sidebar ⌘\\")} onClick={onToggleSidebar}>
             <IconPanel />
           </button>
         </span>
@@ -134,14 +135,14 @@ export default function Sidebar({
 
       {view === "settings" ? (
         <div className="ws-set" key="set">
-          <button className="ws-back" onClick={onExitSettings} title="返回应用（Esc / ⌘,）">
+          <button className="ws-back" onClick={onExitSettings} title={tr("返回应用（Esc / ⌘,）", "Back to app (Esc / ⌘,)")}>
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 3.5 5.5 8l4.5 4.5" />
             </svg>
-            返回应用
+            {tr("返回应用", "Back to app")}
             <span className="kbd">esc</span>
           </button>
-          <div className="ws-set-t">设置</div>
+          <div className="ws-set-t">{tr("设置", "Settings")}</div>
           {SETTINGS_GROUPS.map((g) => (
             <div className="ws-set-g" key={g.title}>
               <div className="gl">
@@ -162,10 +163,10 @@ export default function Sidebar({
       <button
         className="new"
         onClick={onNew}
-        title={activeAccount ? `在「${activeAccount.label}」里新建会话` : "新建会话"}
+        title={activeAccount ? tr(`在「${activeAccount.label}」里新建会话`, `New session in “${activeAccount.label}”`) : tr("新建会话", "New session")}
       >
         <IconPlus />
-        新建会话
+        {tr("新建会话", "New session")}
         <span className="kbd">⌘N</span>
       </button>
 
@@ -184,13 +185,13 @@ export default function Sidebar({
       ))}
 
       <div className="gl">
-        <span>最近</span>
+        <span>{tr("最近", "Recent")}</span>
         <span>{sessions.length > 0 ? sessions.length : ""}</span>
       </div>
 
       <div className="ws-list">
         {sessions.length === 0 ? (
-          <div className="rw rw-empty">还没有会话</div>
+          <div className="rw rw-empty">{tr("还没有会话", "No sessions yet")}</div>
         ) : (
           sessions.map((w) => {
             const live = w.id === activeId && view === "session";
@@ -210,18 +211,18 @@ export default function Sidebar({
                   menu.open(
                     e,
                     [
-                      { label: "打开", icon: <IconTerminal size={14} />, run: () => onSelectWindow(w.id) },
-                      { label: "重命名", icon: <IconEdit />, hint: "双击", run: () => setRenaming(w.id) },
+                      { label: tr("打开", "Open"), icon: <IconTerminal size={14} />, run: () => onSelectWindow(w.id) },
+                      { label: tr("重命名", "Rename"), icon: <IconEdit />, hint: tr("双击", "Double-click"), run: () => setRenaming(w.id) },
                       "sep",
-                      { label: "复制目录路径", icon: <IconCopy size={14} />, run: () => onCopy(w.cwd) },
-                      { label: "在访达中打开", icon: <IconFolder size={14} />, run: () => onReveal(w.cwd) },
+                      { label: tr("复制目录路径", "Copy path"), icon: <IconCopy size={14} />, run: () => onCopy(w.cwd) },
+                      { label: tr("在访达中打开", "Reveal in Finder"), icon: <IconFolder size={14} />, run: () => onReveal(w.cwd) },
                       "sep",
-                      { label: "关闭会话", icon: <IconClose size={14} />, danger: true, run: () => onCloseWindow(w.id) },
+                      { label: tr("关闭会话", "Close session"), icon: <IconClose size={14} />, danger: true, run: () => onCloseWindow(w.id) },
                     ],
                     `${w.title} · ${acc?.label ?? ""}`,
                   )
                 }
-                title={`${w.title} · ${acc?.label ?? ""}\n${w.cwd}\n双击重命名 · 右键更多`}
+                title={tr(`${w.title} · ${acc?.label ?? ""}\n${w.cwd}\n双击重命名 · 右键更多`, `${w.title} · ${acc?.label ?? ""}\n${w.cwd}\nDouble-click to rename · right-click for more`)}
               >
                 {/* 环境标记：每个环境一种颜色、一个首字，几个号的会话混在一起也一眼分得开 */}
                 <span className={`rw-env${live ? " live" : ""}`} style={{ background: acc?.tint }}>
@@ -240,7 +241,7 @@ export default function Sidebar({
                 )}
                 <span
                   className="ws-x"
-                  title="关闭会话"
+                  title={tr("关闭会话", "Close session")}
                   onClick={(e) => {
                     e.stopPropagation();
                     onCloseWindow(w.id);
@@ -261,13 +262,13 @@ export default function Sidebar({
         onClick={(e) => onAccount(e.currentTarget)}
         aria-haspopup="menu"
         aria-expanded={accountMenuOpen}
-        title="切换环境"
+        title={tr("切换环境", "Switch environment")}
       >
         <span className="av" style={activeAccount ? { background: activeAccount.tint } : undefined}>
           {(activeAccount?.label || username || "M").slice(0, 1)}
         </span>
         <span className="who">
-          <b>{activeAccount?.label ?? username ?? "本机用户"}</b>
+          <b>{activeAccount?.label ?? username ?? tr("本机用户", "This Mac")}</b>
           {/* 真实登录态 + 配置目录，一眼能看出现在是哪间屋子 */}
           <small>
             {activeAccount

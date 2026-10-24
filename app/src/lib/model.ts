@@ -26,6 +26,8 @@
  * 界面上必须诚实地告诉用户这一点，而不是给一个"已完全隔离"的假象。
  */
 
+import { tr } from "./i18n";
+
 /** 主题 */
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -43,13 +45,13 @@ export type PermissionMode =
   | "bypassPermissions";
 
 export const PERMISSION_LABEL: Record<PermissionMode, string> = {
-  default: "逐次确认",
-  acceptEdits: "自动接受编辑",
-  plan: "计划模式",
-  manual: "每步都问",
-  auto: "自动判定",
-  dontAsk: "不问不做",
-  bypassPermissions: "全部放行",
+  get default() { return tr("逐次确认", "Ask each time"); },
+  get acceptEdits() { return tr("自动接受编辑", "Auto-accept edits"); },
+  get plan() { return tr("计划模式", "Plan mode"); },
+  get manual() { return tr("每步都问", "Ask every step"); },
+  get auto() { return tr("自动判定", "Auto"); },
+  get dontAsk() { return tr("不问不做", "Don't ask"); },
+  get bypassPermissions() { return tr("全部放行", "Bypass all"); },
 };
 
 /** 只给引导页挑三个常用的，其余在设置里 */
@@ -268,10 +270,10 @@ export interface RhythmStats {
 export type RiskLevel = "calm" | "watch" | "hot" | "critical";
 
 export const RISK_LABEL: Record<RiskLevel, string> = {
-  calm: "空闲",
-  watch: "正常",
-  hot: "偏快",
-  critical: "过快",
+  get calm() { return tr("空闲", "Idle"); },
+  get watch() { return tr("正常", "Normal"); },
+  get hot() { return tr("偏快", "Fast"); },
+  get critical() { return tr("过快", "Too fast"); },
 };
 
 export const RISK_PILL: Record<RiskLevel, string> = {
@@ -397,11 +399,11 @@ export function defaultAccount(): Account {
 }
 
 export const AUTH_LABEL: Record<AuthState, string> = {
-  signedOut: "未登录",
-  signedIn: "已登录",
-  expired: "凭据失效",
-  suspended: "已挂起",
-  unknown: "未知",
+  get signedOut() { return tr("未登录", "Signed out"); },
+  get signedIn() { return tr("已登录", "Signed in"); },
+  get expired() { return tr("凭据失效", "Credentials expired"); },
+  get suspended() { return tr("已挂起", "Suspended"); },
+  get unknown() { return tr("未知", "Unknown"); },
 };
 
 export const AUTH_PILL: Record<AuthState, string> = {
@@ -440,7 +442,7 @@ export function tierLabel(tier: string | null | undefined): string {
 /** 界面上显示的短形式：socks5://127.0.0.1:1080 */
 export function proxyLabel(p: ProxyConfig): string {
   const url = proxyUrl(p);
-  return url ?? "直连";
+  return url ?? tr("直连", "Direct");
 }
 
 // ─────────────────────────────────────────── 格式化
@@ -458,13 +460,13 @@ export function shortenHome(p: string): string {
 export function relTime(ts: number): string {
   const diff = Date.now() - ts;
   const min = Math.floor(diff / 60000);
-  if (min < 1) return "刚刚";
-  if (min < 60) return `${min} 分钟前`;
+  if (min < 1) return tr("刚刚", "Just now");
+  if (min < 60) return tr(`${min} 分钟前`, `${min}m ago`);
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 小时前`;
+  if (hr < 24) return tr(`${hr} 小时前`, `${hr}h ago`);
   const day = Math.floor(hr / 24);
-  if (day === 1) return "昨天";
-  if (day < 7) return `${day} 天前`;
+  if (day === 1) return tr("昨天", "Yesterday");
+  if (day < 7) return tr(`${day} 天前`, `${day}d ago`);
   const d = new Date(ts);
   return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -472,31 +474,35 @@ export function relTime(ts: number): string {
 export function shortTime(ts: number): string {
   const diff = Date.now() - ts;
   const min = Math.floor(diff / 60000);
-  if (min < 1) return "刚刚";
-  if (min < 60) return `${min} 分`;
+  if (min < 1) return tr("刚刚", "now");
+  if (min < 60) return tr(`${min} 分`, `${min}m`);
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 时`;
+  if (hr < 24) return tr(`${hr} 时`, `${hr}h`);
   const day = Math.floor(hr / 24);
-  if (day === 1) return "昨天";
-  if (day < 7) return `${day} 天`;
+  if (day === 1) return tr("昨天", "yesterday");
+  if (day < 7) return tr(`${day} 天`, `${day}d`);
   const d = new Date(ts);
   return `${d.getMonth() + 1}-${d.getDate()}`;
 }
 
 export function fmtDuration(sec: number): string {
-  if (sec < 60) return `${Math.max(0, Math.round(sec))} 秒`;
+  if (sec < 60) {
+    const s = Math.max(0, Math.round(sec));
+    return tr(`${s} 秒`, `${s}s`);
+  }
   const m = Math.floor(sec / 60);
-  if (m < 60) return `${m} 分`;
-  return `${Math.floor(m / 60)} 时 ${String(m % 60).padStart(2, "0")} 分`;
+  if (m < 60) return tr(`${m} 分`, `${m}m`);
+  const mm = String(m % 60).padStart(2, "0");
+  return tr(`${Math.floor(m / 60)} 时 ${mm} 分`, `${Math.floor(m / 60)}h ${mm}m`);
 }
 
 export function greeting(now = new Date()): string {
   const h = now.getHours();
-  if (h < 5) return "夜深了";
-  if (h < 11) return "早上好";
-  if (h < 13) return "中午好";
-  if (h < 18) return "下午好";
-  return "晚上好";
+  if (h < 5) return tr("夜深了", "Working late");
+  if (h < 11) return tr("早上好", "Good morning");
+  if (h < 13) return tr("中午好", "Good afternoon");
+  if (h < 18) return tr("下午好", "Good afternoon");
+  return tr("晚上好", "Good evening");
 }
 
 /* ─────────────────────────── 环境相似度 ─────────────────────────── */
@@ -542,23 +548,23 @@ export function compareEnvironments(
     // ── 换不掉：同一台机器上必然相同 ──
     {
       key: "platform",
-      label: "系统内核",
-      a: "同机",
-      b: "同机",
+      label: tr("系统内核", "OS kernel"),
+      a: tr("同机", "Same machine"),
+      b: tr("同机", "Same machine"),
       fixed: true,
       differs: false,
     },
     {
       key: "arch",
-      label: "CPU 架构",
-      a: "同机",
-      b: "同机",
+      label: tr("CPU 架构", "CPU architecture"),
+      a: tr("同机", "Same machine"),
+      b: tr("同机", "Same machine"),
       fixed: true,
       differs: false,
     },
     {
       key: "account",
-      label: "账号 UUID",
+      label: tr("账号 UUID", "Account UUID"),
       a: short(a.accountUuid),
       b: short(b.accountUuid),
       fixed: true,
@@ -567,7 +573,7 @@ export function compareEnvironments(
     // ── 能拉开 ──
     {
       key: "device",
-      label: "设备码",
+      label: tr("设备码", "Device ID"),
       a: short(a.identity.userID),
       b: short(b.identity.userID),
       fixed: false,
@@ -575,7 +581,7 @@ export function compareEnvironments(
     },
     {
       key: "ip",
-      label: "出口 IP",
+      label: tr("出口 IP", "Exit IP"),
       a: ipOf(a.id) ?? a.lastExitIp ?? "—",
       b: ipOf(b.id) ?? b.lastExitIp ?? "—",
       fixed: false,
@@ -587,7 +593,7 @@ export function compareEnvironments(
     },
     {
       key: "term",
-      label: "终端类型",
+      label: tr("终端类型", "Terminal type"),
       a: a.terminal?.term ?? "—",
       b: b.terminal?.term ?? "—",
       fixed: false,
@@ -595,7 +601,7 @@ export function compareEnvironments(
     },
     {
       key: "lang",
-      label: "语言环境",
+      label: tr("语言环境", "Locale"),
       a: a.terminal?.lang ?? "—",
       b: b.terminal?.lang ?? "—",
       fixed: false,
@@ -603,7 +609,7 @@ export function compareEnvironments(
     },
     {
       key: "tz",
-      label: "时区",
+      label: tr("时区", "Time zone"),
       a: a.terminal?.tz ?? "—",
       b: b.terminal?.tz ?? "—",
       fixed: false,

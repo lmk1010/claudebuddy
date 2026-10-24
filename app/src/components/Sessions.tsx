@@ -17,6 +17,7 @@ import {
 import Help from "./Help";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { IconEdit, RenameInput } from "./Rename";
+import { tr } from "../lib/i18n";
 
 interface Props {
   accounts: Account[];
@@ -60,27 +61,27 @@ export default function Sessions(p: Props) {
     const same = p.windows.filter((x) => x.accountId === w.accountId);
     const acc = p.accounts.find((a) => a.id === w.accountId);
     return [
-      { label: "打开", icon: <IconTerminal size={14} />, hint: "↵", run: () => p.onOpen(w.id) },
-      { label: "重命名", icon: <IconEdit />, run: () => setRenaming(w.id) },
+      { label: tr("打开", "Open"), icon: <IconTerminal size={14} />, hint: "↵", run: () => p.onOpen(w.id) },
+      { label: tr("重命名", "Rename"), icon: <IconEdit />, run: () => setRenaming(w.id) },
       "sep",
-      { label: "复制目录路径", icon: <IconCopy size={14} />, run: () => p.onCopy(w.cwd) },
-      { label: "在访达中打开", icon: <IconFolder size={14} />, run: () => p.onReveal(w.cwd) },
-      { label: `编辑环境「${acc?.label ?? ""}」…`, icon: <IconGear size={14} />, run: () => p.onEditAccount(w.accountId) },
+      { label: tr("复制目录路径", "Copy folder path"), icon: <IconCopy size={14} />, run: () => p.onCopy(w.cwd) },
+      { label: tr("在访达中打开", "Reveal in Finder"), icon: <IconFolder size={14} />, run: () => p.onReveal(w.cwd) },
+      { label: tr(`编辑环境「${acc?.label ?? ""}」…`, `Edit environment "${acc?.label ?? ""}"…`), icon: <IconGear size={14} />, run: () => p.onEditAccount(w.accountId) },
       "sep",
-      { label: "关闭会话", icon: <IconClose size={14} />, danger: true, run: () => p.onRequestClose(w.id) },
+      { label: tr("关闭会话", "Close session"), icon: <IconClose size={14} />, danger: true, run: () => p.onRequestClose(w.id) },
       {
-        label: `关闭「${acc?.label ?? ""}」的全部会话`,
+        label: tr(`关闭「${acc?.label ?? ""}」的全部会话`, `Close all sessions in "${acc?.label ?? ""}"`),
         danger: true,
         disabled: same.length < 2,
-        run: () => p.onCloseMany(same.map((x) => x.id), `「${acc?.label ?? ""}」的 ${same.length} 个会话`),
+        run: () => p.onCloseMany(same.map((x) => x.id), tr(`「${acc?.label ?? ""}」的 ${same.length} 个会话`, `${same.length} sessions in "${acc?.label ?? ""}"`)),
       },
     ];
   };
   const histMenu = (a: Account, s: SessionSummary): MenuItem[] => [
-    { label: "在原目录接着开", icon: <IconTerminal size={14} />, hint: "↵", run: () => p.onResume(a.id, s.cwd) },
+    { label: tr("在原目录接着开", "Resume in original folder"), icon: <IconTerminal size={14} />, hint: "↵", run: () => p.onResume(a.id, s.cwd) },
     "sep",
-    { label: "复制目录路径", icon: <IconCopy size={14} />, run: () => p.onCopy(s.cwd) },
-    { label: "在访达中打开", icon: <IconFolder size={14} />, run: () => p.onReveal(s.cwd) },
+    { label: tr("复制目录路径", "Copy folder path"), icon: <IconCopy size={14} />, run: () => p.onCopy(s.cwd) },
+    { label: tr("在访达中打开", "Reveal in Finder"), icon: <IconFolder size={14} />, run: () => p.onReveal(s.cwd) },
   ];
 
   // 切到历史时，把要看的环境都读一遍（读过的不重读）
@@ -128,7 +129,7 @@ export default function Sessions(p: Props) {
     <>
       <div className="wh">
         <span className="acts">
-          <button className="ib" title="搜索 ⌘K" onClick={p.onSearch}>
+          <button className="ib" title={tr("搜索 ⌘K", "Search ⌘K")} onClick={p.onSearch}>
             <IconSearch />
           </button>
         </span>
@@ -137,14 +138,14 @@ export default function Sessions(p: Props) {
       <div className="sv">
         <div className="sv-h">
           <div>
-            <h1>会话</h1>
+            <h1>{tr("会话", "Sessions")}</h1>
             <p>
-              {liveTotal} 个进行中 · {p.accounts.length} 个环境
+              {tr(`${liveTotal} 个进行中 · ${p.accounts.length} 个环境`, `${liveTotal} active · ${p.accounts.length} environments`)}
             </p>
           </div>
           <button className="btn pri" onClick={p.onNew}>
             <IconPlus />
-            新建会话
+            {tr("新建会话", "New session")}
           </button>
         </div>
 
@@ -153,27 +154,27 @@ export default function Sessions(p: Props) {
             {ind && <i className="envtabs-ind" style={{ transform: `translateX(${ind.left}px)`, width: ind.width }} />}
             <button data-tab="live" className={`envtab${tab === "live" ? " on" : ""}`} onClick={() => setTab("live")}>
               <IconTerminal size={13} />
-              进行中
+              {tr("进行中", "Active")}
               <em>{liveTotal || ""}</em>
             </button>
             <button data-tab="history" className={`envtab${tab === "history" ? " on" : ""}`} onClick={() => setTab("history")}>
               <IconClock size={13} />
-              历史
+              {tr("历史", "History")}
               <em>{histTotal || ""}</em>
             </button>
           </div>
-          <Help title="进行中和历史有什么区别？">
+          <Help title={tr("进行中和历史有什么区别？", "What is the difference between Active and History?")}>
             <p>
-              <b>进行中</b>：现在开着终端的会话，点一下切过去。关掉会结束终端进程（会先问你）。
+              <b>{tr("进行中", "Active")}</b>{tr("：现在开着终端的会话，点一下切过去。关掉会结束终端进程（会先问你）。", ": sessions with a terminal open right now. Click one to switch to it. Closing one ends its terminal process (you will be asked first).")}
             </p>
             <p>
-              <b>历史</b>：环境目录里留下的旧对话。点一下会在原来的目录里重新开一个会话接着干。
+              <b>{tr("历史", "History")}</b>{tr("：环境目录里留下的旧对话。点一下会在原来的目录里重新开一个会话接着干。", ": past conversations stored in the environment folder. Click one to start a new session in its original folder and pick up where you left off.")}
             </p>
           </Help>
 
           <div className="sv-filter">
             <button className={`sv-chip${env === "all" ? " on" : ""}`} onClick={() => setEnv("all")}>
-              全部环境
+              {tr("全部环境", "All environments")}
             </button>
             {p.accounts.map((a) => (
               <button
@@ -191,21 +192,21 @@ export default function Sessions(p: Props) {
             ))}
           </div>
 
-          <input className="sv-q" value={q} placeholder="筛选名字或目录" onChange={(e) => setQ(e.target.value)} />
+          <input className="sv-q" value={q} placeholder={tr("筛选名字或目录", "Filter by name or folder")} onChange={(e) => setQ(e.target.value)} />
         </div>
 
         <div className="sv-body" key={`${tab}-${env}`}>
           {groups.length === 0 ? (
             <div className="sv-empty">
               {kw
-                ? "没有匹配的会话。"
+                ? tr("没有匹配的会话。", "No matching sessions.")
                 : tab === "live"
-                  ? "没有正在跑的会话。去首页选个环境，写一句回车就能开一个。"
-                  : "这些环境里还没有历史会话。"}
+                  ? tr("没有正在跑的会话。去首页选个环境，写一句回车就能开一个。", "No active sessions. Pick an environment on Home, type a message and press Enter to start one.")
+                  : tr("这些环境里还没有历史会话。", "No history in these environments yet.")}
               {tab === "live" && !kw && (
                 <button className="btn" onClick={p.onNew}>
                   <IconPlus />
-                  新建会话
+                  {tr("新建会话", "New session")}
                 </button>
               )}
             </div>
@@ -219,10 +220,10 @@ export default function Sessions(p: Props) {
                   <b>{a.label}</b>
                   <span className="mono">~/{a.configDir}</span>
                   <span className="sv-grp-n">
-                    {tab === "live" ? `${live.length} 个进行中` : loading ? "读取中…" : `${hist.length} 条记录`}
+                    {tab === "live" ? tr(`${live.length} 个进行中`, `${live.length} active`) : loading ? tr("读取中…", "Loading…") : tr(`${hist.length} 条记录`, `${hist.length} records`)}
                   </span>
                   {tab === "history" && (
-                    <button className="det-k" title="重新读取" onClick={() => p.onLoadHistory(a.id)}>
+                    <button className="det-k" title={tr("重新读取", "Reload")} onClick={() => p.onLoadHistory(a.id)}>
                       <IconRefresh size={12} />
                     </button>
                   )}
@@ -242,7 +243,7 @@ export default function Sessions(p: Props) {
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && renaming !== w.id) p.onOpen(w.id);
                           }}
-                          title={`${w.cwd}\n双击重命名 · 右键更多`}
+                          title={`${w.cwd}\n${tr("双击重命名 · 右键更多", "Double-click to rename · right-click for more")}`}
                         >
                           {/* 跟 Claude 的对话列表一样只有文字：标题一行，目录和类型一行，不画图标 */}
                           <span className="sv-nm">
@@ -259,16 +260,16 @@ export default function Sessions(p: Props) {
                             )}
                             <small>
                               <span className="mono">{shortenHome(w.cwd)}</span>
-                              <span className="sv-kind">{w.runsClaude ? "Claude Code" : "终端"}</span>
+                              <span className="sv-kind">{w.runsClaude ? "Claude Code" : tr("终端", "Terminal")}</span>
                             </small>
                           </span>
                           <span className="sv-tm">
-                            <span>已运行 {fmtDuration((Date.now() - w.startedAt) / 1000)}</span>
-                            <small>{shortTime(w.lastActivityAt)} 活动</small>
+                            <span>{tr("已运行", "Running")} {fmtDuration((Date.now() - w.startedAt) / 1000)}</span>
+                            <small>{tr(`${shortTime(w.lastActivityAt)} 活动`, `Active ${shortTime(w.lastActivityAt)}`)}</small>
                           </span>
                           <button
                             className="mh-x sv-more-btn"
-                            title="更多"
+                            title={tr("更多", "More")}
                             onClick={(e) => {
                               const r = e.currentTarget.getBoundingClientRect();
                               menu.open({ clientX: r.left, clientY: r.bottom + 4, preventDefault: () => {}, stopPropagation: () => e.stopPropagation() }, liveMenu(w), w.title);
@@ -278,7 +279,7 @@ export default function Sessions(p: Props) {
                           </button>
                           <button
                             className="mh-x"
-                            title="关闭会话"
+                            title={tr("关闭会话", "Close session")}
                             onClick={(e) => {
                               e.stopPropagation();
                               p.onRequestClose(w.id);
@@ -299,7 +300,7 @@ export default function Sessions(p: Props) {
                           onKeyDown={(e) => {
                             if (e.key === "Enter") p.onResume(a.id, s.cwd);
                           }}
-                          title={`${s.cwd}\n点一下在原目录里接着开`}
+                          title={`${s.cwd}\n${tr("点一下在原目录里接着开", "Click to resume in the original folder")}`}
                         >
                           <span className="sv-nm">
                             <b>{s.title}</b>
@@ -309,11 +310,11 @@ export default function Sessions(p: Props) {
                             <span>{relTime(s.lastActive)}</span>
                             <small>{fmtSize(s.sizeBytes)}</small>
                           </span>
-                          <span className="sv-go">接着开</span>
+                          <span className="sv-go">{tr("接着开", "Resume")}</span>
                         </div>
                       ))}
                 </div>
-                {tab === "history" && hist.length > 40 && <div className="sv-more">还有 {hist.length - 40} 条更早的记录</div>}
+                {tab === "history" && hist.length > 40 && <div className="sv-more">{tr(`还有 ${hist.length - 40} 条更早的记录`, `${hist.length - 40} older records not shown`)}</div>}
               </section>
             ))
           )}

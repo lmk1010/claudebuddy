@@ -14,6 +14,7 @@ const { execFile, execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { L } = require("./i18n.cjs");
 
 const HOME = process.env.CLAUDE_BUDDY_HOME || os.homedir();
 
@@ -57,7 +58,7 @@ function findClaude() {
   // 2. 常见位置
   for (const p of COMMON_PATHS) {
     try {
-      if (fs.existsSync(p)) return { path: p, source: "常见安装位置" };
+      if (fs.existsSync(p)) return { path: p, source: L("常见安装位置", "Common install location") };
     } catch {
       /* 忽略 */
     }
@@ -87,9 +88,9 @@ async function runCheckup() {
       key: "claude",
       label: "Claude Code",
       status: "fail",
-      title: "没装 Claude Code",
-      detail: "这个软件是 Claude Code 的外壳，没有它没法工作。",
-      fix: "打开终端，运行：npm install -g @anthropic-ai/claude-code",
+      title: L("没装 Claude Code", "Claude Code is not installed"),
+      detail: L("这个软件是 Claude Code 的外壳，没有它没法工作。", "This app is a shell around Claude Code and cannot work without it."),
+      fix: L("打开终端，运行：npm install -g @anthropic-ai/claude-code", "Open a terminal and run: npm install -g @anthropic-ai/claude-code"),
       action: "install",
     });
   } else {
@@ -99,7 +100,7 @@ async function runCheckup() {
       key: "claude",
       label: "Claude Code",
       status: "ok",
-      title: ver ? `已安装 ${ver.raw}` : "已安装",
+      title: ver ? L(`已安装 ${ver.raw}`, `Installed ${ver.raw}`) : L("已安装", "Installed"),
       detail: found.path,
       fix: null,
       action: null,
@@ -115,7 +116,7 @@ async function runCheckup() {
       label: "Node",
       status: major >= 18 ? "ok" : "warn",
       title: `v${nv.out.replace(/^v/, "")}`,
-      detail: major >= 18 ? "" : "版本偏低，建议升到 18 以上",
+      detail: major >= 18 ? "" : L("版本偏低，建议升到 18 以上", "Version is too old; upgrade to 18 or later"),
       fix: major >= 18 ? null : "brew install node",
       action: null,
     });
@@ -124,9 +125,9 @@ async function runCheckup() {
       key: "node",
       label: "Node",
       status: found ? "warn" : "fail",
-      title: "没检测到 node",
-      detail: "Claude Code 依赖 Node 运行。",
-      fix: "去 nodejs.org 下载安装，或 brew install node",
+      title: L("没检测到 node", "node not detected"),
+      detail: L("Claude Code 依赖 Node 运行。", "Claude Code requires Node to run."),
+      fix: L("去 nodejs.org 下载安装，或 brew install node", "Download it from nodejs.org, or run brew install node"),
       action: null,
     });
   }
@@ -138,9 +139,9 @@ async function runCheckup() {
     fs.rmdirSync(probe);
     items.push({
       key: "home",
-      label: "主目录权限",
+      label: L("主目录权限", "Home directory access"),
       status: "ok",
-      title: "可写",
+      title: L("可写", "Writable"),
       detail: HOME,
       fix: null,
       action: null,
@@ -148,11 +149,11 @@ async function runCheckup() {
   } catch (e) {
     items.push({
       key: "home",
-      label: "主目录权限",
+      label: L("主目录权限", "Home directory access"),
       status: "fail",
-      title: "无法写入",
+      title: L("无法写入", "Not writable"),
       detail: String(e?.message || e),
-      fix: "检查一下主目录的权限，可能被系统或安全软件限制",
+      fix: L("检查一下主目录的权限，可能被系统或安全软件限制", "Check the home directory permissions; they may be restricted by the system or security software"),
       action: null,
     });
   }
@@ -170,10 +171,10 @@ async function runCheckup() {
   }
   items.push({
     key: "existing",
-    label: "已有环境",
+    label: L("已有环境", "Existing environments"),
     status: "ok",
-    title: existing.length ? `${existing.length} 个` : "没有",
-    detail: existing.length ? existing.map((n) => `~/${n}`).join("  ") : "第一次用会新建一个",
+    title: existing.length ? L(`${existing.length} 个`, `${existing.length}`) : L("没有", "None"),
+    detail: existing.length ? existing.map((n) => `~/${n}`).join("  ") : L("第一次用会新建一个", "One will be created on first use"),
     fix: null,
     action: null,
   });

@@ -12,21 +12,22 @@
 
 const { execFile } = require("node:child_process");
 const net = require("node:net");
+const { L } = require("./i18n.cjs");
 
 /** 常见代理端口 + 它们通常是哪种协议 */
 const COMMON = [
   { port: 7890, protocol: "http", label: "Clash" },
   { port: 7891, protocol: "socks5", label: "Clash (SOCKS)" },
   { port: 7897, protocol: "http", label: "Clash Verge" },
-  { port: 1080, protocol: "socks5", label: "V2Ray / 通用 SOCKS" },
+  { port: 1080, protocol: "socks5", get label() { return L("V2Ray / 通用 SOCKS", "V2Ray / generic SOCKS"); } },
   { port: 1081, protocol: "socks5", label: "V2Ray" },
   { port: 1087, protocol: "http", label: "V2RayN" },
   { port: 6152, protocol: "http", label: "Surge" },
   { port: 6153, protocol: "http", label: "Surge" },
-  { port: 8888, protocol: "http", label: "Charles / 通用" },
-  { port: 8080, protocol: "http", label: "通用 HTTP" },
+  { port: 8888, protocol: "http", get label() { return L("Charles / 通用", "Charles / generic"); } },
+  { port: 8080, protocol: "http", get label() { return L("通用 HTTP", "Generic HTTP"); } },
   { port: 8118, protocol: "http", label: "Privoxy" },
-  { port: 9090, protocol: "http", label: "通用" },
+  { port: 9090, protocol: "http", get label() { return L("通用", "Generic"); } },
 ];
 
 /**
@@ -56,9 +57,9 @@ function readSystemProxy() {
         out.push({ host, port, protocol, label });
       };
 
-      add("HTTPSEnable", "HTTPSProxy", "HTTPSPort", "http", "系统代理");
-      add("HTTPEnable", "HTTPProxy", "HTTPPort", "http", "系统代理");
-      add("SOCKSEnable", "SOCKSProxy", "SOCKSPort", "socks5", "系统 SOCKS");
+      add("HTTPSEnable", "HTTPSProxy", "HTTPSPort", "http", L("系统代理", "System proxy"));
+      add("HTTPEnable", "HTTPProxy", "HTTPPort", "http", L("系统代理", "System proxy"));
+      add("SOCKSEnable", "SOCKSProxy", "SOCKSPort", "socks5", L("系统 SOCKS", "System SOCKS"));
 
       resolve(out);
     });
@@ -99,14 +100,14 @@ function testProxy(proxy, timeoutMs = 8000) {
       ["-sS", "--max-time", String(Math.ceil(timeoutMs / 1000)), "-x", url, "https://api.ipify.org?format=json"],
       { timeout: timeoutMs + 2000 },
       (err, stdout) => {
-        if (err) return resolve({ ok: false, reason: "连不上" });
+        if (err) return resolve({ ok: false, reason: L("连不上", "Unable to connect") });
         try {
           const j = JSON.parse(String(stdout));
           if (j.ip) return resolve({ ok: true, ip: j.ip });
         } catch {
           /* 走到下面 */
         }
-        resolve({ ok: false, reason: "返回格式不对" });
+        resolve({ ok: false, reason: L("返回格式不对", "Unexpected response format") });
       },
     );
   });
@@ -129,7 +130,7 @@ async function discoverProxies(current) {
 
   // 1. 用户已配的那个先测
   if (current && current.protocol !== "none" && current.host && current.port) {
-    push({ ...current, label: "当前配置", from: "current" });
+    push({ ...current, label: L("当前配置", "Current setting"), from: "current" });
   }
 
   // 2. 系统代理
