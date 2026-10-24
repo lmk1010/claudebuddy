@@ -39,21 +39,18 @@ const isDev = DEV_URL.length > 0;
 /**
  * 网络层硬化 —— 应用自己不能成为风控信号的来源。
  *
- * STUN 走 UDP，HTTPS_PROXY 根本管不到它。Chromium 默认允许 WebRTC
- * 用非代理的 UDP 去 stun.l.google.com 拿公网 IP，而那个 IP 是整机真实出口 ——
- * 不管给每个环境配了什么代理，它都一样。两个环境各走各的代理，
- * 却因为同一个 STUN 结果暴露出同一个真实 IP，隔离就白做了。
+ * STUN 走 UDP，HTTPS_PROXY 根本管不到它。Chromium 默认让 WebRTC
+ * 用非代理的 UDP 去 stun.l.google.com 问一句"我的公网 IP 是多少"，
+ * 而那个 IP 是整机真实出口 —— 不管给每个环境配了什么代理，它都一样。
+ * 两个环境各走各的代理，却因为同一个 STUN 结果露出同一个真实 IP。
  *
- * 三刀：
- *   · disable_non_proxied_udp   WebRTC 只走代理，没有代理就完全不用
- *   · disable-quic              QUIC 也是 UDP，同样绕过 HTTP 代理
- *   · 去掉 Media Router        它会在后台找局域网设备，发 mDNS
+ * 但 Chromium 那几个现成开关在 Electron 里拦不住（见 createWindow 里的实测记录），
+ * 所以这里只关 QUIC（它也是 UDP，同样绕过 HTTP 代理），
+ * 真正管用的是把 WebRTC 的构造器从页面上去掉。
  *
  * 必须在 app ready 之前设，之后改无效。
  */
-app.commandLine.appendSwitch("force-webrtc-ip-handling-policy", "disable_non_proxied_udp");
 app.commandLine.appendSwitch("disable-quic");
-app.commandLine.appendSwitch("disable-features", "MediaRouter,WebRtcAllowInputVolumeAdjustment");
 
 /** 应用图标：开发和打包两种路径都要能找到 */
 function iconPath() {
@@ -460,11 +457,37 @@ function createWindow() {
    * 一个权限都不给。
    *
    * 这一页只需要显示和自己的 IPC，不需要摄像头、麦克风、屏幕、定位。
-   * 全部拒绝就等于把 WebRTC 的入口也堵上了 —— 上面那个 Chromium
-   * 开关是主防线，这里是第二道：即使开关被某个未来版本忽略，也发不出 STUN。
    */
   mainWindow.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
   mainWindow.webContents.session.setPermissionCheckHandler(() => false);
+
+  /**
+   * 拔掉 WebRTC 的入口。
+   *
+   * 实测记录（Electron + 本地 STUN 靶场，只发回环包、不出网）：
+   *   force-webrtc-ip-handling-policy=disable_non_proxied_udp  10 个包，没拦住
+   *   webrtc-ip-handling-policy / disable-features 变体           同样没拦住
+   *   删掉 RTCPeerConnection                                    0 个包
+   *
+   * 也就是说 Chromium 那几个策略开关在 Electron 里一个都不管用，
+   * 唯一有效的是不给页面留构造器。页面本来就用不到 WebRTC，
+   * 删掉对功能没影响，但页面就再也没有办法发一个 STUN 包。
+   *
+   * 用 defineProperty 而不是赋值：这样页面自己也没法把它改回来
+   * （实测：赋值看起来“成功”，但再 new 一次依旧被挡，因为不可写属性静默失败）。
+   *
+   * 局限：dom-ready 之前就执行的同步脚本不在保护范围内。本应用加载的是
+   * 自己的本地 bundle、不加载任何远程内容，所以不存在这个场景；
+   * 真正贴在身边的风控风险是 Claude Desktop 发的 STUN，那个拦不住，
+   * 只能靠 leak.cjs 看见它（见「清理本机」页与安全指示器）。
+   */
+  const stripWebRTC = () =>
+    mainWindow.webContents
+      .executeJavaScript(
+        "for (const k of ['RTCPeerConnection','webkitRTCPeerConnection','RTCDataChannel','RTCIceCandidate','RTCSessionDescription']) { try { Object.defineProperty(window, k, { value: undefined, writable: false, configurable: false }); } catch (e) {} } true",
+      )
+      .catch(() => {});
+  mainWindow.webContents.on("dom-ready", stripWebRTC);
 
   mainWindow.on("close", () => saveWindowState(mainWindow));
 
