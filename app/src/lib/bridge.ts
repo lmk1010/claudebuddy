@@ -228,6 +228,50 @@ export interface IpInfo {
   timezone?: string;
 }
 
+/** 网络测试：一个目标的分阶段计时（毫秒，均为多次的平均） */
+export interface NetTarget {
+  id: string;
+  host: string;
+  url: string;
+  role: string;
+  rounds: number;
+  okCount: number;
+  /** 失败率 % */
+  loss: number;
+  dns: number;
+  tcp: number;
+  tls: number;
+  ttfb: number;
+  total: number;
+  min: number;
+  max: number;
+  jitter: number;
+  code: number;
+  remoteIp: string;
+  tlsOk: boolean | null;
+  http: string;
+  error: string | null;
+}
+
+export interface NetTest {
+  ok: boolean;
+  at: number;
+  tookMs: number;
+  route: { label: string; proxy: string | null };
+  rounds: number;
+  targets: NetTarget[];
+  dns: { host: string; sys: string[]; doh: string[] | null; dohVia: string | null; fake: boolean; bogus: boolean; mismatch: boolean }[];
+  local: {
+    systemProxy: { kind: string; addr: string }[] | null;
+    processProxy: { key: string; value: string }[];
+    tunLikely: boolean;
+    fakeIp: boolean;
+    ipv6: string | null;
+  };
+  exits: { direct: string | null; route: string | null };
+  exitInfo: { direct: IpInfo | null; route: IpInfo | null; v6: IpInfo | null };
+}
+
 /** 出口体检：站在 Claude 的角度看一个环境的出口 */
 export interface NetReport {
   ok: boolean;
@@ -357,6 +401,8 @@ export interface ClaudeBuddyBridge {
   ipInfo(ip: string): Promise<IpInfo | null>;
   /** 出口体检（走这个环境的代理） */
   netReport(id: string): Promise<NetReport>;
+  /** 网络测试；id 为 null = 本机直连 */
+  netTest(id: string | null, rounds?: number): Promise<NetTest>;
   gitInfo(cwd: string): Promise<GitInfo>;
   recentProjects(id?: string): Promise<RecentProject[]>;
   sessionUsage(opts: { configDir: string; cwd: string }): Promise<SessionUsage | null>;

@@ -8,6 +8,7 @@ import Home from "./components/Home";
 import Settings, { type SettingsCat } from "./components/Settings";
 import CommandPalette from "./components/CommandPalette";
 import CleanPage from "./components/CleanPage";
+import NetTestPage from "./components/NetTestPage";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
 import { assessSafety } from "./components/SafetyBadge";
@@ -120,7 +121,12 @@ export default function App() {
   const [exitIp, setExitIp] = useState<Record<string, string | null>>({});
   const [, setChecking] = useState<Record<string, boolean>>({});
   /** 从别处直接跳进设置的某个分类（比如账号菜单里的「清理本机」） */
-  const [settingsCat, setSettingsCat] = useState<SettingsCat | null>(null);
+  const [settingsCat, setSettingsCat] = useState<SettingsCat>("general");
+  /** 进设置之前在哪一页 —— 「返回应用」回到那里，而不是一律回首页 */
+  const lastViewRef = useRef<View>("home");
+  useEffect(() => {
+    if (state.view !== "settings") lastViewRef.current = state.view;
+  }, [state.view]);
   const [loginTerm, setLoginTerm] = useState<Record<string, string>>({});
   const [traces, setTraces] = useState<Record<string, TraceItem[] | undefined>>({});
   const [keychain, setKeychain] = useState<KeychainEntry[] | null>(null);
@@ -900,7 +906,8 @@ export default function App() {
       }
       if (meta && e.key === ",") {
         e.preventDefault();
-        update({ view: "settings" });
+        // 再按一次 ⌘, 就退出设置，跟 macOS 原生应用一样
+        update({ view: state.view === "settings" ? lastViewRef.current : "settings" });
         return;
       }
       if (meta && e.key.toLowerCase() === "n") {
@@ -942,6 +949,13 @@ export default function App() {
       if (e.key === "Escape") {
         if (palette) setPalette(false);
         else if (menu) setMenu(null);
+        // 设置里按 Esc 返回应用；有弹窗、或焦点在输入框里时不抢
+        else if (
+          state.view === "settings" &&
+          !document.querySelector(".mask, .cmenu") &&
+          !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
+        )
+          update({ view: lastViewRef.current });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1041,6 +1055,9 @@ export default function App() {
         onRename={renameWindow}
         onCopy={copy}
         onReveal={(p) => void reveal(p)}
+        settingsCat={settingsCat}
+        onSettingsCat={setSettingsCat}
+        onExitSettings={() => update({ view: lastViewRef.current })}
       />
 
       <div className={`wm${view === "session" && activeWindow ? " term-bg" : ""}`}>
@@ -1260,19 +1277,20 @@ export default function App() {
           />
         )}
 
-        {view === "settings" && (
-          <Settings
-            key={settingsCat ?? "default"}
-            initialCat={settingsCat ?? undefined}
-            state={state}
-            update={update}
-            onClose={() => update({ view: "home" })}
-            onOpenClean={() => update({ view: "clean" })}
-          />
+        {view === "settings" && settingsCat !== "clean" && settingsCat !== "net" && (
+          <Settings key={settingsCat} cat={settingsCat} state={state} update={update} />
         )}
 
-        {view === "clean" && (
+        {view === "settings" && settingsCat === "net" && (
+          <>
+            <div className="wh" />
+            <NetTestPage accounts={state.accounts} />
+          </>
+        )}
+
+        {view === "settings" && settingsCat === "clean" && (
           <CleanPage
+            inUse={state.accounts.filter((a) => state.windows.some((w) => w.accountId === a.id)).map((a) => a.configDir)}
             onPurged={(paths) => {
               // 目录被移走的环境从列表里摘掉；还有会话开着的先留着，免得把正在用的页签弄丢
               const gone = new Set(paths.map((p) => p.replace(/^.*\//, "")));
@@ -1378,11 +1396,12 @@ export default function App() {
             }}
             onOpenClean={() => {
               setMenu(null);
-              update({ view: "clean" });
+              setSettingsCat("clean");
+              update({ view: "settings" });
             }}
             onOpenSettings={(cat) => {
               setMenu(null);
-              setSettingsCat(cat ?? null);
+              if (cat) setSettingsCat(cat);
               update({ view: "settings" });
             }}
           />

@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { BuddyState as ShellState, ThemeMode } from "../lib/model";
 import {
-  IconClose,
   IconSettings,
   IconSun,
   IconTerminal,
@@ -10,21 +9,18 @@ import {
   IconGlobe,
   IconTrash,
 } from "./iconAliases";
-import Diagnose from "./Diagnose";
 import Help from "./Help";
 
 interface Props {
   state: ShellState;
   update: (patch: Partial<ShellState>) => void;
-  onClose: () => void;
-  /** 清理本机是单独一页（条目多了要表格、要筛选），设置里只放入口 */
-  onOpenClean: () => void;
-  initialCat?: SettingsCat;
+  /** 分类在左侧边栏里选（跟 Claude Desktop 一样整窗换成设置），这里只画内容 */
+  cat: SettingsCat;
 }
 
 export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "net" | "about";
 
-type CatItem = { id: SettingsCat; label: string; icon: typeof IconSettings };
+export type CatItem = { id: SettingsCat; label: string; icon: typeof IconSettings };
 
 /**
  * 设置只放「跟环境无关」的东西 —— 这台电脑、这个应用怎么用。
@@ -35,7 +31,7 @@ type CatItem = { id: SettingsCat; label: string; icon: typeof IconSettings };
  *   常规：通用（启动、节奏看护、引导）· 外观 · 终端 · 快捷键
  *   本机：清理本机（所有 Claude Code 配置目录和 Keychain 凭据）· 连通诊断
  */
-const GROUPS: { title: string; items: CatItem[] }[] = [
+export const SETTINGS_GROUPS: { title: string; items: CatItem[] }[] = [
   {
     title: "常规",
     items: [
@@ -49,7 +45,7 @@ const GROUPS: { title: string; items: CatItem[] }[] = [
     title: "本机",
     items: [
       { id: "clean", label: "清理本机", icon: IconTrash },
-      { id: "net", label: "连通诊断", icon: IconGlobe },
+      { id: "net", label: "网络测试", icon: IconGlobe },
     ],
   },
   {
@@ -62,42 +58,11 @@ const GROUPS: { title: string; items: CatItem[] }[] = [
  * 设置页 —— 左边分类、右边一行一项：名称和说明在左，控件在右，跟 Claude Desktop 同构。
  * 开关打开是墨色 —— 这一屏没有主操作，陶土不出现。
  */
-export default function Settings({ state, update, onClose, onOpenClean, initialCat }: Props) {
-  const [cat, setCat] = useState<SettingsCat>(initialCat ?? "general");
-
+export default function Settings({ state, update, cat }: Props) {
   return (
     <>
-      <div className="wh">
-        <span className="tt">设置</span>
-        <span className="acts">
-          <button className="ib" title="关闭设置 ⌘," onClick={onClose}>
-            <IconClose />
-          </button>
-        </span>
-      </div>
-      <div className="st">
-        <nav className="st-nav">
-          {GROUPS.map((g) => (
-            <div className="st-grp" key={g.title}>
-              <span className="st-grp-t">{g.title}</span>
-              {g.items.map((c) => {
-                const Icon = c.icon;
-                return (
-                  <button
-                    key={c.id}
-                    className={cat === c.id ? "on" : ""}
-                    onClick={() => (c.id === "clean" ? onOpenClean() : setCat(c.id))}
-                  >
-                    <Icon size={15} />
-                    <span>{c.label}</span>
-                    {c.id === "clean" && <span className="st-go">↗</span>}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
+      <div className="wh" />
+      <div className="st st-solo">
         {/* key={cat} 让内容在切换时重新挂载，动画才有东西可播 */}
         <div className="st-body" key={cat}>
           {cat === "general" && (
@@ -211,7 +176,6 @@ export default function Settings({ state, update, onClose, onOpenClean, initialC
             </>
           )}
 
-          {cat === "net" && <Diagnose part="net" />}
 
           {cat === "about" && (
             <>

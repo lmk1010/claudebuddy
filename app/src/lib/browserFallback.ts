@@ -227,6 +227,36 @@ export function installBrowserFallback(): void {
       proxy: false,
       hosting: true,
     }),
+    netTest: async (id) => {
+      await new Promise((r) => setTimeout(r, 900));
+      const T = (tid: string, host: string, role: string, d: number, c: number, t: number, f: number, j: number, code: number, err?: string) => ({
+        id: tid, host, url: `https://${host}/`, role, rounds: 4, okCount: err ? 0 : 4, loss: err ? 100 : 0,
+        dns: d, tcp: c, tls: t, ttfb: f, total: d + c + t + f, min: d + c + t + f - j, max: d + c + t + f + j, jitter: j,
+        code: err ? 0 : code, remoteIp: "160.79.104.10", tlsOk: err ? null : true, http: "2", error: err ?? null,
+      });
+      return {
+        ok: true, at: Date.now(), tookMs: 14020, route: { label: id ? "环境" : "本机直连", proxy: id ? "http://127.0.0.1:7890" : null }, rounds: 4,
+        targets: [
+          T("api", "api.anthropic.com", "模型 API（对话、补全都走这里）", 2, 1, 704, 306, 229, 404),
+          T("web", "claude.ai", "登录授权、网页", 2, 0, 584, 303, 146, 200),
+          T("console", "console.anthropic.com", "OAuth 回调、账号", 2, 0, 781, 403, 582, 301),
+          T("dist", "storage.googleapis.com", "Claude Code 安装包 / 自动更新", 3, 1, 410, 220, 90, 400),
+          T("status", "status.claude.com", "官方状态页", 68, 1, 842, 560, 682, 200),
+        ],
+        dns: [
+          { host: "api.anthropic.com", sys: ["160.79.104.10", "2607:6bc0::10"], doh: ["160.79.104.10"], dohVia: "Google", fake: false, bogus: false, mismatch: false },
+          { host: "claude.ai", sys: ["160.79.104.10"], doh: ["160.79.104.10"], dohVia: "Google", fake: false, bogus: false, mismatch: false },
+          { host: "console.anthropic.com", sys: ["160.79.104.10"], doh: ["160.79.104.10"], dohVia: "Google", fake: false, bogus: false, mismatch: false },
+        ],
+        local: { systemProxy: [{ kind: "HTTPS", addr: "127.0.0.1:7890" }, { kind: "SOCKS", addr: "127.0.0.1:7890" }], processProxy: [], tunLikely: !id, fakeIp: false, ipv6: "240e:45a:2e02:402d::1" },
+        exits: { direct: "185.186.60.71", route: id ? "185.186.60.71" : null },
+        exitInfo: {
+          direct: { ip: "185.186.60.71", country: "美国", countryCode: "US", region: "加利福尼亚", city: "洛杉矶", isp: "Guidance Hosting Inc", org: "", as: "AS6282", mobile: false, proxy: false, hosting: false },
+          route: null,
+          v6: { ip: "240e::1", country: "中国", countryCode: "CN", region: "安徽", city: "合肥", isp: "China Telecom", org: "", as: "AS4134", mobile: false, proxy: false, hosting: false },
+        },
+      };
+    },
     netReport: async () => ({
       ok: true,
       ip: "185.186.60.71",

@@ -903,6 +903,23 @@ ipcMain.handle("checkup:recheck", async () => checkupModule.runCheckup());
 // ─────────────────────────────────────────── 连通性归因
 
 const diagnoseModule = require("./diagnose.cjs");
+const nettestModule = require("./nettest.cjs");
+
+/**
+ * 网络测试：id 为空 = 本机直连；否则走那个环境的代理。
+ * 几个出口（直连 / 所选线路 / IPv6）顺手查归属，界面上要能说清「这是谁家的 IP」。
+ */
+ipcMain.handle("net:test", async (_e, { id, rounds } = {}) => {
+  const a = id ? resolveAccount(id) : null;
+  const proxy = a ? acct.proxyOrNothing(a) : null;
+  const r = await nettestModule.run({ proxy, label: a ? a.label : "本机直连", rounds });
+  const [direct, route, v6] = await Promise.all([
+    r.exits.direct ? lookupIpInfo(r.exits.direct) : null,
+    r.exits.route ? lookupIpInfo(r.exits.route) : null,
+    r.local.ipv6 ? lookupIpInfo(r.local.ipv6) : null,
+  ]);
+  return { ...r, exitInfo: { direct, route, v6 } };
+});
 
 /**
  * 403 到底是哪一层挡的。

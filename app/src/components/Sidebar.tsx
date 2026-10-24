@@ -16,6 +16,7 @@ import {
 } from "./iconAliases";
 import { useContextMenu } from "./ContextMenu";
 import { IconEdit, RenameInput } from "./Rename";
+import { SETTINGS_GROUPS, type SettingsCat } from "./Settings";
 
 interface Props {
   /** 是否展开。收起时不卸载，只把宽度收到 0 —— 这样能过渡 */
@@ -39,6 +40,10 @@ interface Props {
   onRename: (id: string, title: string) => void;
   onCopy: (text: string) => void;
   onReveal: (path: string) => void;
+  /** 设置模式：整条侧栏换成设置分类（跟 Claude Desktop 一样），顶上一个「返回」 */
+  settingsCat: SettingsCat;
+  onSettingsCat: (c: SettingsCat) => void;
+  onExitSettings: () => void;
 }
 
 /**
@@ -66,6 +71,9 @@ export default function Sidebar({
   onRename,
   onCopy,
   onReveal,
+  settingsCat,
+  onSettingsCat,
+  onExitSettings,
 }: Props) {
   const [width, setWidth] = useState(264);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -123,6 +131,32 @@ export default function Sidebar({
         </span>
       </div>
 
+      {view === "settings" ? (
+        <div className="ws-set" key="set">
+          <button className="ws-back" onClick={onExitSettings} title="返回应用（Esc / ⌘,）">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 3.5 5.5 8l4.5 4.5" />
+            </svg>
+            返回应用
+            <span className="kbd">esc</span>
+          </button>
+          <div className="ws-set-t">设置</div>
+          {SETTINGS_GROUPS.map((g) => (
+            <div className="ws-set-g" key={g.title}>
+              <div className="gl">
+                <span>{g.title}</span>
+              </div>
+              {g.items.map((c) => (
+                <button key={c.id} className={`nv${settingsCat === c.id ? " on" : ""}`} onClick={() => onSettingsCat(c.id)}>
+                  <c.icon />
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
       {/* 直接建在当前环境里 —— 环境在主界面顶部、或底部那一行切 */}
       <button
         className="new"
@@ -247,6 +281,8 @@ export default function Sidebar({
           <IconChevronDown size={13} />
         </span>
       </button>
+        </>
+      )}
     </aside>
   );
 }

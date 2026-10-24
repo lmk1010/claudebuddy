@@ -42,7 +42,8 @@ function when(ts: number) {
   return d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 }
 
-export default function Diagnose({ part }: { part: "clean" | "net" }) {
+/** embedded：嵌在网络测试页底部时不要自己的大标题 */
+export default function Diagnose({ part, embedded }: { part: "clean" | "net"; embedded?: boolean }) {
   const [survey, setSurvey] = useState<CleanupSurvey | null>(null);
   const [diag, setDiag] = useState<DiagnoseResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -100,7 +101,7 @@ export default function Diagnose({ part }: { part: "clean" | "net" }) {
 
   return (
     <>
-      <h1>{part === "clean" ? "清理本机" : "连通诊断"}</h1>
+      {!embedded && <h1>{part === "clean" ? "清理本机" : "连通诊断"}</h1>}
 
       {err && <div className="diag-head">{err}</div>}
 
@@ -263,7 +264,7 @@ export default function Diagnose({ part }: { part: "clean" | "net" }) {
       {/* ── 连通 ── */}
       {part === "net" && (
         <p className="dx-lead">
-          用这台电脑当前的网络（不走任何环境的代理）逐层探测，看 403 / 连不上卡在哪一层。各环境自己的出口在「环境 → 网络出口」里看。
+          用这台电脑当前的网络（不走任何环境的代理）逐层探测：出口 → Cloudflare 挑战 → 账号 → 额度，看 403 / 连不上卡在哪一层。
         </p>
       )}
       {part === "net" && !diag && busy && (

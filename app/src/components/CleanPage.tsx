@@ -58,7 +58,15 @@ function shortPath(p: string) {
 }
 
 /** onPurged：被移走的目录绝对路径，上层据此把对应的环境从列表里摘掉 */
-export default function CleanPage({ onPurged }: { onPurged: (movedPaths: string[]) => void }) {
+export default function CleanPage({
+  onPurged,
+  inUse,
+}: {
+  onPurged: (movedPaths: string[]) => void;
+  /** 本应用里还有会话开着的配置目录名（如 .claude-work）—— 清它等于把正在跑的会话的登录拔掉 */
+  inUse: string[];
+}) {
+  const busyDir = (p: string) => inUse.includes(p.replace(/^.*\//, ""));
   const [survey, setSurvey] = useState<CleanupSurvey | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -313,7 +321,10 @@ export default function CleanPage({ onPurged }: { onPurged: (movedPaths: string[
                           <IconFolder size={13} />
                         </span>
                         <span className="cl-nm">
-                          <b>{it.a.email ?? it.a.name}</b>
+                          <b>
+                            {it.a.email ?? it.a.name}
+                            {busyDir(it.a.path) && <span className="cl-live">有会话在跑</span>}
+                          </b>
                           <small className="mono" title={it.a.path}>
                             {shortPath(it.a.path)}
                             {" · "}
@@ -377,7 +388,7 @@ export default function CleanPage({ onPurged }: { onPurged: (movedPaths: string[
           title={`清理 ${confirm.length} 项？`}
           danger
           okLabel="清理"
-          body={<ConfirmBody list={confirm} />}
+          body={<ConfirmBody list={confirm} busy={confirm.filter((it) => it.type === "dir" && busyDir(it.a.path)).length} />}
           onOk={() => void purge(confirm)}
           onClose={() => setConfirm(null)}
         />
@@ -388,7 +399,7 @@ export default function CleanPage({ onPurged }: { onPurged: (movedPaths: string[
 }
 
 /** 确认框里把每一项会发生什么写清楚，尤其是「默认目录只清凭据」和「凭据不可恢复」 */
-function ConfirmBody({ list }: { list: Item[] }) {
+function ConfirmBody({ list, busy }: { list: Item[]; busy: number }) {
   const dirs = list.filter((it): it is Extract<Item, { type: "dir" }> => it.type === "dir");
   const def = dirs.find((it) => it.a.kind === "default");
   const moved = dirs.filter((it) => it.a.kind !== "default");
@@ -404,6 +415,7 @@ function ConfirmBody({ list }: { list: Item[] }) {
           其中 {live.length} 个是正常登录着的账号（{live.map((it) => it.a.email ?? it.a.name).join("、")}），清掉后要重新登录。
         </p>
       )}
+      {busy > 0 && <p className="warn">其中 {busy} 个目录还有会话开着，清掉后那些会话会立刻掉登录，建议先关掉。</p>}
       <p className="dim">Keychain 凭据删了不可恢复。</p>
     </div>
   );
