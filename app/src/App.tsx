@@ -58,6 +58,7 @@ import type {
 } from "./lib/bridge";
 import "./styles/app.css";
 import "./styles/ui.css";
+import "./styles/guide.css";
 
 /**
  * ClaudeBuddy 主应用。
@@ -1288,9 +1289,9 @@ export default function App() {
             <Guide
               onGo={(to) => {
                 if (to === "home" || to === "sessions" || to === "accounts") update({ view: to });
-                else if (to === "editNet") {
+                else if (to === "editNet" || to === "editLogin") {
                   update({ view: "accounts" });
-                  if (activeAccount) setEditor({ id: activeAccount.id, section: "network" });
+                  if (activeAccount) setEditor({ id: activeAccount.id, section: to === "editNet" ? "network" : "general" });
                 } else setSettingsCat(to);
               }}
             />
@@ -1307,6 +1308,12 @@ export default function App() {
         {view === "settings" && settingsCat === "clean" && (
           <CleanPage
             inUse={state.accounts.filter((a) => state.windows.some((w) => w.accountId === a.id)).map((a) => a.configDir)}
+            onRelogin={() => {
+              // 去环境页，直接打开当前环境的「通用」—— 登录按钮就在最上面
+              update({ view: "accounts" });
+              const target = activeAccount ?? state.accounts[0];
+              if (target) setEditor({ id: target.id, section: "general" });
+            }}
             onPurged={(paths) => {
               // 目录被移走的环境从列表里摘掉；还有会话开着的先留着，免得把正在用的页签弄丢
               const gone = new Set(paths.map((p) => p.replace(/^.*\//, "")));

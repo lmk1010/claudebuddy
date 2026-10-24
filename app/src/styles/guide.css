@@ -1,0 +1,581 @@
+/* ══════════ 使用教程：左图右文，一屏一件事 ══════════ */
+.gd {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 48px 40px;
+}
+
+/* 章节：居中的分段胶囊 */
+.gd-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--hv);
+  margin-bottom: 28px;
+}
+.gd-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 14px 0 6px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--t3);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.gd-tab:hover {
+  color: var(--t1);
+}
+.gd-tab-n {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--t3);
+  background: var(--bg);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.gd-tab.on {
+  background: var(--bg);
+  color: var(--t1);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 0.5px var(--ln);
+}
+.gd-tab.on .gd-tab-n {
+  background: var(--coral);
+  color: #fff;
+}
+
+/* 主卡：左边配图，右边三步 */
+.gd-card {
+  width: 100%;
+  max-width: 880px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 44px;
+  align-items: center;
+  /* 三章高度一致，翻页时下面的箭头不上下跳 */
+  min-height: 360px;
+}
+.gd-card[data-dir="next"] .gd-art,
+.gd-card[data-dir="next"] .gd-txt {
+  animation: gd-next 360ms var(--ease-out) both;
+}
+.gd-card[data-dir="prev"] .gd-art,
+.gd-card[data-dir="prev"] .gd-txt {
+  animation: gd-prev 360ms var(--ease-out) both;
+}
+.gd-card .gd-txt {
+  animation-delay: 50ms !important;
+}
+@keyframes gd-next {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+}
+@keyframes gd-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-22px);
+  }
+}
+.gd-art {
+  aspect-ratio: 4 / 3;
+  border-radius: 20px;
+  background:
+    radial-gradient(90% 80% at 20% 10%, var(--coral-soft), transparent 70%),
+    var(--pp);
+  border: var(--hair) solid var(--ln);
+  display: grid;
+  place-items: center;
+  padding: 26px;
+  overflow: hidden;
+}
+.gd-txt h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--t1);
+}
+.gd-sub {
+  margin: 6px 0 26px;
+  font-size: 13px;
+  color: var(--t3);
+}
+.gd-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.gd-steps li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.gd-steps li > span {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--coral);
+  box-shadow: inset 0 0 0 1px var(--coral);
+}
+.gd-steps b {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t1);
+  line-height: 24px;
+}
+.gd-steps small {
+  display: block;
+  font-size: 12px;
+  color: var(--t4);
+}
+.gd-note {
+  margin: 22px 0 0;
+  padding-left: 38px;
+  font-size: 11.5px;
+  color: var(--t4);
+}
+.gd-go {
+  margin: 26px 0 0 38px;
+}
+
+/* 翻页：左右箭头 + 圆点 */
+.gd-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 36px;
+}
+.gd-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  color: var(--t2);
+  border: var(--hair) solid var(--ln);
+  background: var(--bg);
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    color var(--dur-snap) var(--ease-out),
+    opacity var(--dur-snap) var(--ease-out);
+}
+.gd-arrow:hover:not(:disabled) {
+  background: var(--hv);
+  color: var(--t1);
+}
+.gd-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.gd-dots {
+  display: flex;
+  gap: 6px;
+}
+.gd-dots button {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--ln2);
+  transition:
+    width var(--dur-fast) var(--spring),
+    background var(--dur-fast) var(--ease-out);
+}
+.gd-dots button.on {
+  width: 22px;
+  background: var(--coral);
+}
+
+/* ══════════ 配图：缩小版真实界面 ══════════ */
+.ga-win {
+  width: 100%;
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 18px 40px rgba(60, 40, 20, 0.12), 0 2px 6px rgba(60, 40, 20, 0.06), 0 0 0 0.5px var(--ln);
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--t2);
+}
+.ga-bar {
+  display: flex;
+  gap: 5px;
+  padding: 8px 10px;
+  background: var(--sd);
+}
+.ga-bar i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ln2);
+}
+.ga-bar i:nth-child(1) {
+  background: #ff5f57;
+}
+.ga-bar i:nth-child(2) {
+  background: #febc2e;
+}
+.ga-bar i:nth-child(3) {
+  background: #28c840;
+}
+.ga-body {
+  display: flex;
+  min-height: 150px;
+}
+.ga-side {
+  width: 64px;
+  flex: none;
+  padding: 6px;
+  background: var(--sd);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ga-nv {
+  padding: 4px 6px;
+  border-radius: 5px;
+  font-size: 9px;
+  color: var(--t3);
+}
+.ga-nv.on {
+  background: var(--sel);
+  color: var(--t1);
+  font-weight: 500;
+}
+.ga-main {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ga-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ga-h b {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t1);
+}
+.ga-btn {
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ga-btn.pri {
+  background: var(--coral);
+  color: #fff;
+}
+.ga-btn.danger {
+  background: var(--danger);
+  color: #fff;
+}
+.ga-btn.sm {
+  padding: 3px 14px;
+}
+.ga-seg {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--hv);
+}
+.ga-seg span {
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 9px;
+  color: var(--t3);
+}
+.ga-seg span.on {
+  background: var(--bg);
+  color: var(--t1);
+  font-weight: 500;
+}
+.ga-table {
+  border-radius: 7px;
+  box-shadow: 0 0 0 0.5px var(--ln);
+  overflow: hidden;
+}
+.ga-tr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.ga-tr + .ga-tr {
+  border-top: 0.5px solid var(--ln);
+}
+.ga-tr.on {
+  background: var(--sel);
+}
+.ga-ck {
+  width: 9px;
+  height: 9px;
+  border-radius: 2.5px;
+  box-shadow: inset 0 0 0 1px var(--t4);
+}
+.ga-ck.on {
+  background: var(--t1);
+  box-shadow: none;
+}
+.ga-n {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--t1);
+}
+.ga-tag {
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 8.5px;
+  line-height: 14px;
+  background: var(--hv);
+  color: var(--t3);
+}
+.ga-tag.ok {
+  background: rgba(78, 159, 99, 0.14);
+  color: var(--success);
+}
+.ga-tag.bad {
+  background: rgba(198, 69, 69, 0.12);
+  color: var(--danger);
+}
+.ga-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  box-shadow: 0 0 0 0.5px var(--ln);
+}
+.ga-card.dim {
+  opacity: 0.55;
+}
+.ga-ln {
+  height: 5px;
+  width: 60%;
+  border-radius: 3px;
+  background: var(--ln2);
+}
+.ga-ln.short {
+  width: 38%;
+}
+.ga-stack {
+  position: relative;
+  width: 100%;
+  padding: 0 24% 30px 0;
+}
+/* 浏览器卡片压在窗口右下角外侧，不挡住「登录」按钮 */
+.ga-browser {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 40%;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 16px 36px rgba(60, 40, 20, 0.16), 0 0 0 0.5px var(--ln);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: ga-float 3.2s var(--ease) infinite;
+}
+@keyframes ga-float {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.ga-url {
+  align-self: stretch;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--hv);
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--t3);
+}
+.ga-spark {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.ga-spark.sm {
+  width: 14px;
+  height: 14px;
+}
+.ga-hello {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ga-hello b {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--t1);
+}
+.ga-envs {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  align-self: center;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--hv);
+}
+.ga-envs span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 9px;
+  color: var(--t3);
+}
+.ga-envs span.on {
+  background: var(--bg);
+  color: var(--t1);
+}
+.ga-envs i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.ga-comp {
+  padding: 9px 10px;
+  border-radius: 9px;
+  box-shadow: 0 0 0 0.5px var(--ln2), 0 2px 6px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ga-typing {
+  font-size: 10px;
+  color: var(--t1);
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 1px solid var(--t1);
+  width: 0;
+  animation:
+    ga-type 2.6s steps(8) 0.4s infinite,
+    ga-caret 0.8s step-end infinite;
+  justify-self: start;
+  max-width: max-content;
+}
+@keyframes ga-type {
+  60%,
+  100% {
+    width: 8.4em;
+  }
+}
+@keyframes ga-caret {
+  50% {
+    border-color: transparent;
+  }
+}
+.ga-comp-r {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ga-chip {
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 8.5px;
+  box-shadow: 0 0 0 0.5px var(--ln2);
+  color: var(--t3);
+}
+.ga-chip.ok {
+  background: rgba(78, 159, 99, 0.12);
+  box-shadow: none;
+  color: var(--success);
+}
+.ga-send {
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: #fff;
+  background: var(--coral);
+}
+
+/* 「点这里」：一圈向外散的脉冲 */
+.ga-pulse {
+  position: relative;
+}
+.ga-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(196, 112, 79, 0.55);
+  animation: ga-pulse 1.8s var(--ease-out) infinite;
+}
+.ga-btn.danger.ga-pulse::after {
+  box-shadow: 0 0 0 0 rgba(198, 69, 69, 0.5);
+  animation-name: ga-pulse-red;
+}
+@keyframes ga-pulse {
+  70%,
+  100% {
+    box-shadow: 0 0 0 9px rgba(196, 112, 79, 0);
+  }
+}
+@keyframes ga-pulse-red {
+  70%,
+  100% {
+    box-shadow: 0 0 0 9px rgba(198, 69, 69, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ga-pulse::after,
+  .ga-browser,
+  .ga-typing {
+    animation: none;
+  }
+  .ga-typing {
+    width: auto;
+  }
+}

@@ -61,8 +61,11 @@ function shortPath(p: string) {
 export default function CleanPage({
   onPurged,
   inUse,
+  onRelogin,
 }: {
   onPurged: (movedPaths: string[]) => void;
+  /** 清完凭据后的下一步：去重新登录（清理 → 授权 是同一件事的前后两步） */
+  onRelogin: () => void;
   /** 本应用里还有会话开着的配置目录名（如 .claude-work）—— 清它等于把正在跑的会话的登录拔掉 */
   inUse: string[];
 }) {
@@ -263,6 +266,11 @@ export default function CleanPage({
             {last.moved.length > 0 && (
               <button className="det-k" onClick={() => void window.claudeBuddy.reveal(last.trashRoot)}>
                 打开回收目录
+              </button>
+            )}
+            {last.keychainDeleted.length > 0 && (
+              <button className="btn pri" onClick={onRelogin}>
+                去重新登录 →
               </button>
             )}
             <button className="det-k" onClick={() => setLast(null)}>
