@@ -205,7 +205,7 @@ export default function NetReportCard({
               <b>不是 Anthropic 的内部分数</b>，只用来对比线路好坏。
             </p>
             <p>这里的 IP 是直接请求 claude.ai 时，Cloudflare 回报的来源地址，走的就是这个环境的线路，跟真实会话同一条路。</p>
-            <p>它跟设置里「连通诊断」的「本机直连出口」不一定一样：那个不走任何环境的代理。</p>
+            <p>它跟「设置 → 网络测试」里的「本机直连出口」不一定一样：那个不走任何环境的代理。</p>
             <p>IP 属性两个来源各说各的（ip-api、proxycheck），照实列出，不按运营商名字去猜。</p>
           </Help>
         </div>

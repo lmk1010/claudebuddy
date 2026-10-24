@@ -7,6 +7,11 @@ export interface AppInfo {
   home: string;
   username: string;
   version: string;
+  versions?: { electron: string; chrome: string; node: string };
+  arch?: string;
+  /** Darwin 内核版本，如 24.6.0 */
+  osVersion?: string;
+  userData?: string;
   ptyAvailable: boolean;
   darkMode: boolean;
   forcedTheme: "light" | "dark" | null;

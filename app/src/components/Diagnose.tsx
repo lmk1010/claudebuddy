@@ -5,7 +5,8 @@ import type {
   CleanupSurvey,
   DiagnoseResult,
 } from "../lib/bridge";
-import { IconCheck, IconRefresh, IconWarning } from "./iconAliases";
+import { IconRefresh } from "./iconAliases";
+import StatusIcon from "./StatusIcon";
 
 /**
  * 体检 —— 一进来就查，不用点。
@@ -283,14 +284,19 @@ export default function Diagnose({ part, embedded }: { part: "clean" | "net"; em
         return (
           <>
             <div className={`dx-sum ${worst}`}>
-              <span className="dx-sum-ic">{worst === "ok" ? <IconCheck size={16} /> : <IconWarning size={16} />}</span>
+              <StatusIcon tone={worst} size={30} />
               <div className="dx-sum-t">
                 <b>{diag.headline}</b>
-                {diag.exitIp && (
-                  <small>
-                    出口 <span className="mono">{diag.exitIp.ip}</span> · {diag.exitIp.asn}
-                  </small>
-                )}
+                <small>
+                  {diag.exitIp ? (
+                    <>
+                      本机直连出口 <span className="mono">{diag.exitIp.ip}</span> · {diag.exitIp.asn}
+                    </>
+                  ) : (
+                    "出口没查到"
+                  )}
+                  {worst === "ok" ? " · 若仍遇到 403，多半是登录态失效，重新登录这个环境即可" : ""}
+                </small>
               </div>
               <button className="btn" disabled={busy} onClick={() => void load()}>
                 <IconRefresh />
@@ -303,9 +309,7 @@ export default function Diagnose({ part, embedded }: { part: "clean" | "net"; em
                 const tone = l.status === "ok" ? "ok" : l.status === "warn" ? "mid" : l.status === "fail" ? "bad" : "idle";
                 return (
                   <div key={l.id} className="dx-row">
-                    <span className={`dx-st ${tone}`}>
-                      {tone === "ok" ? <IconCheck size={12} /> : tone === "idle" ? i + 1 : <IconWarning size={12} />}
-                    </span>
+                    <StatusIcon tone={tone} size={22} n={i + 1} />
                     <div className="dx-main">
                       <div className="dx-t">
                         <b>{l.label}</b>
@@ -314,7 +318,28 @@ export default function Diagnose({ part, embedded }: { part: "clean" | "net"; em
                         </span>
                       </div>
                       <p className="dx-n">{l.note}</p>
-                      <code className="dx-d">{l.detail}</code>
+                      {/* 原始数据按「 · 」「；」拆成一枚枚小签，比一整行等宽长串好扫 */}
+                      <div className="dx-chips">
+                        {l.detail
+                          .split(/ · |；/)
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .map((s, k) => {
+                            const m = s.match(/^([^：:\d]+?)[：:]\s*(.+)$/);
+                            return (
+                              <span className="dx-chip" key={k}>
+                                {m ? (
+                                  <>
+                                    <em>{m[1]}</em>
+                                    {m[2]}
+                                  </>
+                                ) : (
+                                  s
+                                )}
+                              </span>
+                            );
+                          })}
+                      </div>
                     </div>
                   </div>
                 );

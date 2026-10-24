@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Account, ShellWindow, View } from "../lib/model";
+import type { SettingsCat } from "./Settings";
 import {
   IconFile,
   IconGear,
@@ -33,6 +34,8 @@ interface Props {
   onClone: () => void;
   onSwitchAccount: (id: string) => void;
   onOpenDiff: () => void;
+  /** 直接跳到设置的某一页 */
+  onSettings: (cat: SettingsCat) => void;
 }
 
 /**
@@ -53,6 +56,7 @@ export default function CommandPalette({
   onClone,
   onSwitchAccount,
   onOpenDiff,
+  onSettings,
 }: Props) {
   const [q, setQ] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -79,9 +83,13 @@ export default function CommandPalette({
       { id: "panel", icon: IconPanel, title: "折叠右栏", keys: ["⌘", "B"], run: onTogglePanel },
       { id: "side", icon: IconPanel, title: "折叠侧栏", keys: ["⌘", "\\"], run: onToggleSidebar },
       { id: "diff", icon: IconFile, title: "查看本次改动", keys: ["⌘", "D"], run: onOpenDiff },
-      { id: "home", icon: IconTerminal, title: "回到主页", run: () => onNav("home") },
+      { id: "home", icon: IconTerminal, title: "回到首页", run: () => onNav("home") },
+      { id: "sessions", icon: IconTerminal, title: "会话总览", run: () => onNav("sessions") },
       { id: "acc", icon: IconKey, title: "管理环境", run: () => onNav("accounts") },
-      { id: "set", icon: IconGear, title: "打开设置", keys: ["⌘", ","], run: () => onNav("settings") },
+      { id: "set", icon: IconGear, title: "打开设置", keys: ["⌘", ","], run: () => onSettings("general") },
+      { id: "clean", icon: IconGear, title: "清理本机（登录痕迹、空壳目录）", hint: "设置", run: () => onSettings("clean") },
+      { id: "net", icon: IconGear, title: "网络测试（延迟、DNS、IPv6）", hint: "设置", run: () => onSettings("net") },
+      { id: "about", icon: IconGear, title: "关于 ClaudeBuddy", hint: "设置", run: () => onSettings("about") },
     );
     // 账号直接可搜：切环境是最常用的动作
     for (const a of accounts) {
@@ -94,7 +102,7 @@ export default function CommandPalette({
       });
     }
     return out;
-  }, [windows, accounts, onOpenWindow, onNew, onNav, onTogglePanel, onToggleSidebar, onClone, onSwitchAccount, onOpenDiff]);
+  }, [windows, accounts, onOpenWindow, onNew, onNav, onTogglePanel, onToggleSidebar, onClone, onSwitchAccount, onOpenDiff, onSettings]);
 
   const filtered = useMemo(() => {
     const k = q.trim().toLowerCase();

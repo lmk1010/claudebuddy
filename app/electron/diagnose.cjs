@@ -338,7 +338,7 @@ async function diagnose() {
   const blocker = failed[0] || warned[0] || null;
 
   const headline = !blocker
-    ? "四层都通。当前的 403 若仍出现，只可能来自未覆盖的环节（如登录态 cookie 失效）。"
+    ? "四层都通，Claude 能正常访问"
     : blocker.id === "challenge"
       ? uaMatters
         ? "主因是 User-Agent 判定：CLI 自己的 UA 被 Claude 的 bot 规则挑战，浏览器 UA 则放行。"

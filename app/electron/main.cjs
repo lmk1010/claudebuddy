@@ -467,6 +467,11 @@ ipcMain.handle("app:info", () => ({
     }
   })(),
   version: app.getVersion(),
+  // 关于页用：运行时版本、系统、数据目录
+  versions: { electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node },
+  arch: process.arch,
+  osVersion: os.release(),
+  userData: app.getPath("userData"),
   ptyAvailable: pty !== null,
   darkMode: nativeTheme.shouldUseDarkColors,
   // 开发期逐屏自检用：强制浅色 / 暗色

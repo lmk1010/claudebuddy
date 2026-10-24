@@ -5,7 +5,8 @@ import type { IpInfo, NetTest, NetTarget } from "../lib/bridge";
 import { flag } from "./IpBadge";
 import Diagnose from "./Diagnose";
 import Help from "./Help";
-import { IconCheck, IconGlobe, IconRefresh, IconWarning } from "./iconAliases";
+import { IconGlobe, IconRefresh } from "./iconAliases";
+import StatusIcon from "./StatusIcon";
 
 /**
  * 网络测试 —— 专业版连通测试，单独一整页。
@@ -155,7 +156,7 @@ export default function NetTestPage({ accounts }: { accounts: Account[] }) {
           <div className="nt-finds">
             {findings(r).map((f) => (
               <div key={f.title} className={`nt-find ${f.tone}`}>
-                <span className="nt-find-ic">{f.tone === "ok" ? <IconCheck size={13} /> : f.tone === "info" ? "i" : <IconWarning size={13} />}</span>
+                <StatusIcon tone={f.tone} size={22} />
                 <div>
                   <b>{f.title}</b>
                   <p>{f.body}</p>

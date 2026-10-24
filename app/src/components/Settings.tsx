@@ -10,6 +10,7 @@ import {
   IconTrash,
 } from "./iconAliases";
 import Help from "./Help";
+import About from "./About";
 
 interface Props {
   state: ShellState;
@@ -29,7 +30,7 @@ export type CatItem = { id: SettingsCat; label: string; icon: typeof IconSetting
  * 这里不再复制一份环境列表：两处都能改同一件事，用户就不知道该去哪改。
  *
  *   常规：通用（启动、节奏看护、引导）· 外观 · 终端 · 快捷键
- *   本机：清理本机（所有 Claude Code 配置目录和 Keychain 凭据）· 连通诊断
+ *   本机：清理本机（所有 Claude Code 配置目录和 Keychain 凭据）· 网络测试
  */
 export const SETTINGS_GROUPS: { title: string; items: CatItem[] }[] = [
   {
@@ -177,25 +178,7 @@ export default function Settings({ state, update, cat }: Props) {
           )}
 
 
-          {cat === "about" && (
-            <>
-              <h1>关于</h1>
-              <div style={{ display: "flex", gap: 16, alignItems: "center", padding: "8px 0 20px" }}>
-                <img
-                  src="./assets/app-icon.png"
-                  alt="ClaudeBuddy"
-                  style={{ width: 56, height: 56, borderRadius: 14, display: "block" }}
-                />
-                <div>
-                  <div style={{ fontFamily: "var(--serif)", fontSize: 22, letterSpacing: "-0.015em" }}>ClaudeBuddy</div>
-                  <div style={{ fontSize: 12, color: "var(--t3)" }}>给 Claude Code 一个安静的家</div>
-                </div>
-              </div>
-              <p style={{ fontSize: 12.5, color: "var(--t3)", lineHeight: 1.75 }}>
-                每个账号一个独立环境，每个项目一个干净的终端。
-              </p>
-            </>
-          )}
+          {cat === "about" && <About />}
         </div>
       </div>
     </>

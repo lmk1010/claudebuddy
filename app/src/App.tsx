@@ -1353,6 +1353,10 @@ export default function App() {
           onOpenWindow={(id) => update({ activeWindowId: id, view: "session" })}
           onNew={goNew}
           onNav={(v) => update({ view: v })}
+          onSettings={(cat) => {
+            setSettingsCat(cat);
+            update({ view: "settings" });
+          }}
           onTogglePanel={() => setInspectorOpen((v) => !v)}
           onToggleSidebar={() => update({ sidebarOpen: !state.sidebarOpen })}
           onClone={() => setCloneOpen(true)}
