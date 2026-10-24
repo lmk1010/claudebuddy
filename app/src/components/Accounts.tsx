@@ -4,6 +4,7 @@ import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem, DesktopProbe
 import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, relTime, tierLabel, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
 import HealthSection from "./EnvHealth";
+import BrowserSection from "./EnvBrowser";
 import Art from "./Art";
 import Modal from "./Modal";
 import Help, { Steps } from "./Help";
@@ -366,7 +367,7 @@ export function ImportDialog({
 
 /* ══════════════════════ 编辑环境（弹窗） ══════════════════════ */
 
-export type EnvSection = "health" | "general" | "network" | "fingerprint" | "sessions" | "clean";
+export type EnvSection = "health" | "general" | "network" | "browser" | "fingerprint" | "sessions" | "clean";
 
 /**
  * 六项，健康评分放第一位 —— 打开一个环境先告诉你“它现在怎样、哪几项不对”，
@@ -406,6 +407,16 @@ const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof Icon
       );
     },
     icon: IconGlobe,
+  },
+  {
+    id: "browser",
+    get label() {
+      return tr("浏览器授权", "Browser for auth");
+    },
+    get desc() {
+      return tr("这个环境用哪个浏览器授权，记住它", "Which browser this environment authorizes with");
+    },
+    icon: IconKey,
   },
   {
     id: "fingerprint",
@@ -660,6 +671,8 @@ export function EnvModal({
                   onAlign={(t) => onPatch({ terminal: { ...account.terminal, ...t } })}
                 />
               )}
+
+              {sec === "browser" && <BrowserSection account={account} onPatch={onPatch} onLogin={onLogin} />}
 
               {sec === "fingerprint" && (
                 <>

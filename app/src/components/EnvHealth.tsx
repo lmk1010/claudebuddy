@@ -88,7 +88,7 @@ export default function HealthSection({
   leak: LeakReport | null;
   traces: TraceItem[] | undefined;
   busy: boolean;
-  onGo: (sec: "health" | "general" | "network" | "fingerprint" | "sessions" | "clean") => void;
+  onGo: (sec: "health" | "general" | "network" | "browser" | "fingerprint" | "sessions" | "clean") => void;
   onLogin: (browser?: string) => void;
   onRotate: () => void;
   onCheckExit: () => void;
