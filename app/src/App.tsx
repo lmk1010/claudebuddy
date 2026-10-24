@@ -1022,11 +1022,6 @@ export default function App() {
 
   return (
     <div className={`shell${state.sidebarOpen ? "" : " ws-closed"}`}>
-      {!state.sidebarOpen && (
-        <button className="ib ws-open" title="展开侧栏 ⌘\\" onClick={() => update({ sidebarOpen: true })}>
-          <IconPanel />
-        </button>
-      )}
       <Sidebar
         open={state.sidebarOpen}
         windows={state.windows}
@@ -1435,6 +1430,14 @@ export default function App() {
             {toast.body ? <small>{toast.body}</small> : null}
           </div>
         </div>
+      )}
+
+      {/* 展开侧栏按钮必须放在 DOM 最后：Electron 按 DOM 顺序合并拖拽区，
+          放在前面会被后面顶栏的 -webkit-app-region: drag 盖掉，看得见却点不动 */}
+      {!state.sidebarOpen && (
+        <button className="ib ws-open" title="展开侧栏 ⌘\\" onClick={() => update({ sidebarOpen: true })}>
+          <IconPanel />
+        </button>
       )}
     </div>
   );
