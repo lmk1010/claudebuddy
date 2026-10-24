@@ -23,7 +23,22 @@ const { app } = require("electron");
 let autoUpdater = null;
 let feedUrl = null;
 let getWindow = () => null;
-let state = { state: "idle", current: app.getVersion(), latest: null, percent: 0, transferred: 0, total: 0, error: null };
+/**
+ * enabled 放在 state 里，不能只在 IPC 里临时拼。
+ *
+ * 之前 push() 出去的状态没有 enabled，界面拿到就判不可用，整块直接不渲染 ——
+ * 表现就是"一点检查，卡片没了"。
+ */
+let state = {
+  state: "idle",
+  current: app.getVersion(),
+  latest: null,
+  percent: 0,
+  transferred: 0,
+  total: 0,
+  error: null,
+  enabled: false,
+};
 
 /** 包里有没有发布源 —— 没有就整块不启用 */
 function hasFeed() {
@@ -56,6 +71,8 @@ function init(getWin) {
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
+  // 有发布源才算可用 —— 这个字段要跟着每次推送给界面
+  push({ enabled: true });
 
   autoUpdater.on("checking-for-update", () => push({ state: "checking", error: null }));
   autoUpdater.on("update-available", (i) => push({ state: "available", latest: i.version, error: null }));

@@ -113,7 +113,9 @@ export function installBrowserFallback(): void {
     killTerm: () => {},
     attachTerm: async () => ({ alive: false, buffer: "" }),
     liveTerms: async () => [],
-    updateState: async () => ({ state: "idle", current: "0.2.1", latest: null, percent: 0, error: null, enabled: false }),
+    // 浏览器预览没有发布源，但界面得能看 —— 给一个"已是最新"的静止态。
+    // 只有 latest 这一个分支可达：available/downloading 永远不会出现，不存在假下载。
+    updateState: async () => ({ state: "latest", current: "0.2.3", latest: "0.2.3", percent: 0, error: null, enabled: true }),
     updateCheck: async () => ({ ok: false, reason: "no-feed" }),
     updateDownload: async () => ({ ok: false, reason: "no-feed" }),
     updateInstall: async () => false,

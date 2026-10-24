@@ -3905,6 +3905,190 @@
   }
 }
 
+/* ── 更新页 ──
+ * 其它设置页是「一行一项」的清单，这一页只有一件事，所以做成一张名片：
+ * 左边应用本体，右边版本与状态。留白比别处大，因为这里没有第二件事要放。
+ */
+.upd {
+  max-width: 620px;
+  padding: 6px 0 8px;
+}
+.upd-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 24px;
+  border: var(--hair) solid var(--ln2);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgba(20, 20, 19, 0.04), 0 12px 32px -18px rgba(20, 20, 19, 0.22);
+}
+.upd-art {
+  position: relative;
+  flex: none;
+  width: 68px;
+  height: 68px;
+  margin-top: 2px;
+}
+.upd-art::after {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(204, 120, 92, 0.16), transparent 72%);
+  z-index: 0;
+}
+.upd-art img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 68px;
+  height: 68px;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(20, 20, 19, 0.1), 0 10px 20px -10px rgba(20, 20, 19, 0.28);
+}
+.upd-main {
+  min-width: 0;
+  flex: 1;
+}
+.upd-top {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.upd-ver {
+  font-family: var(--serif);
+  font-size: 30px;
+  line-height: 1.05;
+  letter-spacing: -0.4px;
+  color: var(--t1);
+  font-variant-numeric: tabular-nums;
+}
+/* 状态胶囊：只有四种状态，颜色克制 —— 这一页没有需要“喊”的信息 */
+.upd-pill {
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 99px;
+  border: var(--hair) solid var(--ln2);
+  color: var(--t3);
+  transform: translateY(-3px);
+}
+.upd-pill.ok {
+  color: #4a7a55;
+  border-color: rgba(78, 159, 99, 0.35);
+  background: rgba(78, 159, 99, 0.08);
+}
+.upd-pill.new {
+  color: var(--coral-ink, #b5603f);
+  border-color: rgba(204, 120, 92, 0.4);
+  background: rgba(204, 120, 92, 0.1);
+}
+.upd-pill.bad {
+  color: #b4432f;
+  border-color: rgba(180, 67, 47, 0.35);
+  background: rgba(180, 67, 47, 0.08);
+}
+.upd-t {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.upd-s {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--t3);
+}
+.upd-bar-wrap {
+  width: min(380px, 100%);
+  margin-top: 20px;
+  min-height: 6px;
+}
+/*
+ * 进度条两种态：
+ *   确定态（下载）—— 宽度跟着 percent 长，transition 让它是“流”而不是跳
+ *   不确定态（检查）—— 检查没有进度可言，给一段来回滑的，比假的百分比诚实
+ */
+.upd-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(20, 20, 19, 0.07);
+  overflow: hidden;
+}
+.upd-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--coral, #cc785c);
+  transition: width 260ms var(--ease);
+}
+.upd-bar.idle > i {
+  width: 0;
+}
+.upd-bar.indet > i {
+  width: 34%;
+  animation: upd-indet 1.15s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+@keyframes upd-indet {
+  0% {
+    transform: translateX(-105%);
+  }
+  100% {
+    transform: translateX(310%);
+  }
+}
+.upd-acts {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}
+
+/* 三条事实：这一页只有一事，空白太多，拿真实的运行事实把它填起来 */
+.upd-facts {
+  margin-top: 14px;
+  border: var(--hair) solid var(--ln2);
+  border-radius: 12px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.upd-fact {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 46px;
+  padding: 0 16px;
+  font-size: 12.5px;
+}
+.upd-fact + .upd-fact {
+  border-top: var(--hair) solid var(--ln2);
+}
+.upd-fk {
+  flex: none;
+  width: 84px;
+  color: var(--t3);
+}
+.upd-fv {
+  color: var(--t2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 出口闸弹窗：正文比普通确认框长，行高放宽，IP 用等宽好对照 */
+.ipgate-body {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--t2);
+}
+.ipgate-risk {
+  color: #b4432f;
+}
+
 /* ── 健康检查页 ── */
 .hc-note {
   display: flex;

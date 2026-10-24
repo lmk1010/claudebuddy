@@ -353,13 +353,16 @@ async function checkExitIp(account) {
   const urls = ["https://api.ipify.org?format=json", "https://ifconfig.co/json"];
 
   for (const url of urls) {
+    const px = proxyOrNothing(account);
+    /**
+     * -x 和它的值必须一起给，不能靠 filter(Boolean) 各自过滤：
+     * 没配代理时 px 是 null，过滤掉 null 却留下裸的 -x，
+     * curl 会把后面的 URL 当成代理地址，报 "no URL specified" ——
+     * 这一步曾经让所有无代理环境的出口 IP 恒为空。
+     */
+    const args = ["-sS", "--max-time", "8", ...(px ? ["-x", px] : []), url];
     const r = await new Promise((resolve) => {
-      execFile(
-        "curl",
-        ["-sS", "--max-time", "8", "-x", proxyOrNothing(account), url].filter(Boolean),
-        { timeout: 10000, env },
-        (err, stdout) => resolve(err ? null : stdout),
-      );
+      execFile("curl", args, { timeout: 10000, env }, (err, stdout) => resolve(err ? null : stdout));
     }).catch(() => null);
 
     if (!r) continue;

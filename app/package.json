@@ -1,6 +1,6 @@
 {
   "name": "claude-buddy",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "description": "给 Claude Code 一个安全、隔离、不用反复配置的家 —— 每个账号一个独立环境、独立 IP、独立身份",
   "type": "module",

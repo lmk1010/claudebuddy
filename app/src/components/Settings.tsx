@@ -8,9 +8,11 @@ import {
   IconInfo,
   IconTrash,
   IconFile,
+  IconRefresh,
 } from "./iconAliases";
 import Help from "./Help";
 import About from "./About";
+import UpdatePage from "./UpdatePage";
 import { systemLang, tr } from "../lib/i18n";
 
 interface Props {
@@ -20,7 +22,7 @@ interface Props {
   cat: SettingsCat;
 }
 
-export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "guide" | "about";
+export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "guide" | "update" | "about";
 
 export type CatItem = { id: SettingsCat; label: string; icon: typeof IconSettings };
 
@@ -53,6 +55,7 @@ export const SETTINGS_GROUPS: { title: string; items: CatItem[] }[] = [
     get title() { return tr("其他", "Other"); },
     items: [
       { id: "guide", get label() { return tr("使用教程", "Guide"); }, icon: IconFile },
+      { id: "update", get label() { return tr("更新", "Updates"); }, icon: IconRefresh },
       { id: "about", get label() { return tr("关于", "About"); }, icon: IconInfo },
     ],
   },
@@ -194,6 +197,7 @@ export default function Settings({ state, update, cat }: Props) {
           )}
 
 
+          {cat === "update" && <UpdatePage />}
           {cat === "about" && <About />}
         </div>
       </div>

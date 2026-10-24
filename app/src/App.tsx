@@ -16,6 +16,18 @@ import { setPendingPrompt } from "./lib/pendingPrompt";
 import { browserLabel, loadBrowsers } from "./components/LoginButton";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
+
+/**
+ * 出口量测缓存。
+ *
+ * 切会话、连开几个窗口不该每次都等一次网络往返，所以同一个环境量过的结果
+ * 留 45 秒。超过就重量 —— 真正会出事的时间尺度是分钟级，不是秒级。
+ */
+type ExitSeen = { ok: boolean; ip: string | null; at: number };
+const exitSeen = new Map<string, ExitSeen>();
+const EXIT_TTL = 45_000;
+/** 量出口最多等这么久，超时算「量不到」而不是把会话入口挂住 */
+const EXIT_WAIT = 4000;
 import { assessSafety } from "./components/SafetyBadge";
 import {
   IconAccounts,
@@ -730,8 +742,22 @@ export default function App() {
     };
   }, [activeWindow]);
 
+  /**
+   * 出口闸的弹窗。
+   *
+   * 挂在 state 上而不是 toast 上：这件事必须等用户点一下才能继续，
+   * 一闪而过的提示拦不住任何东西。
+   */
+  const [ipGate, setIpGate] = useState<{
+    account: Account;
+    kind: "mismatch" | "unknown";
+    current: string | null;
+    expected: string;
+    next: () => void;
+  } | null>(null);
+
   // ── 建会话
-  const spawnWindow = useCallback((account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string) => {
+  const spawnNow = useCallback((account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string) => {
     /**
      * 强制代理的硬闸。
      *
@@ -789,6 +815,82 @@ export default function App() {
     setInspectorOpen(false);
     void refreshAccount(account.id);
   }, [refreshAccount, home]);
+
+  /**
+   * 出口闸 —— 开任何会话之前先把出口核实一道。
+   *
+   * 会话一开，里面跑的 CLI 就会带着这台机器的真实出口发请求。环境里记的出口 IP
+   * 和当前不一致，或者根本量不出来（代理挂了、断网、超时），都先停下来问一句：
+   * 这一步挡的正是「在国内的 IP 上打开美国环境的会话」—— 那种情况一旦真连上，
+   * 账号那边看到的是异地，不是我们的 bug。
+   *
+   * 没记录过出口的环境不拦：第一次进就是它定基线的那一次。
+   */
+  const gateExit = useCallback(async (account: Account, run: () => void) => {
+    const expected = account.lastExitIp;
+    if (!expected) {
+      run();
+      return;
+    }
+
+    const cached = exitSeen.get(account.id);
+    let seen: ExitSeen;
+    if (cached && Date.now() - cached.at < EXIT_TTL) {
+      seen = cached;
+    } else {
+      let r: { ok: boolean; ip: string | null } | null = null;
+      try {
+        r = await Promise.race([
+          window.claudeBuddy.accountCheckExit(account.id),
+          new Promise<null>((res) => setTimeout(() => res(null), EXIT_WAIT)),
+        ]);
+      } catch {
+        r = null;
+      }
+      seen = { ok: Boolean(r?.ok && r?.ip), ip: r?.ip ?? null, at: Date.now() };
+      if (seen.ok) exitSeen.set(account.id, seen);
+    }
+
+    if (!seen.ok || !seen.ip) {
+      /**
+       * 量不到不拦。
+       *
+       * 量不到只说明这个检测端点此刻不可达（断网、DNS、代理挂了），
+       * 不等于出口就一定错 —— 拿它硬拦，一次网络抖动就能让人连会话都开不了。
+       * 真的跳了 IP 是下面那个分支，那里才必须停下来问。
+       */
+      setToast({
+        title: tr("量不到出口 IP", "Exit IP could not be measured"),
+        body: tr(`这个环境记录的是 ${expected}，这次没测到。`, `Recorded ${expected}, but this check measured nothing.`),
+      });
+      run();
+      return;
+    }
+    if (seen.ip !== expected) {
+      setIpGate({ account, kind: "mismatch", current: seen.ip, expected, next: run });
+      return;
+    }
+    run();
+  }, []);
+
+  const spawnWindow = useCallback(
+    (account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string) => {
+      void gateExit(account, () => spawnNow(account, cwd, runsClaude, firstPrompt));
+    },
+    [spawnNow, gateExit],
+  );
+
+  /** 回到已经在跑的会话也要过闸：终端里那个进程还在，一敲字就带着新 IP 出去了 */
+  const openWindow = useCallback(
+    (id: string) => {
+      const w = state.windows.find((x) => x.id === id);
+      const acc = w ? state.accounts.find((a) => a.id === w.accountId) : undefined;
+      const go = () => update({ activeWindowId: id, view: "session" });
+      if (!acc) return go();
+      void gateExit(acc, go);
+    },
+    [state.windows, state.accounts, update, gateExit],
+  );
 
   // 记住最后建的窗口，把首句送进去
   useEffect(() => {
@@ -1311,7 +1413,7 @@ export default function App() {
         accountStatus={status}
         view={view}
         username={username}
-        onSelectWindow={(id) => update({ activeWindowId: id, view: "session" })}
+        onSelectWindow={openWindow}
         onCloseWindow={requestCloseWindow}
         onNew={goNew}
         onNav={(v) => update({ view: v })}
@@ -1662,7 +1764,7 @@ export default function App() {
           windows={state.windows}
           accounts={state.accounts}
           onClose={() => setPalette(false)}
-          onOpenWindow={(id) => update({ activeWindowId: id, view: "session" })}
+          onOpenWindow={openWindow}
           onNew={goNew}
           onNav={(v) => update({ view: v })}
           onSettings={(cat) => {
@@ -1756,6 +1858,69 @@ export default function App() {
           onOk={confirm.onOk}
           onClose={() => setConfirm(null)}
         />
+      )}
+
+      {ipGate && (
+        <Modal onClose={() => setIpGate(null)} className="dlg-sm ipgate" label={tr("出口 IP 不一致", "Exit IP mismatch")}>
+          {(close) => (
+            <>
+              <div className="dlg-h">
+                <b>
+                  {ipGate.kind === "mismatch"
+                    ? tr("出口 IP 不是这个环境的", "Not this environment's exit IP")
+                    : tr("量不到出口 IP", "Exit IP could not be measured")}
+                </b>
+              </div>
+              <p className="ipgate-body">
+                {ipGate.kind === "mismatch"
+                  ? tr(
+                      `环境「${ipGate.account.label}」记录的是 ${ipGate.expected}，现在量到 ${ipGate.current}。`,
+                      `“${ipGate.account.label}” is recorded on ${ipGate.expected}, but the current exit is ${ipGate.current}.`,
+                    )
+                  : tr(
+                      `环境「${ipGate.account.label}」记录的是 ${ipGate.expected}，但现在量不出来 —— 代理不通、或者断网。这种状态下流量可能直接走本机出口。`,
+                      `“${ipGate.account.label}” is recorded on ${ipGate.expected}, but nothing could be measured — the proxy is down or you are offline. Traffic may go out on this machine's own exit.`,
+                    )}
+              </p>
+              <p className="ipgate-body">
+                {tr(
+                  "现在进会话，账号那边看到的是异地登录 —— 这就是封号的典型形态。建议先把出口修好。",
+                  "Entering now shows the account a login from somewhere else — the classic ban pattern. Fix the exit first.",
+                )}
+              </p>
+              {ipGate.account.heldAt && (
+                <p className="ipgate-body ipgate-risk">
+                  {tr("这个环境已经被标记为暂时风控，再叠一个异地出口风险很高。", "This environment is already flagged. Stacking a foreign exit on top is risky.")}
+                </p>
+              )}
+              <div className="dlg-acts">
+                <button className="btn ghost" onClick={close}>
+                  {tr("取消", "Cancel")}
+                </button>
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    const id = ipGate.account.id;
+                    close();
+                    setEditor({ id, section: "network" });
+                  }}
+                >
+                  {tr("先修出口", "Fix the exit")}
+                </button>
+                <button
+                  className="btn danger"
+                  onClick={() => {
+                    const next = ipGate.next;
+                    close();
+                    setTimeout(next, 170);
+                  }}
+                >
+                  {tr("仍然进入", "Enter anyway")}
+                </button>
+              </div>
+            </>
+          )}
+        </Modal>
       )}
 
       {toast && (
