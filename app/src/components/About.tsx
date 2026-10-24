@@ -75,13 +75,13 @@ export default function About() {
           </span>
         ),
       };
-    if (st === "latest") return { node: <span className="ab-upd-t">{tr("已是最新版本", "Up to date")}<button className="ab-ic" onClick={act} title={tr("再看一眼", "Check again")}>{tr("重查", "Recheck")}</button></span> };
+    if (st === "latest") return { node: <span className="ab-upd-t">{tr("已是最新版本", "Up to date")}<button className="ab-upd-link" onClick={act} title={tr("再看一眼", "Check again")}>{tr("重查", "Recheck")}</button></span> };
     if (st === "error")
       return {
         node: (
           <span className="ab-upd-t">
             <b className="ab-upd-bad">{tr("检查失败", "Check failed")}</b>
-            <button className="ab-ic" onClick={act}>{tr("重试", "Retry")}</button>
+            <button className="ab-upd-link" onClick={act}>{tr("重试", "Retry")}</button>
           </span>
         ),
       };
