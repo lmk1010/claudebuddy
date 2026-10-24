@@ -161,6 +161,7 @@ const acct = require("./account.cjs");
 const desktopModule = require("./desktop.cjs");
 const leakModule = require("./leak.cjs");
 const riskModule = require("./risk.cjs");
+const updater = require("./updater.cjs");
 
 /** 当前账号表（从 state 同步进来） */
 function syncAccounts(list) {
@@ -713,6 +714,13 @@ ipcMain.handle("term:attach", (_e, { id }) => ({
  * 所以一走开就灭了 —— 可“离开页面”不等于“会话停了”。
  */
 ipcMain.handle("term:live", () => [...terms.keys()]);
+
+/* ── 自动更新 ──
+ * 没配发布源时全部返回 no-feed，界面据此不显示入口，不报错。 */
+ipcMain.handle("update:state", () => ({ ...updater.getState(), enabled: updater.enabled() }));
+ipcMain.handle("update:check", () => updater.check());
+ipcMain.handle("update:download", () => updater.download());
+ipcMain.handle("update:install", () => updater.install());
 
 ipcMain.handle("term:activity", () => sampleActivity());
 
@@ -2258,6 +2266,8 @@ app.whenReady().then(() => {
 
   buildAppMenu();
   createWindow();
+  // 发布源存在才会真的启用；启动几秒后静默查一次，有新版才提示
+  updater.init(() => mainWindow);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

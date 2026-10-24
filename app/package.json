@@ -1,6 +1,6 @@
 {
   "name": "claude-buddy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "给 Claude Code 一个安全、隔离、不用反复配置的家 —— 每个账号一个独立环境、独立 IP、独立身份",
   "type": "module",
@@ -19,6 +19,7 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
+    "electron-updater": "^6.8.11",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -47,7 +48,8 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ]
     }
   },
