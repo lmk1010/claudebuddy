@@ -278,17 +278,22 @@ function survey() {
     .map((s) => ({ service: s, reason: L("没有对应的配置目录", "No matching config directory") }));
 
   /**
-   * 其他工具（codex-config-ui）临时建的 prof_* 不列出来：那是别的工具自己管的会话目录，
-   * 用户在那边正用着，这里清掉等于把那边的登录拔了。
-   * 但它们仍然参与上面的「认领」—— 否则它们的凭据会被误判成无人认领、进到建议清理里。
+   * 全部列出来，包括其他工具（codex-config-ui）建的 prof_*。
+   *
+   * 之前把它们藏了，理由是“那边正用着，这里清掉等于把那边登录拔了”。
+   * 但那导致同一个号在那边死了、这边扫不到也删不掉 —— 看得见才能决定。
+   * 界面把 kind 标成「其他工具」，并且它们仍参与上一段的「认领」，
+   * 所以不会被误判成无人认领的凭据。
    */
-  const visible = accounts.filter((a) => a.kind !== "codex-profile");
+  const visible = accounts;
   visible.sort((a, b) => b.lastActive - a.lastActive);
 
   /**
-   * 建议清理的只有 `empty` —— 真正的空壳。
+   * 建议清理的只有 `empty` —— 真正的空壳（没凭据、没对话记录、体积也很小）。
    * 有对话记录但掉了登录的（signed-out）绝不自动建议：
    * 那 600MB 对话一删就没了，而重新登录本来就能救回来。
+   *
+   * 其他工具的目录也走同一道判定：死的才建议，活的（有凭据/有对话）只列出来。
    */
   const disposable = visible.filter((a) => a.state === "empty");
 
