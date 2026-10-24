@@ -163,6 +163,8 @@ export default function App() {
   /** 回调里要读最新 state 又不想把 state 塞进依赖时用 */
   const stateRef = useRef(state);
   stateRef.current = state;
+  const exitIpRef = useRef(exitIp);
+  exitIpRef.current = exitIp;
   /** 进设置之前在哪一页 —— 「返回应用」回到那里，而不是一律回首页 */
   const lastViewRef = useRef<View>("home");
   useEffect(() => {
@@ -863,6 +865,52 @@ export default function App() {
     setExitIp((prev) => ({ ...prev, [id]: null }));
   }, []);
 
+  /** 哪些环境已经用过这个出口 IP（包含刚测出来还没存的值） */
+  const exitHoldersOf = useCallback(
+    (ip: string, exceptId: string) =>
+      stateRef.current.accounts
+        .filter((a) => a.id !== exceptId && (a.lastExitIp === ip || exitIpRef.current[a.id] === ip))
+        .map((a) => a.label),
+    [],
+  );
+
+  /**
+   * 记下出口 IP —— 但这个 IP 已经在别的环境名下时，先问一句再落。
+   *
+   * 风控不看这台机器上开了几个环境，看的是同一个出口后面出现了哪些身份。
+   * 两个环境共用一个出口，等于把这两条线亲手连起来，所以发现就要说一声。
+   * 返回 false 表示卡在确认框上、还没写入。
+   */
+  const recordExitIp = useCallback(
+    (id: string, ip: string): boolean => {
+      const holders = exitHoldersOf(ip, id);
+      const commit = () => {
+        setExitIp((m) => ({ ...m, [id]: ip }));
+        setState((s) => ({
+          ...s,
+          accounts: s.accounts.map((a) =>
+            a.id === id ? { ...a, lastExitIp: ip, lastExitCheckedAt: Date.now() } : a,
+          ),
+        }));
+      };
+      if (holders.length === 0) {
+        commit();
+        return true;
+      }
+      setConfirm({
+        title: tr("这个出口已经有环境在用了", "This exit is already in use"),
+        body: tr(
+          `${ip} 已经被「${holders.join("、")}」用过。两个环境共用同一个出口，服务端看到的就是同一台机器后面的两个身份 —— 这也正是风控最容易把它们连起来的一条线。确定要这么做？`,
+          `${ip} has already been used by ${holders.join(", ")}. Two environments behind one exit look like two identities on one machine, which is exactly the link that gets picked up. Are you sure?`,
+        ),
+        okLabel: tr("仍然用这个 IP", "Use it anyway"),
+        onOk: commit,
+      });
+      return false;
+    },
+    [exitHoldersOf],
+  );
+
   /**
    * 登录。browser 不给就用这个环境上次选的；给了就记住，下次直接用。
    * 提示等 CLI 真把链接交出来（login:url）再报「已在 xx 打开」，不提前说。
@@ -929,19 +977,14 @@ export default function App() {
         return;
       }
       const prev = state.accounts.find((a) => a.id === id)?.lastExitIp ?? null;
-      setExitIp((m) => ({ ...m, [id]: r.ip }));
-      setState((s) => ({
-        ...s,
-        accounts: s.accounts.map((a) =>
-          a.id === id ? { ...a, lastExitIp: r.ip!, lastExitCheckedAt: Date.now() } : a,
-        ),
-      }));
+      // 撞到别的环境用过的出口就不落库，也不再叠一个 toast：确认框已经在问了
+      if (!recordExitIp(id, r.ip)) return;
       setToast({
         title: tr(`出口 IP ${r.ip}`, `Exit IP ${r.ip}`),
         body: prev && prev !== r.ip ? tr(`注意：从 ${prev} 变了，频繁跳变本身是信号`, `Note: changed from ${prev}. Frequent changes are a signal in themselves`) : tr("已记录，跟这个账号绑定", "Saved and tied to this account"),
       });
     },
-    [state.accounts],
+    [state.accounts, recordExitIp],
   );
 
   const rotate = useCallback(
@@ -1290,7 +1333,12 @@ export default function App() {
             key={drawerAccount.id}
             initialSection={editor?.section}
             canRemove={state.accounts.length > 1}
-            onPatch={(patch) => patchAccount(drawerAccount.id, patch)}
+            onPatch={(patch) => {
+              // 出口 IP 单独走一道：其它字段直接写，IP 要先看是不是已有环境占着
+              const { lastExitIp, ...rest } = patch;
+              if (lastExitIp) recordExitIp(drawerAccount.id, lastExitIp);
+              if (Object.keys(rest).length > 0) patchAccount(drawerAccount.id, rest);
+            }}
             account={drawerAccount}
             status={status[drawerAccount.id]}
             exitIp={exitIp[drawerAccount.id] ?? null}

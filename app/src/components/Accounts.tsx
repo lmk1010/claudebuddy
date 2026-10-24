@@ -1107,9 +1107,11 @@ function NetworkSection({
                     <button
                       className={`btn${cur ? " ghost" : ""}`}
                       disabled={cur || !c.ok}
-                      onClick={() =>
-                        onSetProxy({ protocol: c.protocol, host: c.host, port: c.port, noProxy: "localhost,127.0.0.1,::1" })
-                      }
+                      onClick={() => {
+                        onSetProxy({ protocol: c.protocol, host: c.host, port: c.port, noProxy: "localhost,127.0.0.1,::1" });
+                        // 探测时已经量过这个候选的出口，直接记下来，才能和别的环境对比
+                        if (c.ip) onIp(c.ip);
+                      }}
                     >
                       {cur ? tr("正在用", "In use") : tr("用这个", "Use this")}
                     </button>
