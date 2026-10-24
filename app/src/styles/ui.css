@@ -1491,10 +1491,32 @@
   border-bottom: 0;
   gap: 12px;
 }
+/* 竖轴：组头像在 12px，名字从 44px 起；会话行的文字也从 44px 起，正好落在名字下面 */
 .sv-grp-h > .av.xs {
-  margin: 0 4px;
+  margin: 0;
 }
-/* 右侧同理：时间列贴右边、跟组标题的计数对齐；
+.sv-list .sv-row {
+  padding-left: 44px;
+}
+.sv-list .sv-row + .sv-row::before {
+  left: 44px;
+}
+.sv-nm small {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.sv-nm small .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sv-kind {
+  flex: none;
+  font-size: 10.5px;
+  color: var(--t4);
+}/* 右侧同理：时间列贴右边、跟组标题的计数对齐；
    悬停才出现的按钮浮在时间上面，不再平时也占着一截空白把时间往里挤 */
 .sv-grp-h {
   padding-right: 12px;

@@ -244,11 +244,7 @@ export default function Sessions(p: Props) {
                           }}
                           title={`${w.cwd}\n双击重命名 · 右键更多`}
                         >
-                          {/* 图标说明它是什么（Claude / 终端），右下角的小点说明它在跑 */}
-                          <span className={`sv-ico${w.runsClaude ? " claude" : ""}`} title={w.runsClaude ? "Claude Code · 运行中" : "终端 · 运行中"}>
-                            {w.runsClaude ? <img src="./assets/claude-spark.png" alt="" /> : <IconTerminal size={14} />}
-                            <i />
-                          </span>
+                          {/* 跟 Claude 的对话列表一样只有文字：标题一行，目录和类型一行，不画图标 */}
                           <span className="sv-nm">
                             {renaming === w.id ? (
                               <RenameInput
@@ -261,7 +257,10 @@ export default function Sessions(p: Props) {
                             ) : (
                               <b>{w.title}</b>
                             )}
-                            <small className="mono">{shortenHome(w.cwd)}</small>
+                            <small>
+                              <span className="mono">{shortenHome(w.cwd)}</span>
+                              <span className="sv-kind">{w.runsClaude ? "Claude Code" : "终端"}</span>
+                            </small>
                           </span>
                           <span className="sv-tm">
                             <span>已运行 {fmtDuration((Date.now() - w.startedAt) / 1000)}</span>
@@ -302,9 +301,6 @@ export default function Sessions(p: Props) {
                           }}
                           title={`${s.cwd}\n点一下在原目录里接着开`}
                         >
-                          <span className="sv-ico idle">
-                            <IconClock size={14} />
-                          </span>
                           <span className="sv-nm">
                             <b>{s.title}</b>
                             <small className="mono">{shortenHome(s.cwd)}</small>
