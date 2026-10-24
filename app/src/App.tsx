@@ -1528,6 +1528,16 @@ export default function App() {
         {view === "settings" && settingsCat === "clean" && (
           <CleanPage
             inUse={state.accounts.filter((a) => state.windows.some((w) => w.accountId === a.id)).map((a) => a.configDir)}
+            onFix={(fix) => {
+              // 清痕迹就在本页做，另外两种要打开对应环境的抽屉
+              if (fix.kind === "open-clean") return;
+              if (!fix.accountId) return;
+              update({ view: "accounts" });
+              setEditor({
+                id: fix.accountId,
+                section: fix.kind === "open-network" ? "network" : "fingerprint",
+              });
+            }}
             onRelogin={() => {
               // 去环境页，直接打开当前环境的「通用」—— 登录按钮就在最上面
               update({ view: "accounts" });

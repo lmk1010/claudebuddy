@@ -3474,6 +3474,124 @@
   background: rgba(180, 130, 40, 0.14);
   color: #a8792a;
 }
+
+/*
+ * 风控陷阱清单：先给一句总账，展开才看细节。
+ * 默认收起 —— 它不是阅读材料，是行动清单。
+ */
+.rk {
+  margin: 0 0 12px;
+  border: var(--hair) solid var(--ln);
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.rk-sum {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--t1);
+  cursor: pointer;
+  text-align: left;
+}
+.rk-sum em {
+  font-style: normal;
+  color: var(--t3);
+  font-size: 11.5px;
+}
+.rk-sp {
+  flex: 1;
+}
+.rk-chev {
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.rk-pill {
+  padding: 1px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.rk-pill.bad {
+  background: rgba(198, 69, 69, 0.12);
+  color: #c64545;
+}
+.rk-pill.mid {
+  background: rgba(180, 130, 40, 0.14);
+  color: #a8792a;
+}
+.rk-pill.ok {
+  background: rgba(78, 159, 99, 0.12);
+  color: #3f7f52;
+}
+.rk-list {
+  border-top: var(--hair) solid var(--ln);
+  padding: 4px 0;
+}
+.rk-i {
+  padding: 10px 14px;
+  border-bottom: var(--hair) solid var(--ln);
+}
+.rk-i:last-child {
+  border-bottom: 0;
+}
+.rk-i .rk-t {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rk-i .rk-t b {
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+}
+.rk-i .rk-t em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--t3);
+}
+.rk-tag {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  line-height: 1.7;
+  border: var(--hair) solid transparent;
+}
+.rk-tag.st-risk {
+  color: #c64545;
+  border-color: rgba(198, 69, 69, 0.3);
+}
+.rk-tag.st-unfixable {
+  color: var(--t3);
+  border-color: var(--ln);
+}
+.rk-tag.st-ok {
+  color: #3f7f52;
+  border-color: rgba(78, 159, 99, 0.3);
+}
+.rk-i p {
+  margin: 5px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--t2);
+}
+.rk-i p.rk-d {
+  color: var(--t3);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  word-break: break-all;
+}
+.rk-i .btn {
+  margin-top: 8px;
+}
+.rk-i.lv-ok {
+  opacity: 0.7;
+}
 .cl-tr {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) 84px 76px 52px 76px 40px;

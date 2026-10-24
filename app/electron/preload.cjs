@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   accountRepos: (id) => ipcRenderer.invoke("account:repos", { id }),
   desktopProbe: (force) => ipcRenderer.invoke("desktop:probe", { force }),
   leakProbe: (force) => ipcRenderer.invoke("leak:udp", { force }),
+  riskAudit: () => ipcRenderer.invoke("risk:audit"),
   accountClearTraces: (id, keys, includeCredentials) =>
     ipcRenderer.invoke("account:clearTraces", { id, keys, includeCredentials }),
   accountKeychain: () => ipcRenderer.invoke("account:keychain"),

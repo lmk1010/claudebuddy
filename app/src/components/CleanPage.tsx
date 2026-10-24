@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CleanupAccount, CleanupResult, CleanupSurvey, DesktopProbe, LeakReport } from "../lib/bridge";
+import type { CleanupAccount, CleanupResult, CleanupSurvey, DesktopProbe, LeakReport, RiskItem, RiskReport } from "../lib/bridge";
 import { tierLabel } from "../lib/model";
 import { ConfirmDialog } from "./Modal";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
@@ -74,12 +74,15 @@ export default function CleanPage({
   onPurged,
   inUse,
   onRelogin,
+  onFix,
 }: {
   onPurged: (movedPaths: string[]) => void;
   /** 清完凭据后的下一步：去重新登录（清理 → 授权 是同一件事的前后两步） */
   onRelogin: () => void;
   /** 本应用里还有会话开着的配置目录名（如 .claude-work）—— 清它等于把正在跑的会话的登录拔掉 */
   inUse: string[];
+  /** 漏斗清单里的“去处理”：交给上层跳转（配出口 / 轮换设备码 / 清痕迹） */
+  onFix?: (fix: { kind: "open-network" | "open-clean" | "rotate-identity"; accountId?: string }) => void;
 }) {
   const busyDir = (p: string) => inUse.includes(p.replace(/^.*\//, ""));
   const [survey, setSurvey] = useState<CleanupSurvey | null>(null);
@@ -94,6 +97,9 @@ export default function CleanPage({
   const [desk, setDesk] = useState<DesktopProbe | null>(null);
   /** UDP / STUN 泄漏面 —— 同一道体检拿回来 */
   const [leak, setLeak] = useState<LeakReport | null>(null);
+  /** 风控陷阱清单 */
+  const [risk, setRisk] = useState<RiskReport | null>(null);
+  const [riskOpen, setRiskOpen] = useState(false);
   const menu = useContextMenu();
 
   useEffect(() => {
@@ -112,6 +118,14 @@ export default function CleanPage({
       },
       () => {
         /* 体检失败就不显示 */
+      },
+    );
+    void window.claudeBuddy.riskAudit().then(
+      (r) => {
+        if (alive) setRisk(r);
+      },
+      () => {
+        /* 清单拿不到就不显示 */
       },
     );
     return () => {
@@ -264,6 +278,55 @@ export default function CleanPage({
             </button>
           </div>
         </div>
+
+        {risk && risk.items.length > 0 && (
+          <div className="rk">
+            <button className={`rk-sum${riskOpen ? " open" : ""}`} onClick={() => setRiskOpen(!riskOpen)}>
+              <b>{tr("风控体检", "Risk audit")}</b>
+              <span className={`rk-pill ${risk.danger ? "bad" : risk.warn ? "mid" : "ok"}`}>
+                {risk.danger
+                  ? tr(`${risk.danger} 项会直接暴露`, `${risk.danger} exposures`)
+                  : risk.warn
+                    ? tr(`${risk.warn} 项要注意`, `${risk.warn} warnings`)
+                    : tr("没有发现暴露", "No exposures found")}
+              </span>
+              {risk.unfixable > 0 && (
+                <em>{tr(`其中 ${risk.unfixable} 项只能提醒你`, `${risk.unfixable} can only be reported`)}</em>
+              )}
+              <span className="rk-sp" />
+              <span className="rk-chev">{riskOpen ? tr("收起", "Collapse") : tr("展开", "Expand")}</span>
+            </button>
+
+            {riskOpen && (
+              <div className="rk-list">
+                {risk.items.map((it: RiskItem) => (
+                  <div key={it.key} className={`rk-i lv-${it.level}`}>
+                    <div className="rk-t">
+                      <b>{it.title}</b>
+                      <span className={`rk-tag st-${it.status}`}>
+                        {it.status === "risk"
+                          ? tr("能改", "Fixable")
+                          : it.status === "unfixable"
+                            ? tr("只能看", "Read-only")
+                            : it.status === "ok"
+                              ? tr("已堵", "Closed")
+                              : tr("信息", "Info")}
+                      </span>
+                      <em>{it.group}</em>
+                    </div>
+                    <p>{it.why}</p>
+                    {it.detail && <p className="rk-d">{it.detail}</p>}
+                    {it.fix && onFix && (
+                      <button className="btn" onClick={() => it.fix && onFix(it.fix)}>
+                        {tr("去处理 →", "Fix it →")}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="sv-bar">
           <div className="envtabs sv-seg" ref={segRef}>

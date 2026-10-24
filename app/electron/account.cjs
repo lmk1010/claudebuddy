@@ -105,6 +105,35 @@ function envForAccount(account, { includeProxy = true } = {}) {
   delete env.no_proxy;
 
   /**
+   * 会“把请求指到别人那儿”的变量。
+   *
+   * 实测从 claude.exe 里扫出来的：它真的会读这些。从父进程继承下来，
+   * 轻则把这一轮的调用记到另一个账号/项目名下，重则拿着别人的云凭据发请求。
+   */
+  delete env.ANTHROPIC_CUSTOM_HEADERS; // 自定义 header，可能带着上一个环境的标识
+  delete env.ANTHROPIC_UNIX_SOCKET; // 指向别的本地 socket
+  for (const k of [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_PROFILE",
+    "AWS_REGION",
+    "AWS_DEFAULT_REGION",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "ANTHROPIC_VERTEX_PROJECT_ID",
+    "ANTHROPIC_BEDROCK_BASE_URL",
+    "ANTHROPIC_VERTEX_BASE_URL",
+  ]) {
+    delete env[k];
+  }
+  /** git 的临时配置注入：会改掉这个会话里所有 git 命令的隉为 */
+  delete env.GIT_CONFIG_COUNT;
+  delete env.GIT_CONFIG_PARAMETERS;
+  for (const k of Object.keys(env)) if (k.startsWith("GIT_CONFIG_KEY_")) delete env[k];
+  /** OTEL 导出器：别人机器上配的收集端点，不能跟着继承 */
+  for (const k of Object.keys(env)) if (k.startsWith("OTEL_")) delete env[k];
+
+  /**
    * 默认环境（~/.claude）不能显式设 CLAUDE_CONFIG_DIR：只要设了，CLI 就去找
    * 带哈希后缀的 Keychain 条目，读不到主条目里的凭据，明明登录着却报「未登录」。
    * 不设时 CLI 默认就用 ~/.claude，结果一样。
@@ -119,11 +148,25 @@ function envForAccount(account, { includeProxy = true } = {}) {
   const t = account.terminal || {};
   env.TERM = t.term || "xterm-256color";
   env.COLORTERM = "truecolor";
+  /**
+   * TERM_PROGRAM 也会进 env 上报（实测在 claude.exe 里出现 57 次）。
+   * 以前没管它，于是整个应用从 iTerm / VS Code 里启动时，
+   * 每个环境上报的都是宿主那个终端 —— 白白多一条相同的指纹。
+   */
+  env.TERM_PROGRAM = t.termProgram || "Apple_Terminal";
   env.LANG = t.lang || "en_US.UTF-8";
   env.LC_ALL = env.LANG;
   env.TZ = t.tz || "Asia/Shanghai";
 
   env.CLAUDE_BUDDY = "1";
+  /**
+   * 关掉非必要流量。
+   *
+   * 这是官方给的开关（claude.exe 里出现 37 次）。打开时，错误上报（Sentry）
+   * 和产品遥测会带着 deviceId 一起出去；那两个端点是在 host 白名单里写死的。
+   * 我们不需要它们：一旦发了，服务端就能把 deviceId 和 accountUuid 放在同一条记录里。
+   */
+  env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
 
   if (includeProxy) {
     const p = account.proxy || {};
@@ -470,13 +513,37 @@ const TRACE_ITEMS = [
   { key: "backups", get label() { return L("配置备份", "Config backups"); }, path: "backups", critical: false },
   { key: "shellSnapshots", get label() { return L("shell 快照", "Shell snapshots"); }, path: "shell-snapshots", critical: false },
   { key: "plugins", get label() { return L("插件", "Plugins"); }, path: "plugins", critical: false },
+  /**
+   * 下面两项不在配置目录里，是整机的。
+   * 它们不按环境分，所以清任何一个环境都会连着其他环境一起清 ——
+   * 界面必须把这句话说出来，不能让人以为只清了一个环境。
+   */
+  {
+    key: "mcpLogs",
+    get label() { return L("MCP 日志缓存（整机）", "MCP log cache (machine-wide)"); },
+    abs: path.join(HOME, "Library", "Caches", "claude-cli-nodejs"),
+    machineWide: true,
+    critical: false,
+  },
+  {
+    key: "clientLogs",
+    get label() { return L("客户端日志（整机）", "Client logs (machine-wide)"); },
+    abs: path.join(HOME, "Library", "Logs", "Claude"),
+    machineWide: true,
+    critical: false,
+  },
 ];
+
+/** 允许清理的整机级绝对路径 —— 写死一份，不靠“跑出配置目录就放行”这种宽松规则 */
+const MACHINE_WIDE_TRACE_PATHS = new Set(
+  TRACE_ITEMS.filter((it) => it.abs).map((it) => path.resolve(it.abs)),
+);
 
 function inspectTraces(account) {
   const dir = configDirOf(account);
 
   return TRACE_ITEMS.map((it) => {
-    const full = path.join(dir, it.path);
+    const full = it.abs || path.join(dir, it.path);
     let exists = false;
     let size = 0;
     let count = 0;
@@ -719,9 +786,21 @@ function clearTraces(account, keys, { includeCredentials = false } = {}) {
       continue;
     }
 
-    const target = path.join(dir, item.path);
-    // 双保险：解析后的路径必须还在配置目录里
-    if (!path.resolve(target).startsWith(path.resolve(dir) + path.sep)) {
+    const target = item.abs || path.join(dir, item.path);
+    /**
+     * 双保险：
+     *   · 普通项 —— 解析后的路径必须还在配置目录里
+     *   · 整机项 —— 必须命中上面写死的那份白名单
+     * 两者都不满足就拒绝，不给“清任意目录”留口子。
+     */
+    const resolvedTarget = path.resolve(target);
+    const inConfigDir = resolvedTarget.startsWith(path.resolve(dir) + path.sep);
+    const isAllowedMachineWide = !item.abs || MACHINE_WIDE_TRACE_PATHS.has(resolvedTarget);
+    if (!inConfigDir && !isAllowedMachineWide) {
+      failed.push({ key, reason: L("路径越界", "Path is out of bounds") });
+      continue;
+    }
+    if (item.abs && !MACHINE_WIDE_TRACE_PATHS.has(resolvedTarget)) {
       failed.push({ key, reason: L("路径越界", "Path is out of bounds") });
       continue;
     }

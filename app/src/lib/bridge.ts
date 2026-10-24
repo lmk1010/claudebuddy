@@ -125,6 +125,35 @@ export interface LeakReport {
   error?: string;
 }
 
+/**
+ * 风控陷阱清单的一条。
+ *
+ * status 决定界面怎么画，不能混：
+ *   risk      我们能改，给按钮
+ *   unfixable 不在我们管辖内，只解释原因
+ *   ok        已经堵上了
+ *   info      中性信息
+ */
+export interface RiskItem {
+  key: string;
+  group: string;
+  level: "danger" | "warn" | "info" | "ok";
+  status: "risk" | "ok" | "unfixable" | "info";
+  title: string;
+  why: string;
+  detail?: string | null;
+  /** 能点的动作；null = 只能看 */
+  fix?: { kind: "open-network" | "open-clean" | "rotate-identity"; accountId?: string } | null;
+}
+
+export interface RiskReport {
+  items: RiskItem[];
+  danger: number;
+  warn: number;
+  unfixable: number;
+  checkedAt?: number;
+}
+
 export interface TraceItem {
   key: string;
   label: string;
@@ -464,6 +493,8 @@ export interface ClaudeBuddyBridge {
   desktopProbe(force?: boolean): Promise<DesktopProbe>;
   /** UDP / STUN 泄漏体检：只跑 lsof / ps 看 socket，不发包 */
   leakProbe(force?: boolean): Promise<LeakReport>;
+  /** 风控陷阱清单：一次把设备码、出口、Desktop、痕迹全量一遍 */
+  riskAudit(): Promise<RiskReport>;
   accountClearTraces(
     id: string,
     keys: string[],

@@ -160,6 +160,7 @@ function saveState(state) {
 const acct = require("./account.cjs");
 const desktopModule = require("./desktop.cjs");
 const leakModule = require("./leak.cjs");
+const riskModule = require("./risk.cjs");
 
 /** 当前账号表（从 state 同步进来） */
 function syncAccounts(list) {
@@ -1457,6 +1458,34 @@ ipcMain.handle("account:traces", (_e, { id }) => {
   const a = resolveAccount(id);
   return acct.inspectTraces(a);
 });
+/**
+ * 风控陷阱清单。
+ *
+ * 一次把所有环境量一遍（设备码、痕迹）+ 整机两项探测，交给 risk.cjs 排版。
+ * 只在打开体检页时跑，不进状态刷新 —— 里面要读目录大小，不该拖慢界面。
+ */
+ipcMain.handle("risk:audit", () => {
+  const st = loadState();
+  const accounts = (st?.accounts || []).map((a) => {
+    const full = resolveAccount(a.id) || a;
+    return {
+      id: a.id,
+      label: a.label,
+      configDir: a.configDir,
+      proxy: a.proxy,
+      enforceProxy: a.enforceProxy,
+      lastExitIp: a.lastExitIp,
+      identity: acct.readIdentity(full),
+      traces: acct.inspectTraces(full),
+    };
+  });
+  return riskModule.build({
+    accounts,
+    desktop: desktopModule.probe(),
+    leak: leakModule.probe(),
+  });
+});
+
 /**
  * UDP / STUN 泄漏体检。
  *
