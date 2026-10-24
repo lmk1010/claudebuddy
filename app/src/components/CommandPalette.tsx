@@ -89,6 +89,7 @@ export default function CommandPalette({
       { id: "set", icon: IconGear, title: "打开设置", keys: ["⌘", ","], run: () => onSettings("general") },
       { id: "clean", icon: IconGear, title: "清理本机（登录痕迹、空壳目录）", hint: "设置", run: () => onSettings("clean") },
       { id: "net", icon: IconGear, title: "网络测试（延迟、DNS、IPv6）", hint: "设置", run: () => onSettings("net") },
+      { id: "guide", icon: IconGear, title: "使用教程（每个页面怎么用、结果怎么看）", hint: "设置", run: () => onSettings("guide") },
       { id: "about", icon: IconGear, title: "关于 ClaudeBuddy", hint: "设置", run: () => onSettings("about") },
     );
     // 账号直接可搜：切环境是最常用的动作

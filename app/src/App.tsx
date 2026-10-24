@@ -9,6 +9,7 @@ import Settings, { type SettingsCat } from "./components/Settings";
 import CommandPalette from "./components/CommandPalette";
 import CleanPage from "./components/CleanPage";
 import NetTestPage from "./components/NetTestPage";
+import Guide from "./components/Guide";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
 import { assessSafety } from "./components/SafetyBadge";
@@ -1277,8 +1278,23 @@ export default function App() {
           />
         )}
 
-        {view === "settings" && settingsCat !== "clean" && settingsCat !== "net" && (
+        {view === "settings" && settingsCat !== "clean" && settingsCat !== "net" && settingsCat !== "guide" && (
           <Settings key={settingsCat} cat={settingsCat} state={state} update={update} />
+        )}
+
+        {view === "settings" && settingsCat === "guide" && (
+          <>
+            <div className="wh" />
+            <Guide
+              onGo={(to) => {
+                if (to === "home" || to === "sessions" || to === "accounts") update({ view: to });
+                else if (to === "editNet") {
+                  update({ view: "accounts" });
+                  if (activeAccount) setEditor({ id: activeAccount.id, section: "network" });
+                } else setSettingsCat(to);
+              }}
+            />
+          </>
         )}
 
         {view === "settings" && settingsCat === "net" && (
@@ -1664,6 +1680,10 @@ function MenuBody({
         <button className="pi" onClick={onGuide} role="menuitem">
           <IconAuto size={15} />
           <span className="pi-main">新手引导</span>
+        </button>
+        <button className="pi" onClick={() => onOpenSettings("guide")} role="menuitem">
+          <IconPlan size={15} />
+          <span className="pi-main">使用教程</span>
         </button>
         <button className="pi" onClick={() => onOpenSettings()} role="menuitem">
           <IconSettings size={15} />

@@ -8,6 +8,7 @@ import {
   IconInfo,
   IconGlobe,
   IconTrash,
+  IconFile,
 } from "./iconAliases";
 import Help from "./Help";
 import About from "./About";
@@ -19,7 +20,7 @@ interface Props {
   cat: SettingsCat;
 }
 
-export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "net" | "about";
+export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "net" | "guide" | "about";
 
 export type CatItem = { id: SettingsCat; label: string; icon: typeof IconSettings };
 
@@ -51,7 +52,10 @@ export const SETTINGS_GROUPS: { title: string; items: CatItem[] }[] = [
   },
   {
     title: "其他",
-    items: [{ id: "about", label: "关于", icon: IconInfo }],
+    items: [
+      { id: "guide", label: "使用教程", icon: IconFile },
+      { id: "about", label: "关于", icon: IconInfo },
+    ],
   },
 ];
 
