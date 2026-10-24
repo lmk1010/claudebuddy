@@ -204,6 +204,16 @@ function spawnTerm(opts) {
   if (!pty) throw new Error(L("node-pty 不可用", "node-pty is unavailable"));
 
   const { id, account, cwd, cols, rows, command } = opts;
+
+  /**
+   * 已经有一个活着的同 id 终端：不要另起一个。
+   *
+   * 以前这里无条件 spawn，所以“切走再回来”等于把整个进程杀掉重开 ——
+   * 正在跑的对话、上下文、工作目录全丢。现在回来是接回去，不是重来。
+   */
+  const existing = terms.get(id);
+  if (existing) return { pid: existing.pid, reused: true };
+
   // 渲染层只允许传配置文件里的账号 id，不许自造 configDir ——
   // 否则"账号隔离"就变成一个可以绕过的约定。
   const resolved = resolveAccount(account);
@@ -257,6 +267,7 @@ function spawnTerm(opts) {
   });
 
   p.onData((data) => {
+    rememberOutput(id, data);
     const a = activity.get(id);
     if (a) {
       a.lastDataAt = Date.now();
@@ -282,6 +293,22 @@ function spawnTerm(opts) {
   return { pid: p.pid };
 }
 
+/**
+ * 每个终端的回放缓冲。
+ *
+ * 终端进程的生命周期绑在标签页上，不绑在 React 组件上：用户切到别的页面
+ * （环境/网络/首页）时组件会卸载，但进程不能跟着死。为了切回来还能看到
+ * 期间发生了什么，主进程把输出留一份；重新挂载时先补上再接着收。
+ */
+const termBuffers = new Map();
+const TERM_BUFFER_MAX = 256 * 1024;
+
+function rememberOutput(id, data) {
+  const prev = termBuffers.get(id) ?? "";
+  const next = prev + data;
+  termBuffers.set(id, next.length > TERM_BUFFER_MAX ? next.slice(-TERM_BUFFER_MAX) : next);
+}
+
 function killTerm(id) {
   const p = terms.get(id);
   if (!p) return;
@@ -292,6 +319,7 @@ function killTerm(id) {
   }
   terms.delete(id);
   activity.delete(id);
+  termBuffers.delete(id);
 }
 
 // ─────────────────────────────────────────── 节奏采样
@@ -666,6 +694,17 @@ ipcMain.on("term:resize", (_e, { id, cols, rows }) => {
 });
 
 ipcMain.on("term:kill", (_e, { id }) => killTerm(id));
+
+/**
+ * 接回一个还在跑的终端。
+ *
+ * 渲染层挂载时先问一句：这个 id 的进程还活着吗？活着就把期间缓冲的输出
+ * 补回去，不要 spawn；否则才走 spawn。
+ */
+ipcMain.handle("term:attach", (_e, { id }) => ({
+  alive: terms.has(id),
+  buffer: termBuffers.get(id) ?? "",
+}));
 
 ipcMain.handle("term:activity", () => sampleActivity());
 

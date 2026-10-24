@@ -15,6 +15,10 @@ import { tr } from "../lib/i18n";
  *
  * 为了不让切窗口丢状态，所有实例都常驻 DOM，非激活的用 visibility 隐藏。
  *
+ * 而且切到别的页面时（环境/网络/首页），本组件会被卸载 —— 那时**不杀进程**，
+ * 只断开视图；进程的生命周期跟着标签页走，回来时用 term:attach 接回去，
+ * 并把切走期间缓冲的输出补上。
+ *
  * 配色来自设计稿的 .tw：浅色 #FFFEFB / 暗色 #24221F，语法色按底色重调，
  * 保证纸面上也有 4.5:1。
  */
@@ -81,6 +85,9 @@ export default function TerminalView({
     // StrictMode 会挂载→卸载→再挂载：dispose 之后 rAF / ResizeObserver
     // 的回调还可能跑进来，那时 xterm 内部的 renderService 已经没了。
     let disposed = false;
+    /** 实时数据放行了没有 —— 见 offData 里那段说明 */
+    let live = false;
+    const pending: string[] = [];
     const safeFit = () => {
       if (disposed || termRef.current !== term) return;
       if (!term.element || term.element.offsetWidth === 0) return;
@@ -96,9 +103,23 @@ export default function TerminalView({
 
     const sub = term.onData((data) => window.claudeBuddy.writeTerm(win.id, data));
 
-    const offData = window.claudeBuddy.onTermData((p) => {
-      if (p.id === win.id) term.write(p.data);
-    });
+    const offData = (() => {
+      /**
+       * 实时输出先攒着，等 attach 决策做完再放行。
+       *
+       * 不然会和回放的旧输出交错：订阅比 attach 早，而 attach 走 IPC 是异步的 ——
+       * 期间的实时数据会先写进 xterm，紧接着回放缓冲又把同一段重写一遍，
+       * 结果顺序乱、内容重。
+       */
+      return window.claudeBuddy.onTermData((p) => {
+        if (p.id !== win.id) return;
+        if (!live) {
+          pending.push(p.data);
+          return;
+        }
+        term.write(p.data);
+      });
+    })();
     const offExit = window.claudeBuddy.onTermExit((p) => {
       if (p.id !== win.id) return;
       term.write(`\r\n\x1b[38;5;244m[${tr(`进程已退出，代码 ${p.exitCode}`, `Process exited, code ${p.exitCode}`)}]\x1b[0m\r\n`);
@@ -121,16 +142,43 @@ export default function TerminalView({
       }
       safeFit();
       if (disposed) return;
-      const r = await window.claudeBuddy.spawnTerm({
-        id: win.id,
-        account: accountId,
-        cwd: win.cwd,
-        cols: term.cols,
-        rows: term.rows,
-        command: win.runsClaude ? "claude" : undefined,
-        permission: win.permission,
-        prompt: win.runsClaude ? takePendingPrompt(win.id) : undefined,
-      });
+
+      /**
+       * 先问主进程：这个 id 的进程还活着吗？
+       *
+       * 终端进程的生命周期绑在标签页上，不绑在这个组件上 —— 用户切到环境/
+       * 网络/首页时本组件会卸载，但进程不该跟着死。活着就把它切走期间缓冲的
+       * 输出补回来，不重开；只有真的没了才 spawn。
+       */
+      let reused = false;
+      try {
+        const a = await window.claudeBuddy.attachTerm(win.id);
+        if (disposed) return;
+        if (a?.alive) {
+          if (a.buffer) term.write(a.buffer);
+          reused = true;
+        }
+      } catch {
+        /* 问不到就当没活着，照旧 spawn */
+      }
+
+      const r = reused
+        ? { ok: true, reused: true, error: undefined as string | undefined }
+        : await window.claudeBuddy.spawnTerm({
+            id: win.id,
+            account: accountId,
+            cwd: win.cwd,
+            cols: term.cols,
+            rows: term.rows,
+            command: win.runsClaude ? "claude" : undefined,
+            permission: win.permission,
+            prompt: win.runsClaude ? takePendingPrompt(win.id) : undefined,
+          });
+
+      // 决策做完了，放行实时数据（等待期间攒下的先补上）
+      live = true;
+      for (const d of pending) term.write(d);
+      pending.length = 0;
       return r;
     };
     void start()
@@ -157,7 +205,7 @@ export default function TerminalView({
       sub.dispose();
       offData();
       offExit();
-      window.claudeBuddy.killTerm(win.id);
+      // 不杀进程：只断开这个视图。进程跟着标签页活，关标签页时才由上层 killTerm
       term.dispose();
       // 清掉 xterm 在宿主里留下的节点，否则再挂载时旧元素会和新的渲染服务打架
       host.replaceChildren();

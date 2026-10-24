@@ -111,6 +111,7 @@ export function installBrowserFallback(): void {
     writeTerm: () => {},
     resizeTerm: () => {},
     killTerm: () => {},
+    attachTerm: async () => ({ alive: false, buffer: "" }),
     onTermData: () => () => {},
     onTermExit: () => () => {},
     activity: async () => [],
