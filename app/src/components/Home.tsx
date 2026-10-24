@@ -61,7 +61,8 @@ export default function Home(p: Props) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const acc = p.activeAccount;
-  const auth = acc ? (p.status[acc.id]?.auth ?? acc.auth) : "unknown";
+  // 没测过就是未知。不拿配置文件里那个旧值当事实，否则已登录也会被当成没登录
+  const auth = acc ? (p.status[acc.id]?.auth ?? "unknown") : "unknown";
   const signedIn = auth === "signedIn";
 
   useEffect(() => {
@@ -103,8 +104,10 @@ export default function Home(p: Props) {
   const proxyReady = Boolean(acc && acc.proxy && acc.proxy.protocol !== "none" && acc.proxy.host);
   const proxyBlocked = Boolean(acc?.enforceProxy) && !proxyReady;
 
-  const blocked = !signedIn
-    ? tr(`「${acc?.label ?? "这个环境"}」还没登录`, `"${acc?.label ?? "This environment"}" is not signed in`)
+  const blocked = auth === "unknown"
+    ? tr(`正在确认「${acc?.label ?? "这个环境"}」的登录态…`, `Checking sign-in state for "${acc?.label ?? "this environment"}"…`)
+    : !signedIn
+      ? tr(`「${acc?.label ?? "这个环境"}」还没登录`, `"${acc?.label ?? "This environment"}" is not signed in`)
     : proxyBlocked
       ? tr(
           `「${acc?.label ?? "这个环境"}」要求必须走代理，但还没有配出口`,

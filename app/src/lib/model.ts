@@ -32,7 +32,7 @@ import { tr } from "./i18n";
 export type ThemeMode = "light" | "dark" | "system";
 
 /** 顶层视图 */
-export type View = "home" | "sessions" | "session" | "accounts" | "network" | "settings" | "clean";
+export type View = "home" | "sessions" | "session" | "accounts" | "network" | "settings" | "clean" | "health";
 
 /** 权限模式 —— 对应 claude --permission-mode */
 export type PermissionMode =
@@ -375,7 +375,12 @@ export function createAccount(label: string, taken: string[], tint: string): Acc
     label,
     configDir: configDirFor(label, taken),
     tint,
-    auth: "signedOut",
+    /**
+     * 刚建出来当然还没测过。以前这里写 "signedOut"，等于把一个猜测
+     * 当成事实存进配置文件 —— 界面就会拿着“未登录”去让已经登录的人再登一次。
+     * 真实登录态只能问 CLI，这里保持未知。
+     */
+    auth: "unknown",
     proxy: { ...DIRECT_PROXY },
     identity: { userID: null, machineID: null, rotateOnNextLaunch: false },
     terminal: { ...DEFAULT_TERMINAL },
@@ -419,6 +424,124 @@ export const AUTH_PILL: Record<AuthState, string> = {
   suspended: "p-bad",
   unknown: "p-idle",
 };
+
+// ─────────────────────────────────────────── 健康度
+
+/** 绿 = 就绪，黄 = 有风险，红 = 账号级被风控 */
+export type HealthLevel = "ok" | "risk" | "blocked";
+
+export interface Health {
+  score: number;
+  level: HealthLevel;
+  /**
+   * 每一分为什么被扣掉。
+   *
+   * 不搞加权模型那套“看起来很科学”的东西：每扣一分都要能说出一条
+   * 用户看得懂、也能去改的理由，否则分数就只是个装饰。
+   */
+  reasons: string[];
+}
+
+/**
+ * 算一个环境的健康度。
+ *
+ * 红色只留给账号级状态（被风控 / 凭据失效）—— 那是我们自己改不了的。
+ * 能改的（直连、没设备码、出口跟别人撞了）一律算黄色，配得上“去修一下就行”。
+ */
+export function healthOf(
+  account: Account,
+  status: AccountStatusSnapshot | undefined,
+  exitIp: string | null | undefined,
+  all: Account[],
+  flags: { stunDetected?: boolean; desktopRunning?: boolean } = {},
+): Health {
+  const reasons: string[] = [];
+  let score = 100;
+  const others = all.filter((a) => a.id !== account.id);
+
+  /** 没测过就是未知，不拿配置文件里那个旧值当事实 */
+  const auth = status?.auth ?? "unknown";
+
+  if (auth === "unknown") {
+    /**
+     * 还没问过 CLI：不下任何结论。
+     *
+     * 这条比“没登录”轻得多，但它会提醒你去跑一次体检 —— 而不是骗你
+     * 去重新登录一个本来就好的账号。
+     */
+    score -= 5;
+    reasons.push(tr("登录态还没确认", "Sign-in state not confirmed yet"));
+  }
+
+  if (auth === "suspended") {
+    return {
+      score: 0,
+      level: "blocked",
+      reasons: [tr("账号处于暂时风控", "Account is temporarily restricted")],
+    };
+  }
+
+  if (auth === "expired") {
+    score -= 70;
+    reasons.push(tr("登录凭据已失效", "Sign-in expired"));
+  } else if (auth === "signedOut") {
+    score -= 40;
+    reasons.push(tr("这个环境还没登录", "Not signed in"));
+  }
+
+  const proxied = Boolean(account.proxy && account.proxy.protocol !== "none" && account.proxy.host);
+  if (!proxied) {
+    score -= 25;
+    reasons.push(tr("走直连，出口和本机一样", "Direct connection; exit matches this Mac"));
+  }
+
+  const ip = exitIp ?? account.lastExitIp;
+  if (ip) {
+    const same = others.filter((a) => a.lastExitIp === ip);
+    if (same.length > 0) {
+      score -= 35;
+      reasons.push(
+        tr(
+          `出口 IP 和「${same.map((a) => a.label).join("、")}」相同`,
+          `Exit IP is shared with ${same.map((a) => a.label).join(", ")}`,
+        ),
+      );
+    }
+  } else if (proxied) {
+    score -= 5;
+    reasons.push(tr("出口还没测过", "Exit has not been measured"));
+  }
+
+  const uid = account.identity?.userID;
+  if (!uid) {
+    score -= 10;
+    reasons.push(tr("还没生成设备码", "No device ID yet"));
+  } else {
+    const same = others.filter((a) => a.identity?.userID === uid);
+    if (same.length > 0) {
+      score -= 30;
+      reasons.push(
+        tr(
+          `设备码和「${same.map((a) => a.label).join("、")}」相同`,
+          `Device ID is shared with ${same.map((a) => a.label).join(", ")}`,
+        ),
+      );
+    }
+  }
+
+  if (flags.stunDetected) {
+    score -= 40;
+    reasons.push(tr("有程序在发 STUN，真实公网 IP 已暴露", "Something sends STUN; the real public IP is exposed"));
+  }
+  if (flags.desktopRunning) {
+    score -= 15;
+    reasons.push(tr("Claude Desktop 正开着，它共用整机身份", "Claude Desktop is running and shares this machine's identity"));
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const level: HealthLevel = score >= 85 ? "ok" : "risk";
+  return { score, level, reasons };
+}
 
 // ─────────────────────────────────────────── 代理
 

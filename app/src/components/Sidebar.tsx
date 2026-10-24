@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { Account, AccountStatusSnapshot, ShellWindow, View } from "../lib/model";
 import { AUTH_LABEL, shortTime } from "../lib/model";
 import {
+  IconAlert,
   IconChevronDown,
   IconClose,
   IconCopy,
@@ -109,6 +110,7 @@ export default function Sidebar({
     { icon: IconKey, label: tr("环境", "Environments"), view: "accounts", count: accounts.length ? String(accounts.length) : "" },
     // 设置不占主导航（左下角账号菜单、⌘, 都能进）；这里放更常用的「网络」
     { icon: IconGlobe, label: tr("网络", "Network"), view: "network" },
+    { icon: IconAlert, label: tr("健康检查", "Health check"), view: "health" },
   ];
 
   return (

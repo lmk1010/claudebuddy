@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Account, AccountStatusSnapshot, ProxyConfig } from "../lib/model";
 import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem } from "../lib/bridge";
-import { ACCOUNT_TINTS, AUTH_LABEL, AUTH_PILL, proxyLabel, relTime, tierLabel, type SimilarityReport } from "../lib/model";
+import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, relTime, tierLabel, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
 import Art from "./Art";
 import Modal from "./Modal";
@@ -131,7 +131,9 @@ export default function Accounts(p: Props) {
       <div className="acc">
         {p.accounts.map((a) => {
           const s = p.status[a.id];
-          const auth = s?.auth ?? a.auth ?? "unknown";
+          // 只信问过 CLI 的结果。status 里没有就说明还没测，不拿配置文件里
+          // 那个猜出来的值当事实 —— 否则已登录的环境会显示“未登录”
+          const auth = s?.auth ?? "unknown";
           const on = a.id === p.activeId;
           const n = p.sessionCount[a.id] ?? 0;
           return (
@@ -159,7 +161,23 @@ export default function Accounts(p: Props) {
                 {a.proxy.protocol === "none" ? tr("直连", "Direct") : a.proxy.protocol.toUpperCase()}
               </span>
               <span className="as">{n > 0 ? tr(`${n} 个会话`, `${n} sessions`) : relTime(a.lastUsedAt)}</span>
-              <span className={`pill ${AUTH_PILL[auth]}`}>{AUTH_LABEL[auth]}</span>
+              {(() => {
+                /**
+                 * 健康分并进原来那个状态药丸里 —— 不新增节点。
+                 *
+                 * 这行的布局是写死的 6 列 grid，多插一个元素就会把
+                 * “…” 挤到第二行、行高也被撑开。
+                 */
+                const h = healthOf(a, s, undefined, p.accounts);
+                return (
+                  <span
+                    className={`pill ${h.level === "blocked" ? "p-bad" : h.level === "risk" ? "p-warn" : "p-ok"}`}
+                    title={h.reasons.length ? h.reasons.join("；") : tr("一切就绪", "All good")}
+                  >
+                    {h.score} · {AUTH_LABEL[auth]}
+                  </span>
+                );
+              })()}
               <span
                 className="ar-more"
                 role="button"
@@ -480,7 +498,8 @@ export function EnvModal({
   onLoadSessions: () => void;
   onOpenSession: (s: SessionSummary) => void;
 }) {
-  const auth = status?.auth ?? account.auth ?? "unknown";
+  // 同上：没测过就是未知，不是未登录
+  const auth = status?.auth ?? "unknown";
   const [sec, setSec] = useState<EnvSection>(initialSection);
   const [dir, setDir] = useState<"up" | "down">("down");
   const order: EnvSection[] = SECTIONS.map((s) => s.id);
@@ -534,13 +553,24 @@ export function EnvModal({
                 >
                   <s.icon size={15} />
                   <span>{s.label}</span>
-                  {s.id === "general" && auth !== "signedIn" && <em className="em-badge" title={tr("还没登录", "Not signed in yet")} />}
+                  {s.id === "general" && auth === "signedOut" && <em className="em-badge" title={tr("还没登录", "Not signed in yet")} />}
                 </button>
               ))}
             </div>
 
             <div className="em-foot">
-              <span className={`pill ${AUTH_PILL[auth]}`}>{AUTH_LABEL[auth]}</span>
+              {(() => {
+                // 抽屉里只有当前这一个环境，做不了“跟谁撞了”的比较，只看自己
+                const h = healthOf(account, status, undefined, [account]);
+                return (
+                  <span
+                    className={`pill ${h.level === "blocked" ? "p-bad" : h.level === "risk" ? "p-warn" : "p-ok"}`}
+                    title={h.reasons.length ? h.reasons.join("；") : tr("一切就绪", "All good")}
+                  >
+                    {h.score} · {AUTH_LABEL[auth]}
+                  </span>
+                );
+              })()}
             </div>
           </aside>
 
@@ -971,7 +1001,7 @@ function GeneralSection({
           }
         >
           <span className={`em-val${signedIn ? "" : " dim"}`}>
-            {status?.email ?? (auth === "unknown" ? tr("读不到状态", "Status unavailable") : tr("未登录", "Signed out"))}
+            {status?.email ?? (auth === "unknown" ? tr("还没确认", "Not checked yet") : tr("未登录", "Signed out"))}
           </span>
         </Row>
         {signedIn && status?.tier && (
@@ -980,15 +1010,32 @@ function GeneralSection({
           </Row>
         )}
         <Row
-          title={signedIn ? tr("退出登录", "Sign out") : tr("登录授权", "Sign in")}
+          title={
+            signedIn
+              ? tr("退出登录", "Sign out")
+              : status?.email
+                ? tr("重新登录", "Sign in again")
+                : tr("登录授权", "Sign in")
+          }
           desc={
             signedIn
               ? tr("从 Keychain 清掉这个环境的凭据", "Removes this environment's credentials from Keychain")
-              : tr("打开浏览器授权，完成后自动识别", "Authorize in your browser. It's detected automatically")
+              : status?.email
+                ? tr(
+                    `上次是 ${status.email}，凭据已不在 Keychain，授权一次就好`,
+                    `Last signed in as ${status.email}. Credentials are gone; authorize once to restore`,
+                  )
+                : tr("打开浏览器授权，完成后自动识别", "Authorize in your browser. It's detected automatically")
           }
         >
           {!signedIn ? (
-            <LoginButton account={account} busy={busy} waiting={Boolean(loginTermId)} onLogin={onLogin} />
+            <LoginButton
+              account={account}
+              busy={busy}
+              waiting={Boolean(loginTermId)}
+              label={status?.email ? tr("重新登录", "Sign in again") : tr("登录", "Sign in")}
+              onLogin={onLogin}
+            />
           ) : (
             <button className="btn" onClick={onLogout} disabled={busy}>
               {tr("退出登录", "Sign out")}

@@ -8,6 +8,7 @@ import Home from "./components/Home";
 import Settings, { type SettingsCat } from "./components/Settings";
 import CommandPalette from "./components/CommandPalette";
 import CleanPage from "./components/CleanPage";
+import HealthPage from "./components/HealthPage";
 import NetTestPage from "./components/NetTestPage";
 import Guide from "./components/Guide";
 import { setLang, systemLang, tr } from "./lib/i18n";
@@ -58,6 +59,7 @@ import type {
   TraceItem,
   KeychainEntry,
   ScannedDir,
+  RiskReport,
   LeakReport,
   DesktopProbe,
   SessionSummary,
@@ -405,6 +407,34 @@ export default function App() {
       ),
     };
   }, [drawerAccount, state.accounts, exitIp, repos]);
+
+  /** 风控体检：整机清单，进入健康页时取一次 */
+  const [risk, setRisk] = useState<RiskReport | null>(null);
+  /**
+   * 进健康页时重算一次整机清单。
+   *
+   * 用 state.view 而不是下面的 view 常量 —— 那个声明在更靠后的位置，
+   * 在 effect 里引用会变成 TDZ。
+   */
+  useEffect(() => {
+    if (state.view !== "health") return;
+    let alive = true;
+    void window.claudeBuddy.riskAudit().then(
+      (r) => {
+        if (alive) setRisk(r);
+      },
+      () => {
+        /* 拿不到就不显示整机块 */
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [state.view]);
+
+  /** 一键体检正在进行（跟单环境的 checking 不是同一个东西） */
+  const [auditing, setAuditing] = useState(false);
+
 
   /**
    * Claude Desktop 的本地体检。
@@ -1072,6 +1102,25 @@ export default function App() {
     [state.accounts, recordExitIp],
   );
 
+  /**
+   * 一键体检：把所有环境的登录态重新读一遍，再逐个测出口，最后重算整机清单。
+   *
+   * 刻意串行逐个测：同时发几条出口请求本身就是个很奇怪的网络行为，
+   * 而且代理多数扑不住并发——那样测出来反而是错的。
+   */
+  const auditAll = useCallback(async () => {
+    setAuditing(true);
+    try {
+      await refreshAll();
+      for (const a of stateRef.current.accounts) {
+        await checkExit(a.id);
+      }
+      setRisk(await window.claudeBuddy.riskAudit());
+    } finally {
+      setAuditing(false);
+    }
+  }, [refreshAll, checkExit]);
+
   const rotate = useCallback(
     async (id: string) => {
       setBusy((b) => ({ ...b, [id]: true }));
@@ -1516,6 +1565,27 @@ export default function App() {
               }}
             />
           </>
+        )}
+
+        {view === "health" && (
+          <HealthPage
+            accounts={state.accounts}
+            status={status}
+            exitIp={exitIp}
+            desktop={desktop}
+            leak={leak}
+            risk={risk}
+            checking={auditing}
+            onCheckAll={() => void auditAll()}
+            onOpenAccount={(id) => {
+              update({ view: "accounts" });
+              setEditor({ id, section: "general" });
+            }}
+            onOpenClean={() => {
+              update({ view: "settings" });
+              setSettingsCat("clean");
+            }}
+          />
         )}
 
         {view === "network" && (
