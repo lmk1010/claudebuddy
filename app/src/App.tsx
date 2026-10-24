@@ -370,6 +370,13 @@ export default function App() {
   const [desktop, setDesktop] = useState<DesktopProbe | null>(null);
   /** UDP / STUN 泄漏面 —— 跟 Desktop 一起周期性体检 */
   const [leak, setLeak] = useState<LeakReport | null>(null);
+  /**
+   * 正在跑的会话 id。
+   *
+   * 侧栏那个圆点看的是这个，不是“我是不是正在看它”——
+   * 离开页面不等于会话停了，进程还在跑就该是绿的。
+   */
+  const [running, setRunning] = useState<Set<string>>(new Set());
   /** 安全状态：常驻右栏顶部，四步全过才显示"环境就绪" */
   const [safetyOpen, setSafetyOpen] = useState(false);
   const safety = useMemo(
@@ -437,6 +444,35 @@ export default function App() {
     return () => {
       alive = false;
       clearInterval(timer);
+    };
+  }, []);
+
+  /**
+   * 同步“哪些会话在跑”。
+   *
+   * 事件驱动为主（进程退出立刻反应），外加一个慢轮询兜底（进程自然结束、
+   * 或者渲染层重载后对不上时能自己纠回来）。集合没变就不写 state，
+   * 否则每 2.5 秒白重渲染一次。
+   */
+  useEffect(() => {
+    let alive = true;
+    const same = (a: Set<string>, b: string[]) => a.size === b.length && b.every((x) => a.has(x));
+    const sync = async () => {
+      try {
+        const ids = await window.claudeBuddy.liveTerms();
+        if (!alive) return;
+        setRunning((prev) => (same(prev, ids) ? prev : new Set(ids)));
+      } catch {
+        /* 主进程不可用就保持上一次的值 */
+      }
+    };
+    void sync();
+    const timer = setInterval(sync, 2500);
+    const offExit = window.claudeBuddy.onTermExit(() => void sync());
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      offExit();
     };
   }, []);
 
@@ -1261,6 +1297,7 @@ export default function App() {
       <Sidebar
         open={state.sidebarOpen}
         windows={state.windows}
+        running={running}
         accounts={state.accounts}
         activeId={state.activeWindowId}
         activeAccount={activeAccount}

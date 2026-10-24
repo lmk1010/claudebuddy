@@ -446,6 +446,8 @@ export interface ClaudeBuddyBridge {
   killTerm(id: string): void;
   /** 接回一个还在跑的终端：返回它是否活着，以及切走期间缓冲的输出 */
   attachTerm(id: string): Promise<{ alive: boolean; buffer: string }>;
+  /** 现在活着的终端 id —— 侧栏圆点用它判“在跑 / 不在线” */
+  liveTerms(): Promise<string[]>;
   onTermData(cb: (p: { id: string; data: string }) => void): () => void;
   onTermExit(cb: (p: { id: string; exitCode: number }) => void): () => void;
 

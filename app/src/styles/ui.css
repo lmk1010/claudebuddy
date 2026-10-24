@@ -1107,21 +1107,8 @@
   color: #faf9f5;
   position: relative;
 }
-/* 当前打开的那个会话：右下角一颗绿点 */
-.rw-env.live::after {
-  content: "";
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 0 2px var(--sd);
-}
-.rw.on .rw-env.live::after {
-  box-shadow: 0 0 0 2px var(--sel);
-}
+/* 环境标记右下角不再挂绿点：状态点已经单独占一格了，
+   而且它的含义从“我正在看它”改成了“进程在跑”。 */
 
 /* ══════════════════════ 侧栏收起：给红绿灯让位 ══════════════════════ */
 

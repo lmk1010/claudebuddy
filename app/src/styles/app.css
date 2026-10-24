@@ -167,6 +167,10 @@
   border-radius: 50%;
   background: var(--t4);
 }
+/* 进程在跑就是绿的 —— 这个状态跟“有没有正在看它”无关 */
+.rw .dt.on::before {
+  background: var(--success);
+}
 .rw:hover {
   background: var(--hv);
 }

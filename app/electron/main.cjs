@@ -706,6 +706,14 @@ ipcMain.handle("term:attach", (_e, { id }) => ({
   buffer: termBuffers.get(id) ?? "",
 }));
 
+/**
+ * 现在活着的终端 id。
+ *
+ * 侧栏的圆点靠它：绿=进程在跑，灰=不在线。以前那个点用的是“我是不是正在看它”，
+ * 所以一走开就灭了 —— 可“离开页面”不等于“会话停了”。
+ */
+ipcMain.handle("term:live", () => [...terms.keys()]);
+
 ipcMain.handle("term:activity", () => sampleActivity());
 
 ipcMain.handle("dialog:pickFolder", async () => {

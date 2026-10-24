@@ -23,6 +23,8 @@ interface Props {
   /** 是否展开。收起时不卸载，只把宽度收到 0 —— 这样能过渡 */
   open: boolean;
   windows: ShellWindow[];
+  /** 哪些会话的进程还活着 —— 圆的绿/灰看它，不看“是不是正在看” */
+  running: Set<string>;
   accounts: Account[];
   activeId: string | null;
   activeAccount: Account | null;
@@ -56,6 +58,7 @@ interface Props {
 export default function Sidebar({
   open,
   windows,
+  running,
   accounts,
   activeId,
   activeAccount,
@@ -195,6 +198,8 @@ export default function Sidebar({
         ) : (
           sessions.map((w) => {
             const live = w.id === activeId && view === "session";
+            /** 进程在不在跑 —— 跟“我是不是正在看它”是两件事 */
+            const isRunning = running.has(w.id);
             const acc = accById.get(w.accountId);
             return (
               <div
@@ -224,8 +229,14 @@ export default function Sidebar({
                 }
                 title={tr(`${w.title} · ${acc?.label ?? ""}\n${w.cwd}\n双击重命名 · 右键更多`, `${w.title} · ${acc?.label ?? ""}\n${w.cwd}\nDouble-click to rename · right-click for more`)}
               >
+                {/* 状态点：绿=进程在跑，灰=不在线。
+                    槽位固定 15px（跟导航图标同宽），文字起点才对得齐。 */}
+                <span
+                  className={`dt${isRunning ? " on" : ""}`}
+                  title={isRunning ? tr("运行中", "Running") : tr("不在线", "Not running")}
+                />
                 {/* 环境标记：每个环境一种颜色、一个首字，几个号的会话混在一起也一眼分得开 */}
-                <span className={`rw-env${live ? " live" : ""}`} style={{ background: acc?.tint }}>
+                <span className="rw-env" style={{ background: acc?.tint }}>
                   {acc?.label.slice(0, 1)}
                 </span>
                 {renaming === w.id ? (

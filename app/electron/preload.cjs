@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   resizeTerm: (id, cols, rows) => ipcRenderer.send("term:resize", { id, cols, rows }),
   killTerm: (id) => ipcRenderer.send("term:kill", { id }),
   attachTerm: (id) => ipcRenderer.invoke("term:attach", { id }),
+  liveTerms: () => ipcRenderer.invoke("term:live"),
   onTermData: (cb) => {
     const h = (_e, p) => cb(p);
     ipcRenderer.on("term:data", h);
