@@ -42,7 +42,9 @@ function Row({
       <span className={`hs-dot ${DOT[state]}`}>
         {state === "ok" ? <IconCheck size={11} /> : state === "info" ? null : <IconWarning size={11} />}
       </span>
-      <span className="hs-k">{label}</span>
+      <span className="hs-k" title={label}>
+        {label}
+      </span>
       <span className="hs-v">
         <b className="mono">{value}</b>
         {note && <small>{note}</small>}

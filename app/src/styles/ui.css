@@ -3654,7 +3654,12 @@
    * 标签起点就参差不齐、值列也对不齐了。固定一个够宽的常量、并且禁止
    * 折行，才能保证首列整齐、值列对齐。
    */
-  --hs-k: 80px;
+  /*
+   * 测过每个标签在真实字体下的自然宽度，最宽的是英文 "Machine logs" = 84px
+   * （"UDP / STUN" 是 75px）。留出余量取 92px，再加截断兜底，
+   * 以后加更长的文案也不会把行高撑破。
+   */
+  --hs-k: 92px;
 }
 .hs-row {
   display: grid;
@@ -3693,6 +3698,9 @@
   color: var(--t2);
   /* 标签一律单行：折行会把行高撑成两行，整列节奏就乱了 */
   white-space: nowrap;
+  /* 真遇到超长的（比如以后加了更长的翻译）宁可截断，也不要撑破布局 */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .hs-v {
   display: flex;
