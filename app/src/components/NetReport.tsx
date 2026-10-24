@@ -174,6 +174,8 @@ export default function NetReportCard({
           <span>{v.text}</span>
         </div>
         <div className="nr-id">
+          {/* 「出口」有好几种：本机直连的、代理的、DNS 的……这里说清楚是哪一个 */}
+          <div className="nr-cap">Claude 看到的出口 · 走 {proxyKey}</div>
           <div className="nr-ip">
             <span className="mono">{r.ip}</span>
             <span className={`ipb-kind ${hosting ? "mid" : "ok"}`}>{kind}</span>
@@ -202,7 +204,9 @@ export default function NetReportCard({
               信任分 = 100 − proxycheck.io 的风险分，被标成代理 / VPN 直接压到 30 以下，机房 IP 再扣 15。它是按公开数据估的，
               <b>不是 Anthropic 的内部分数</b>，只用来对比线路好坏。
             </p>
-            <p>「Claude 看到的」直接请求 claude.ai 拿到，走的就是这个环境的代理，跟真实会话是同一条路。</p>
+            <p>这里的 IP 是直接请求 claude.ai 时，Cloudflare 回报的来源地址，走的就是这个环境的线路，跟真实会话同一条路。</p>
+            <p>它跟设置里「连通诊断」的「本机直连出口」不一定一样：那个不走任何环境的代理。</p>
+            <p>IP 属性两个来源各说各的（ip-api、proxycheck），照实列出，不按运营商名字去猜。</p>
           </Help>
         </div>
       </div>
@@ -231,15 +235,28 @@ export default function NetReportCard({
         <div className="nr-col">
           <h4>IP 属性</h4>
           <Line k="代理 / VPN">{r.risk?.proxy || info?.proxy ? <Tag tone="bad">已标记</Tag> : <Tag tone="ok">未检测到</Tag>}</Line>
-          <Line k="风险分">{r.risk ? <Tag tone={r.risk.risk >= 50 ? "bad" : r.risk.risk >= 25 ? "mid" : "ok"}>{r.risk.risk} / 100</Tag> : "—"}</Line>
-          <Line k="ASN">
-            <span className="mono nr-trunc" title={info?.as}>
-              {info?.as?.split(" ")[0] || "—"}
-            </span>
+          {/* 两个来源分开列，各说各的 */}
+          <Line k="proxycheck">
+            {r.risk ? (
+              <Tag tone={r.risk.risk >= 50 ? "bad" : r.risk.risk >= 25 ? "mid" : "ok"}>
+                {KIND_ZH[r.risk.type.toLowerCase()] ?? (r.risk.type || "未知")} · {r.risk.risk}
+              </Tag>
+            ) : (
+              "没查到"
+            )}
           </Line>
-          <Line k="运营商">
-            <span className="nr-trunc" title={info?.org}>
-              {r.risk?.provider || info?.org || "—"}
+          <Line k="ip-api">
+            {info ? (
+              <Tag tone={info.proxy ? "bad" : info.hosting ? "mid" : "ok"}>
+                {info.proxy ? "代理" : info.hosting ? "机房" : info.mobile ? "移动网络" : "非机房"}
+              </Tag>
+            ) : (
+              "没查到"
+            )}
+          </Line>
+          <Line k="ASN">
+            <span className="nr-trunc" title={`${info?.as ?? ""}\n${info?.isp ?? ""}`}>
+              {info?.as || "—"}
             </span>
           </Line>
         </div>

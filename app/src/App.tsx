@@ -7,6 +7,7 @@ import Sessions from "./components/Sessions";
 import Home from "./components/Home";
 import Settings, { type SettingsCat } from "./components/Settings";
 import CommandPalette from "./components/CommandPalette";
+import CleanPage from "./components/CleanPage";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
 import { assessSafety } from "./components/SafetyBadge";
@@ -1271,6 +1272,31 @@ export default function App() {
             state={state}
             update={update}
             onClose={() => update({ view: "home" })}
+            onOpenClean={() => update({ view: "clean" })}
+          />
+        )}
+
+        {view === "clean" && (
+          <CleanPage
+            onPurged={(paths) => {
+              // 目录被移走的环境从列表里摘掉；还有会话开着的先留着，免得把正在用的页签弄丢
+              const gone = new Set(paths.map((p) => p.replace(/^.*\//, "")));
+              setState((s) => {
+                const busyIds = new Set(s.windows.map((w) => w.accountId));
+                const accounts = s.accounts.filter(
+                  (a) => a.configDir === ".claude" || !gone.has(a.configDir) || busyIds.has(a.id),
+                );
+                if (accounts.length === s.accounts.length) return s;
+                return {
+                  ...s,
+                  accounts,
+                  activeAccountId: accounts.some((a) => a.id === s.activeAccountId)
+                    ? s.activeAccountId
+                    : (accounts[0]?.id ?? null),
+                };
+              });
+              void refreshAll();
+            }}
           />
         )}
 
@@ -1354,6 +1380,10 @@ export default function App() {
             onGuide={() => {
               setMenu(null);
               update({ onboarded: false });
+            }}
+            onOpenClean={() => {
+              setMenu(null);
+              update({ view: "clean" });
             }}
             onOpenSettings={(cat) => {
               setMenu(null);
@@ -1516,7 +1546,9 @@ function MenuBody({
   onManageAccounts,
   onGuide,
   onOpenSettings,
+  onOpenClean,
 }: {
+  onOpenClean: () => void;
   onGuide: () => void;
   onOpenSettings: (cat?: SettingsCat) => void;
   menu: NonNullable<Menu>;
@@ -1599,7 +1631,7 @@ function MenuBody({
           <IconAccounts size={15} />
           <span className="pi-main">管理环境…</span>
         </button>
-        <button className="pi" onClick={() => onOpenSettings("clean")} role="menuitem">
+        <button className="pi" onClick={onOpenClean} role="menuitem">
           <IconTrash size={15} />
           <span className="pi-main">清理本机…</span>
         </button>

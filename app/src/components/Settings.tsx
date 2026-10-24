@@ -17,6 +17,8 @@ interface Props {
   state: ShellState;
   update: (patch: Partial<ShellState>) => void;
   onClose: () => void;
+  /** 清理本机是单独一页（条目多了要表格、要筛选），设置里只放入口 */
+  onOpenClean: () => void;
   initialCat?: SettingsCat;
 }
 
@@ -60,7 +62,7 @@ const GROUPS: { title: string; items: CatItem[] }[] = [
  * 设置页 —— 左边分类、右边一行一项：名称和说明在左，控件在右，跟 Claude Desktop 同构。
  * 开关打开是墨色 —— 这一屏没有主操作，陶土不出现。
  */
-export default function Settings({ state, update, onClose, initialCat }: Props) {
+export default function Settings({ state, update, onClose, onOpenClean, initialCat }: Props) {
   const [cat, setCat] = useState<SettingsCat>(initialCat ?? "general");
 
   return (
@@ -81,9 +83,14 @@ export default function Settings({ state, update, onClose, initialCat }: Props) 
               {g.items.map((c) => {
                 const Icon = c.icon;
                 return (
-                  <button key={c.id} className={cat === c.id ? "on" : ""} onClick={() => setCat(c.id)}>
+                  <button
+                    key={c.id}
+                    className={cat === c.id ? "on" : ""}
+                    onClick={() => (c.id === "clean" ? onOpenClean() : setCat(c.id))}
+                  >
                     <Icon size={15} />
                     <span>{c.label}</span>
+                    {c.id === "clean" && <span className="st-go">↗</span>}
                   </button>
                 );
               })}
@@ -204,7 +211,6 @@ export default function Settings({ state, update, onClose, initialCat }: Props) 
             </>
           )}
 
-          {cat === "clean" && <Diagnose part="clean" />}
           {cat === "net" && <Diagnose part="net" />}
 
           {cat === "about" && (

@@ -170,6 +170,30 @@ function lookupIp() {
   });
 }
 
+/** proxycheck.io 对这个 IP 的类型与风险分（第二个独立来源）。拿不到返回 null */
+function lookupRisk(ipAddr) {
+  return new Promise((resolve) => {
+    const req = https.get(`https://proxycheck.io/v2/${ipAddr}?vpn=1&risk=1&asn=1`, { timeout: 8000 }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (c) => (body += c));
+      res.on("end", () => {
+        try {
+          const d = JSON.parse(body)[ipAddr];
+          resolve(d ? { type: d.type || "", risk: Number(d.risk ?? 0), proxy: d.proxy === "yes" } : null);
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(null);
+    });
+    req.on("error", () => resolve(null));
+  });
+}
+
 /**
  * 归因。
  *
@@ -192,21 +216,33 @@ async function diagnose() {
 
   /* ── 层 1：网络 ── */
   const ipOk = ip.ok && ip.status === "success";
-  // 注意：不能只信 hosting 字段。实测本机出口 ip-api 报 hosting:false，
-  // 但 ISP 名是 "Guidance Hosting Inc"，所以 ISP/org 名也要一起看。
-  const dcHint = ipOk ? `${ip.isp || ""} ${ip.org || ""} ${ip.asname || ""}` : "";
-  const datacenterish = ipOk && (ip.hosting === true || /hosting|datacenter|server|cloud|colo/i.test(dcHint));
+  /**
+   * 只报数据源真实给出的结论，不按名字猜。
+   * 之前看 ISP 名里带 "Hosting" 就判机房，可同一个 IP 在 ip-api 是 hosting:false、
+   * 在 proxycheck 是 Residential —— 名字只是公司名，不是线路类型。两个来源各说各的，照实列出来。
+   */
+  const risk = ipOk ? await lookupRisk(ip.query) : null;
+  const flaggedProxy = ipOk && (ip.proxy === true || Boolean(risk?.proxy));
+  const flaggedHosting = ipOk && (ip.hosting === true || /hosting|business|data ?cent/i.test(risk?.type || ""));
+  const sources = ipOk
+    ? [
+        `ip-api：${ip.proxy ? "代理" : ip.hosting ? "机房" : ip.mobile ? "移动网络" : "非机房"}`,
+        risk ? `proxycheck：${risk.type || "未知类型"} · 风险 ${risk.risk}/100${risk.proxy ? " · 标记为代理" : ""}` : "proxycheck：没查到",
+      ].join("；")
+    : "";
   layers.push({
     id: "network",
-    label: "网络出口",
-    status: !ipOk ? "unknown" : datacenterish ? "warn" : "ok",
+    label: "本机直连出口",
+    status: !ipOk ? "unknown" : flaggedProxy ? "fail" : flaggedHosting ? "warn" : "ok",
     detail: ipOk
-      ? `${ip.query} · ${ip.as || ip.isp || "?"} · ${ip.city || ""} ${ip.country || ""}`
+      ? `${ip.query} · ${ip.as || ip.isp || "?"} · ${ip.city || ""} ${ip.country || ""} · ${sources}`
       : "查不到出口归属",
     note: ipOk
-      ? datacenterish
-        ? "出口像是机房/云主机（ISP 或 ASN 名里带 hosting/cloud）。这类 IP 在风控里天然高分，是 403 的常见土壤。"
-        : "出口不是明显的机房 IP。"
+      ? flaggedProxy
+        ? "有数据源把这个 IP 标成了代理 / VPN，风控里分数会很差。"
+        : flaggedHosting
+          ? "有数据源把这个 IP 归为机房 / 企业线路。"
+          : "两个数据源都没把它标成机房或代理。"
       : "无法判定。",
   });
 

@@ -1138,6 +1138,9 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
+  /* 图标要在 30px 方块里居中，中线才跟红绿灯（y=24）和顶栏标题对齐 */
+  display: grid;
+  place-items: center;
   animation: fade-in 200ms var(--ease) both;
   -webkit-app-region: no-drag;
 }
@@ -2099,6 +2102,10 @@
   flex-direction: column;
   gap: 5px;
 }
+.nr-cap {
+  font-size: 11px;
+  color: var(--t4);
+}
 .nr-ip {
   display: flex;
   align-items: center;
@@ -2519,6 +2526,195 @@
 [data-theme="dark"] .dx-sum.mid .dx-sum-ic,
 [data-theme="dark"] .dx-st.mid {
   color: #e2b46a;
+}
+
+/* ══════════ 清理本机（独立页，表格） ══════════ */
+.sv-sp {
+  flex: 1;
+}
+.st-go {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--t4);
+}
+.cl-q {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  width: 220px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: var(--hair) solid var(--ln);
+  background: var(--bg);
+  color: var(--t4);
+  transition: border-color var(--dur-snap) var(--ease-out);
+}
+.cl-q:focus-within {
+  border-color: var(--t3);
+}
+.cl-q input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--t1);
+}
+.cl-err,
+.cl-done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  animation: nr-in var(--dur-base) var(--ease-out);
+}
+.cl-err {
+  background: rgba(198, 69, 69, 0.08);
+  color: var(--danger);
+}
+.cl-done {
+  background: rgba(78, 159, 99, 0.1);
+  color: var(--success);
+}
+.cl-done span {
+  flex: 1;
+  color: var(--t2);
+}
+.cl-table {
+  border: var(--hair) solid var(--ln);
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+  animation: nr-in var(--dur-base) var(--ease-out);
+}
+.cl-tr {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 84px 76px 52px 76px 40px;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 6px 0 8px;
+  font-size: 12.5px;
+  color: var(--t2);
+  cursor: pointer;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.cl-tr + .cl-tr {
+  border-top: var(--hair) solid var(--ln);
+}
+.cl-tr:not(.cl-th):hover {
+  background: var(--hv);
+}
+.cl-tr.on {
+  background: var(--sel);
+}
+.cl-th {
+  min-height: 36px;
+  font-size: 11px;
+  color: var(--t4);
+  background: var(--pp);
+  cursor: default;
+}
+.cl-ck {
+  display: grid;
+  place-items: center;
+}
+.cl-ck input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--t1);
+  cursor: pointer;
+}
+.cl-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cl-ic {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--pp);
+  border: var(--hair) solid var(--ln);
+  color: var(--t4);
+}
+.cl-ic.ok {
+  color: var(--t2);
+}
+.cl-nm {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cl-nm b {
+  font-weight: 500;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-nm small {
+  font-size: 11px;
+  color: var(--t4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-num {
+  text-align: right;
+  font-size: 12px;
+  color: var(--t3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cl-th .cl-num {
+  font-size: 11px;
+  color: var(--t4);
+}
+.cl-act {
+  display: grid;
+  place-items: center end;
+}
+.cl-more {
+  opacity: 0;
+}
+.cl-tr:hover .cl-more,
+.cl-more:focus-visible {
+  opacity: 1;
+}
+.cl-more:hover {
+  background: var(--hv);
+  color: var(--t1);
+}
+.cl-empty {
+  padding: 36px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--t4);
+  border-top: var(--hair) solid var(--ln);
+}
+.cl-confirm p {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--t2);
+}
+.cl-confirm p.warn {
+  color: #9a6e24;
+}
+.cl-confirm p.dim {
+  color: var(--t4);
+  margin: 10px 0 0;
 }
 
 /* 清理本机 */

@@ -30,7 +30,7 @@
 export type ThemeMode = "light" | "dark" | "system";
 
 /** 顶层视图 */
-export type View = "home" | "sessions" | "session" | "accounts" | "settings";
+export type View = "home" | "sessions" | "session" | "accounts" | "settings" | "clean";
 
 /** 权限模式 —— 对应 claude --permission-mode */
 export type PermissionMode =
