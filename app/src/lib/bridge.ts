@@ -233,6 +233,16 @@ export interface IpInfo {
   timezone?: string;
 }
 
+/** 登录用的浏览器选项 */
+export interface BrowserOption {
+  id: string;
+  label: string;
+  /** 用户资料登着的谷歌账号，或一句说明 */
+  sub: string;
+  group: "default" | "browser" | "private" | "copy";
+  private?: boolean;
+}
+
 /** 网络测试：一个目标的分阶段计时（毫秒，均为多次的平均） */
 export interface NetTarget {
   id: string;
@@ -375,7 +385,12 @@ export interface ClaudeBuddyBridge {
     port: number;
     protocol: "http" | "socks5";
   }): Promise<{ ok: boolean; ip: string | null; reason: string | null }>;
-  accountLogin(id: string): Promise<LoginHandle>;
+  /** browser：登录用哪个浏览器（browsersList 里的 id），不给就用系统默认 */
+  accountLogin(id: string, browser?: string): Promise<LoginHandle>;
+  /** 本机能用来登录的浏览器、用户资料、隐私窗口 */
+  browsersList(): Promise<BrowserOption[]>;
+  /** CLI 交出授权链接时触发（已经按选择打开 / 复制） */
+  onLoginUrl(cb: (p: { id: string; url: string; browser: string }) => void): () => void;
   accountCloseLogin(id: string, termId?: string): Promise<boolean>;
   accountLogout(id: string): Promise<{ ok: boolean; output: string }>;
   accountCheckExit(id: string): Promise<ExitCheck>;

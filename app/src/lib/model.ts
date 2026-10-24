@@ -163,6 +163,8 @@ export interface Account {
   proxy: ProxyConfig;
   /** 上次测到的出口 IP，用于发现 IP 跳变 */
   lastExitIp?: string;
+  /** 这个环境登录时用哪个浏览器（browsersList 的 id），记住上次的选择 */
+  loginBrowser?: string;
   lastExitCheckedAt?: number;
 
   /** 身份 */

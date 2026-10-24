@@ -10,6 +10,7 @@ import CommandPalette from "./components/CommandPalette";
 import CleanPage from "./components/CleanPage";
 import NetTestPage from "./components/NetTestPage";
 import Guide from "./components/Guide";
+import { browserLabel, loadBrowsers } from "./components/LoginButton";
 import Onboarding from "./components/Onboarding";
 import Modal, { ConfirmDialog } from "./components/Modal";
 import { assessSafety } from "./components/SafetyBadge";
@@ -124,6 +125,9 @@ export default function App() {
   const [, setChecking] = useState<Record<string, boolean>>({});
   /** 从别处直接跳进设置的某个分类（比如账号菜单里的「清理本机」） */
   const [settingsCat, setSettingsCat] = useState<SettingsCat>("general");
+  /** 回调里要读最新 state 又不想把 state 塞进依赖时用 */
+  const stateRef = useRef(state);
+  stateRef.current = state;
   /** 进设置之前在哪一页 —— 「返回应用」回到那里，而不是一律回首页 */
   const lastViewRef = useRef<View>("home");
   useEffect(() => {
@@ -801,18 +805,40 @@ export default function App() {
     setExitIp((prev) => ({ ...prev, [id]: null }));
   }, []);
 
+  /**
+   * 登录。browser 不给就用这个环境上次选的；给了就记住，下次直接用。
+   * 提示等 CLI 真把链接交出来（login:url）再报「已在 xx 打开」，不提前说。
+   */
   const login = useCallback(
-    async (id: string) => {
+    async (id: string, browser?: string) => {
+      const acc = stateRef.current.accounts.find((a) => a.id === id);
+      const choice = browser ?? acc?.loginBrowser ?? "system";
+      if (browser && acc && acc.loginBrowser !== browser) {
+        setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === id ? { ...a, loginBrowser: browser } : a)) }));
+      }
       setBusy((b) => ({ ...b, [id]: true }));
-      const r = await window.claudeBuddy.accountLogin(id);
+      const r = await window.claudeBuddy.accountLogin(id, choice);
       setBusy((b) => ({ ...b, [id]: false }));
       if (r.ok && r.termId) {
         setLoginTerm((m) => ({ ...m, [id]: r.termId! }));
-        setToast({ title: "已打开授权页", body: "浏览器里完成授权后会自动识别" });
       } else {
         setToast({ title: "登录启动失败", body: "请确认已安装 claude CLI" });
       }
     },
+    [],
+  );
+
+  useEffect(
+    () =>
+      window.claudeBuddy.onLoginUrl(({ browser }) => {
+        void loadBrowsers().then((list) =>
+          setToast(
+            browser === "copy"
+              ? { title: "登录链接已复制", body: "粘到任意浏览器打开，授权后这里会自动识别" }
+              : { title: `已在「${browserLabel(list, browser)}」打开授权页`, body: "在网页上点授权，回来会自动识别" },
+          ),
+        );
+      }),
     [],
   );
 
@@ -1213,7 +1239,7 @@ export default function App() {
             keychain={keychain}
             busy={Boolean(busy[drawerAccount.id])}
             onClose={() => setEditor(null)}
-            onLogin={() => login(drawerAccount.id)}
+            onLogin={(browser) => login(drawerAccount.id, browser)}
             onLogout={() => logout(drawerAccount.id)}
             onRotate={() => rotate(drawerAccount.id)}
             onLoadTraces={() => loadTraces(drawerAccount.id)}

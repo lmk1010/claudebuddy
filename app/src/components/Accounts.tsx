@@ -8,6 +8,7 @@ import Modal from "./Modal";
 import Help, { Steps } from "./Help";
 import IpBadge from "./IpBadge";
 import NetReportCard from "./NetReport";
+import LoginButton from "./LoginButton";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import type { ProxyCandidate } from "../lib/bridge";
 import {
@@ -371,7 +372,8 @@ export function EnvModal({
   canRemove: boolean;
   onClose: () => void;
   onPatch: (patch: Partial<Account>) => void;
-  onLogin: () => void;
+  /** browser 不给 = 用这个环境记住的浏览器 */
+  onLogin: (browser?: string) => void;
   onLogout: () => void;
   onRotate: () => void;
   onLoadTraces: () => void;
@@ -690,7 +692,7 @@ function GeneralSection({
   busy: boolean;
   loginTermId: string | null;
   onPatch: (patch: Partial<Account>) => void;
-  onLogin: () => void;
+  onLogin: (browser?: string) => void;
   onLogout: () => void;
   onRefresh: () => void;
   onOpenTerminal: () => void;
@@ -721,7 +723,7 @@ function GeneralSection({
           ? `上次登录的是 ${status.email}，凭据已不在，需要重新授权`
           : "点「登录」会打开浏览器，在网页上点授权，回来就自动识别",
       act: status?.email ? "重新登录" : "登录",
-      run: onLogin,
+      run: () => onLogin(),
     },
     {
       done: netDone,
@@ -755,15 +757,15 @@ function GeneralSection({
                 <b>{s.title}</b>
                 <small>{s.desc}</small>
               </span>
-              {!s.done && (
-                <button
-                  className={`btn${i === steps.findIndex((x) => !x.done) ? " pri" : ""}`}
-                  onClick={s.run}
-                  disabled={i === 0 && (busy || Boolean(loginTermId))}
-                >
-                  {i === 0 && loginTermId ? "等待授权…" : s.act}
-                </button>
-              )}
+              {!s.done &&
+                (i === 0 ? (
+                  // 登录这一步也能就地换浏览器 / 用户资料 / 无痕
+                  <LoginButton account={account} busy={busy} waiting={Boolean(loginTermId)} label={s.act} onLogin={onLogin} />
+                ) : (
+                  <button className={`btn${i === steps.findIndex((x) => !x.done) ? " pri" : ""}`} onClick={s.run}>
+                    {s.act}
+                  </button>
+                ))}
             </div>
           ))}
         </div>
@@ -842,10 +844,7 @@ function GeneralSection({
         )}
         <Row title={signedIn ? "退出登录" : "登录授权"} desc={signedIn ? "从 Keychain 清掉这个环境的凭据" : "打开浏览器授权，完成后自动识别"}>
           {!signedIn ? (
-            <button className="btn pri" onClick={onLogin} disabled={busy || Boolean(loginTermId)}>
-              <IconKey />
-              {busy ? "启动中…" : loginTermId ? "等待授权…" : "登录"}
-            </button>
+            <LoginButton account={account} busy={busy} waiting={Boolean(loginTermId)} onLogin={onLogin} />
           ) : (
             <button className="btn" onClick={onLogout} disabled={busy}>
               退出登录

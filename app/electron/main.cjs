@@ -24,11 +24,13 @@ const {
   dialog,
   Menu,
   screen,
+  clipboard,
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 const { execFile } = require("node:child_process");
+const browsersModule = require("./browsers.cjs");
 
 const DEV_URL = process.env.CLAUDE_BUDDY_DEV_URL || "";
 const isDev = DEV_URL.length > 0;
@@ -994,9 +996,44 @@ ipcMain.handle("account:status", async (_e, { id }) => {
  * 这样做的好处：不需要解析 CLI 的输出去猜成功，
  * 只认它自己写下的凭据 —— 那是唯一可信的成功信号。
  */
-ipcMain.handle("account:login", async (_e, { id }) => {
+ipcMain.handle("browsers:list", () => browsersModule.list());
+
+ipcMain.handle("account:login", async (_e, { id, browser }) => {
   const a = resolveAccount(id);
   acct.ensureConfigDir(a);
+
+  /**
+   * 浏览器钩子：CLI 认 BROWSER 环境变量（实测），把它指到我们的小脚本，
+   * 脚本只把授权链接写进一个临时文件；这里读到后按用户选的浏览器 / 用户资料 / 无痕打开。
+   * 「复制链接」时不打开，直接放进剪贴板。
+   */
+  const choice = typeof browser === "string" && browser ? browser : "system";
+  const urlFile = path.join(os.tmpdir(), `claude-buddy-login-${process.pid}-${Date.now().toString(36)}.txt`);
+  const hook = browsersModule.ensureHook(app.getPath("userData"));
+  let urlSeen = false;
+  const urlPoll = setInterval(() => {
+    let txt = "";
+    try {
+      txt = fs.readFileSync(urlFile, "utf8");
+    } catch {
+      return;
+    }
+    const url = txt.split("\n").find((l) => /^https:\/\//.test(l.trim()));
+    if (!url || urlSeen) return;
+    urlSeen = true;
+    clearInterval(urlPoll);
+    try {
+      fs.unlinkSync(urlFile);
+    } catch {
+      /* 已删 */
+    }
+    if (choice === "copy") clipboard.writeText(url.trim());
+    else void browsersModule.open(choice, url.trim());
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("login:url", { id, url: url.trim(), browser: choice });
+    }
+  }, 250);
+  setTimeout(() => clearInterval(urlPoll), 2 * 60 * 1000);
 
   // 同一账号已有登录进程就先杀，避免两个浏览器回调打架
   for (const [tid, meta] of loginTerms) {
@@ -1017,7 +1054,7 @@ ipcMain.handle("account:login", async (_e, { id }) => {
     cols: 120,
     rows: 30,
     cwd: os.homedir(),
-    env: { ...acct.envForAccount(a), CLAUDE_BUDDY_LOGIN: "1" },
+    env: { ...acct.envForAccount(a), CLAUDE_BUDDY_LOGIN: "1", BROWSER: hook, CLAUDE_BUDDY_URL_FILE: urlFile },
   });
 
   terms.set(tid, p);

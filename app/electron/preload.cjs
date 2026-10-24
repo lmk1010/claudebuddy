@@ -58,7 +58,13 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
 
   /* ── 账号：登录闭环 ── */
   accountStatus: (id) => ipcRenderer.invoke("account:status", { id }),
-  accountLogin: (id) => ipcRenderer.invoke("account:login", { id }),
+  accountLogin: (id, browser) => ipcRenderer.invoke("account:login", { id, browser }),
+  browsersList: () => ipcRenderer.invoke("browsers:list"),
+  onLoginUrl: (cb) => {
+    const h = (_e, p) => cb(p);
+    ipcRenderer.on("login:url", h);
+    return () => ipcRenderer.removeListener("login:url", h);
+  },
   accountCloseLogin: (id, termId) => ipcRenderer.invoke("account:closeLogin", { id, termId }),
   accountLogout: (id) => ipcRenderer.invoke("account:logout", { id }),
   accountCheckExit: (id) => ipcRenderer.invoke("account:checkExit", { id }),

@@ -1905,6 +1905,8 @@
 
 .cmenu {
   min-width: 220px;
+  /* 必须高于弹窗遮罩（.mask 是 60）：编辑环境弹窗里的下拉 / 右键菜单之前被压在遮罩下面 */
+  z-index: 90;
 }
 .cmenu .pi > svg {
   width: 14px;
@@ -2943,6 +2945,27 @@
 }
 [data-theme="dark"] .nt-find.mid .nt-find-ic {
   color: #e2b46a;
+}
+
+/* ══════════ 登录按钮：主按钮 + 换浏览器 ▾ ══════════ */
+.lgb {
+  display: inline-flex;
+  align-items: stretch;
+  flex: none;
+}
+.lgb .lgb-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.lgb .lgb-more {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 0 8px;
+  margin-left: 1px;
+  min-width: 0;
+}
+.lgb .btn.pri.lgb-more {
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.22);
 }
 
 /* ══════════ 状态圆标：实心底 + 白色粗线 ══════════ */

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Account, AccountStatusSnapshot } from "../lib/model";
 import type { CheckupResult, ProxyCandidate, ScannedDir } from "../lib/bridge";
 import LoginConsole from "./LoginConsole";
+import LoginButton from "./LoginButton";
 import Art from "./Art";
 import IpBadge from "./IpBadge";
 import { IconCopy, IconRefresh } from "./iconAliases";
@@ -52,7 +53,7 @@ interface Props {
   onImportDir: (configDir: string, label: string) => void;
   onCreateAccount: (label: string) => Account;
   onSelectAccount: (id: string) => void;
-  onLogin: (id: string) => void;
+  onLogin: (id: string, browser?: string) => void;
   onScanProxy: () => void;
   onSetProxy: (id: string, proxy: Account["proxy"]) => void;
   onCheckExit: (id: string) => void;
@@ -346,14 +347,13 @@ export default function Onboarding(p: Props) {
                   </div>
                 ) : (
                   <div className="ob-acts" style={{ marginTop: 14 }}>
-                    <button
-                      className="btn pri"
-                      onClick={() => p.onLogin(p.activeAccount!.id)}
-                      disabled={p.busy}
-                    >
-                      <Key />
-                      {p.busy ? "正在打开…" : "登录 Claude"}
-                    </button>
+                    <LoginButton
+                      account={p.activeAccount!}
+                      busy={p.busy}
+                      waiting={Boolean(p.loginTermId)}
+                      label="登录 Claude"
+                      onLogin={(b: string) => p.onLogin(p.activeAccount!.id, b)}
+                    />
                   </div>
                 )}
 
@@ -581,23 +581,4 @@ function Cross() {
 }
 function Bang() {
   return <Glyph d="M8 3.6 L8 9.2 M8 12.4 L8 12.6" />;
-}
-
-/** 钥匙：圆环 + 齿 */
-function Key() {
-  return (
-    <svg
-      width={13}
-      height={13}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      aria-hidden
-    >
-      <circle cx="5.4" cy="5.4" r="2.6" />
-      <path d="M7.3 7.3 L13 13 M10.6 10.6 L12.2 9 M12.1 12.1 L13.7 10.5" />
-    </svg>
-  );
 }
