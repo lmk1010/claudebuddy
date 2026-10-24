@@ -139,10 +139,23 @@ export default function LoginConsole({
         </div>
       )}
 
-      {sent && !signedIn && (
+      {/**
+       * 等待态一定要有动效，而且要从头就有。
+       *
+       * 以前 spinner 只在“提交完授权码”之后才出现。但浏览器回调自动完成的
+       * 那条路根本不需要提交码 —— 于是整个过程界面一点动静都没有，
+       * 看着像卡死了，用户不知道到底在等什么。
+       */}
+      {!signedIn && (
         <div className="ob-wait" style={{ marginTop: 8 }}>
           <span className="spinner" />
-          {tr("已提交，正在校验…", "Submitted, verifying…")}
+          {sent
+            ? tr("已提交，正在校验…", "Submitted, verifying…")
+            : waitingForCode
+              ? tr("在浏览器里完成授权，把返回的码贴到上面", "Finish in the browser, then paste the returned code above")
+              : url
+                ? tr("已在浏览器打开授权页，等你完成…", "Authorization page opened in your browser; waiting for you to finish…")
+                : tr("正在拉起授权流程…", "Starting the authorization flow…")}
         </div>
       )}
 

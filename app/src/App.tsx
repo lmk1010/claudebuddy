@@ -1012,6 +1012,14 @@ export default function App() {
       setBusy((b) => ({ ...b, [id]: false }));
       if (r.ok && r.termId) {
         setLoginTerm((m) => ({ ...m, [id]: r.termId! }));
+        // 点完立刻给个回执：不然界面一点动静没有，人以为没反应
+        setToast({
+          title: tr("授权页已经在浏览器打开了", "Authorization page opened in your browser"),
+          body: tr(
+            "在浏览器里完成就行，完了会自动回到这里，不需要手动贴码。",
+            "Just finish in the browser; it comes back here automatically, no code to paste.",
+          ),
+        });
       } else {
         setToast({ title: tr("登录启动失败", "Couldn't start sign-in"), body: tr("请确认已安装 claude CLI", "Make sure the claude CLI is installed") });
       }
