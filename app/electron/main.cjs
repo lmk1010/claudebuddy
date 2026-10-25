@@ -606,6 +606,9 @@ ipcMain.handle("app:info", () => ({
   platform: process.platform,
   home: os.homedir(),
   username: (() => {
+    // 截图/演示时用固定名字，不把本机真实用户名带进画面
+    const override = process.env.CLAUDE_BUDDY_USERNAME;
+    if (override) return override;
     try {
       const u = os.userInfo().username;
       return u ? u.charAt(0).toUpperCase() + u.slice(1) : L("本机用户", "Local user");
