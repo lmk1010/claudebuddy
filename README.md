@@ -57,18 +57,57 @@ ClaudeBuddy 把这些收进一个窗口，一个账号一个环境。
 
 ## 界面
 
+**首页** —— 问候、切换环境、直接开新会话
+
+<img src="docs/assets/shot-home.png" width="100%" alt="首页">
+
+**首次启动** —— 三步走完就能用，不要求先读文档
+
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/shot-home.png" alt="首页"></td>
-    <td width="50%"><img src="docs/assets/shot-settings.png" alt="设置"></td>
+    <td width="33%"><img src="docs/assets/shot-onboard-1.png" alt="检查电脑"></td>
+    <td width="33%"><img src="docs/assets/shot-onboard-2.png" alt="建环境 + 登录"></td>
+    <td width="33%"><img src="docs/assets/shot-onboard-3.png" alt="网络出口"></td>
   </tr>
   <tr>
-    <td align="center"><sub>首页：问候、环境切换、直接开新会话</sub></td>
-    <td align="center"><sub>设置：语言、外观、终端、快捷键</sub></td>
+    <td align="center"><sub>1 · 检查电脑</sub></td>
+    <td align="center"><sub>2 · 建环境 + 登录</sub></td>
+    <td align="center"><sub>3 · 网络出口</sub></td>
+  </tr>
+</table>
+
+**环境** —— 一个账号一个目录、一套凭据、一条出口
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/shot-accounts.png" alt="环境"></td>
+    <td width="50%"><img src="docs/assets/shot-sessions.png" alt="会话"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>环境：状态、登录情况、出口一览</sub></td>
+    <td align="center"><sub>会话：运行中的终端在这里</sub></td>
+  </tr>
+</table>
+
+**网络** —— 真发请求，按层判定 403 卡在哪
+
+<img src="docs/assets/shot-network.png" width="100%" alt="网络测试">
+
+**设置** —— 语言、外观、终端、快捷键
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/shot-settings.png" alt="设置 · 通用"></td>
+    <td width="50%"><img src="docs/assets/shot-settings-appearance.png" alt="设置 · 外观"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>通用：语言、恢复会话、新手引导</sub></td>
+    <td align="center"><sub>外观：主题、字号</sub></td>
   </tr>
 </table>
 
 ## 安装
+
 
 **下载**
 
