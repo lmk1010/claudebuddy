@@ -534,7 +534,6 @@ export interface ClaudeBuddyBridge {
   accountScan(): Promise<ScannedDir[]>;
   /** 移除环境记录；purge 为 true 时连磁盘目录一起删（主进程会二次校验路径） */
   accountSessions(id: string): Promise<SessionSummary[]>;
-  accountSessions(id: string): Promise<SessionSummary[]>;
   accountRemove(
     id: string,
     purge?: boolean,

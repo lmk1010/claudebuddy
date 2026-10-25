@@ -389,35 +389,8 @@
  *   · 内容矮于窗口 → 整组居中，上下留白相等
  *   · 内容高于窗口 → auto 外边距失效，自然回到顶部，且首尾不裁切
  *     （纯 justify-content:center 会把溢出部分推到滚动区外，顶部滚不到） */
-.home {
-  width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 40px 24px 56px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  justify-content: center;
-}
-/* 内容高于窗口时，auto 让首屏从顶部开始、底部留白 */
-.home > .greet {
-  margin-top: auto;
-}
-.home > .recent {
-  margin-bottom: auto;
-}
-/* 视口太矮时不居中：居中会把输入框压到看不见的地方 */
-@media (max-height: 680px) {
-  .home {
-    justify-content: flex-start;
-    padding-top: 28px;
-  }
-  .home > .greet {
-    margin-top: 0;
-  }
-}
+/* 主页外层布局在 ui.css 的 .hm / .hm-c（margin:auto 让整组居中）。
+   这里不再重复定义 —— .home 这个类名已经不存在了。 */
 
 /* 样机 260 */
 .greet {
@@ -4156,37 +4129,20 @@
   }
 }
 
-/* 主页内容分层入场：问候语先落，输入框跟上，建议与最近随后。
-   三档错开 40ms，观感是「依次就位」而不是「一起闪现」。 */
-.home > * {
+/* 主页内容分层入场：问候语先落，输入框跟上，建议随后。
+   三档错开 40ms，观感是「依次就位」而不是「一起闪现」。
+   容器在新版叫 .hm-c（ui.css），所以这段跟着改名 —— 否则规则白写。 */
+.hm-c > * {
   animation: rise-in var(--dur-base) var(--ease-out) backwards;
 }
-.home > .greet {
+.hm-c > .greet {
   animation-delay: 0ms;
 }
-.home > .composer {
+.hm-c > .composer {
   animation-delay: 40ms;
 }
-.home > .sugg {
+.hm-c > .sugg {
   animation-delay: 80ms;
-}
-.home > .recent {
-  animation-delay: 120ms;
-}
-
-/* 最近卡片逐个跟上（CDS .cds-chip-in 的 sibling-index 错位做法，
-   这里用 nth-child 代替 —— 卡片最多三张，够用且不依赖新特性） */
-.recent .rc {
-  animation: rise-in var(--dur-base) var(--ease-out) backwards;
-}
-.recent .rc:nth-child(1) {
-  animation-delay: 140ms;
-}
-.recent .rc:nth-child(2) {
-  animation-delay: 170ms;
-}
-.recent .rc:nth-child(3) {
-  animation-delay: 200ms;
 }
 
 /* 弹层/面板：scale .98→1 + 淡入，跟命令面板一致。
@@ -4254,7 +4210,7 @@
 }
 
 @supports (animation-timeline: scroll()) {
-  .home {
+  .hm {
     --fade-top: 0px;
     --fade-bottom: var(--scroll-fade);
     mask-image: linear-gradient(
@@ -4275,17 +4231,11 @@
   }
 }
 
-/* 没内容可滚时不淡 —— 空状态下一片渐变会像脏了 */
-.home:not(:has(*)) {
-  mask-image: none;
-}
-
 /* ── 减少动效 ──
    不是「关掉动画」，是「关掉位移和缩放，保留透明度」——
    内容该出现还是要出现，只是不要飞过来。 */
 @media (prefers-reduced-motion: reduce) {
-  .home > *,
-  .recent .rc,
+  .hm-c > *,
   .rw .dt.live,
   .sh-dot {
     animation: none;

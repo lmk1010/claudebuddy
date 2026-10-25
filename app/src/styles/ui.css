@@ -1151,14 +1151,15 @@
   min-height: 0;
   overflow-y: auto;
   display: flex;
-  padding: 0 24px 48px;
+  /* 底部不能再留 48px：margin:auto 只在 padding box 里居中，
+     留了就变成「上方 150 / 下方 198」的偏上。滚动贴边由滚动渐隐处理。 */
+  padding: 0 24px;
 }
 /* margin:auto 让整组在可视区居中；内容超高时自然回到顶部、不被裁 */
 .hm-c {
   margin: auto;
   width: 100%;
   max-width: 720px;
-  padding-bottom: 6vh;
 }
 .hm .greet {
   margin-bottom: 24px;
@@ -2542,10 +2543,17 @@
 }
 
 /* ══════════ 设置：分类挪进左侧边栏 ══════════ */
+/* 顶部留白 52px：左栏是「返回应用」一行 + 22px 衬线标题，右栏直接是 30px 标题。
+   两边各自从顶边排，就会一高一低差 44px —— 加上这段让两个大标题落在同一基线。
+   这个数是量出来的，不是猜的。 */
 .st.st-solo {
   display: block;
-  max-width: 820px;
-  padding: 8px 48px 0;
+  /* 原来卡死 820px：1220 宽的窗口里右栏会空出 280px，看着像没排完。
+     改成随窗口增长、封顶 1040 —— 再宽表单行就太长不好读。
+     左栏 264 + 48 间距 + 1040 之外的空间由 margin auto 均分到两侧。 */
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 52px 48px 0;
 }
 .ws-set {
   display: flex;

@@ -83,7 +83,6 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   accountScan: () => ipcRenderer.invoke("account:scan"),
   accountRemove: (id, purge) => ipcRenderer.invoke("account:remove", { id, purge }),
   accountSessions: (id) => ipcRenderer.invoke("account:sessions", { id }),
-  accountSessions: (id, limit) => ipcRenderer.invoke("account:sessions", { id, limit }),
   onLoginExit: (cb) => {
     const h = (_e, p) => cb(p);
     ipcRenderer.on("login:exit", h);
