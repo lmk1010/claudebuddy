@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
 
   /* ── 代理 ── */
   proxyDiscover: (id) => ipcRenderer.invoke("proxy:discover", { id }),
+  proxyNodes: () => ipcRenderer.invoke("proxy:nodes"),
+  auditAppend: (entry) => ipcRenderer.invoke("audit:append", entry),
+  auditList: (limit) => ipcRenderer.invoke("audit:list", { limit }),
   proxyTest: (proxy) => ipcRenderer.invoke("proxy:test", proxy),
 
   /* ── 环境自检 ── */

@@ -79,6 +79,356 @@
 .dlg-md {
   width: 560px;
 }
+
+/* ══════════════════════ 配置指导（轮播） ══════════════════════ */
+
+/* 宽度 520：正文一行 30 来个字，读着不累；再宽就成横向扫读了。
+   高度不固定 —— 各步内容长短不一，固定高会留大片空白。 */
+.dlg.gx {
+  width: 520px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gx-head {
+  padding: 18px 20px 0;
+}
+.gx-kicker {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t4);
+}
+
+.gx-body {
+  padding: 10px 20px 0;
+}
+.gx-body h3 {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+}
+.gx-body p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--t2);
+}
+
+/* ── 图示 ──
+   纯色块 + 文字，不引图片：深浅色都跟主题走，也不用等加载。 */
+.gx-fig {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 18px 0 0;
+  padding: 18px 16px;
+  border-radius: 11px;
+  background: var(--tl);
+}
+.gx-fig.col {
+  flex-direction: column;
+  gap: 9px;
+}
+.gx-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gx-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--pp);
+  border: var(--hair) solid var(--ln);
+  font-size: 11.5px;
+  color: var(--t2);
+  white-space: nowrap;
+}
+.gx-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--t4);
+}
+.gx-dot.a {
+  background: #cc785c;
+}
+.gx-dot.b {
+  background: #8a8279;
+}
+.gx-dot.ok {
+  background: #4e9f63;
+}
+/* 连线：表达"两个环境汇到同一个出口"。
+   用 ln2 太淡，在 tl 底上几乎看不见 —— 这条线是这一步的全部含义，必须看得清。 */
+.gx-link {
+  width: 24px;
+  height: var(--hair);
+  background: var(--t4);
+  opacity: 0.5;
+  flex: none;
+  position: relative;
+}
+.gx-link::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-right: var(--hair) solid var(--t4);
+  border-top: var(--hair) solid var(--t4);
+  transform: translateY(-50%) rotate(45deg);
+  opacity: 0.9;
+}
+.gx-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--pp);
+  border: var(--hair) solid var(--ln);
+}
+.gx-box.wide {
+  min-width: 108px;
+}
+.gx-box.on {
+  border-color: rgba(78, 159, 99, 0.45);
+}
+.gx-box b {
+  font-size: 12px;
+  font-weight: var(--w-medium);
+  color: var(--t1);
+}
+.gx-box small {
+  font-size: 10.5px;
+  color: var(--t4);
+}
+/* 端口后面挂的节点：小标签一排，表明"再多也只有一个出口" */
+.gx-fan {
+  display: flex;
+  gap: 6px;
+}
+.gx-fan span {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--pp);
+  border: var(--hair) solid var(--ln);
+  font-size: 10.5px;
+  color: var(--t3);
+}
+/* 两个端口并排：中间加一条短横，读作"这里是两个独立入口" */
+.gx-pair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gx-pair::before {
+  content: "";
+  order: 1;
+  width: 14px;
+  height: var(--hair);
+  background: var(--t4);
+  opacity: 0.4;
+  flex: none;
+}
+.gx-pair > .gx-box:first-child {
+  order: 0;
+}
+.gx-pair > .gx-box:last-child {
+  order: 2;
+}
+.gx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 240px;
+  font-size: 11.5px;
+  color: var(--t2);
+}
+.gx-ip {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--t3);
+}
+.gx-note {
+  font-size: 10.5px;
+  color: var(--t4);
+}
+
+/* ── 代码块 ──
+   要粘到别人的配置文件里，必须能逐字核对：等宽、可选中、带行高。 */
+.gx-code {
+  margin-top: 14px;
+  border: var(--hair) solid var(--ln2);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.gx-code-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 11px;
+  background: var(--tl);
+  font-size: 11px;
+  color: var(--t3);
+}
+.gx-code-h .det-k {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* pre 默认有 margin（1em 0），而且继承的 line-height 会把首行推下去。
+   代码块要贴着边框均匀留白，所以 margin 清零、padding 左右对称。 */
+.gx-code pre {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--t1);
+  overflow-x: auto;
+  user-select: text;
+  cursor: text;
+  white-space: pre;
+  tab-size: 2;
+}
+.gx-code > small {
+  display: block;
+  padding: 0 13px 11px;
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: var(--t4);
+}
+
+/* ── 底部：进度点 + 操作 ── */
+.gx-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 18px;
+}
+.gx-dots {
+  display: flex;
+  gap: 6px;
+}
+.gx-nav {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ln2);
+  transition: background var(--dur-snap) var(--ease-out), width var(--dur-snap) var(--ease-out);
+}
+.gx-nav.on {
+  width: 18px;
+  border-radius: 3px;
+  background: var(--t2);
+}
+.gx-acts {
+  display: flex;
+  gap: 8px;
+}
+/* 下一步的箭头：旋转成右向 */
+.gx-next {
+  transform: rotate(-90deg);
+}
+
+/* ══════════════════════ 出口对比 ══════════════════════ */
+
+.ex-cmp-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  /* 16px 跟卡片里其他行同一条左基准线 */
+  padding: 12px 16px 8px;
+  border-bottom: var(--hair) solid var(--ln);
+}
+.ex-cmp-h span {
+  font-size: 12.5px;
+  font-weight: var(--w-medium);
+  color: var(--t1);
+}
+.ex-cmp-h small {
+  font-size: 11.5px;
+  color: var(--t4);
+}
+
+/* 一行一个环境：色点 · 名字 · IP · 结论。
+   当前环境加一层浅底，扫的时候能立刻定位到自己。 */
+.ex-row {
+  display: grid;
+  /* 第一列 14px 跟 .pn-row 一致 —— 两张卡的文字起点才会落在同一条竖线上 */
+  grid-template-columns: 14px minmax(0, 1fr) minmax(0, 130px) auto;
+  align-items: center;
+  /* 10px 跟 .pn-row 一致：两张卡的"标记 + 文字"起点才对得上 */
+  gap: 10px;
+  height: 34px;
+  /* 不再用负 margin 做满宽高亮：卡片本身没有内边距，-8px 会把高亮
+     推到卡片边框外面去。改成和别的行一样 16px 内缩。 */
+  padding: 0 16px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--t2);
+}
+.ex-row.on {
+  background: var(--tl);
+  color: var(--t1);
+}
+.ex-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.ex-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ex-ip {
+  font-size: 11.5px;
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 结论标签：撞了才用告警色，独立用绿，没测过保持灰 ——
+   不给"没测过"上颜色，否则一进来满屏都是黄的。 */
+.ex-tag {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--tl);
+  color: var(--t4);
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ex-tag.ok {
+  background: rgba(78, 159, 99, 0.12);
+  color: #3f7f52;
+}
+.ex-tag.bad {
+  background: rgba(198, 69, 69, 0.1);
+  color: #b04a4a;
+}
 .dlg-h {
   display: flex;
   align-items: center;
@@ -485,7 +835,9 @@
   justify-content: space-between;
   font-size: 11.5px;
   color: var(--t4);
-  padding: 0 4px 8px;
+  /* 左右不再留 4px：小标题要对齐卡片外沿，否则跟下面的卡片差半个字。
+     卡片内容再各自缩进 16px（见 .em-row / .pn-row），层次才读得出来。 */
+  padding: 0 0 8px;
 }
 .em-sub {
   margin-top: 24px;
@@ -1802,6 +2154,188 @@
 }
 .em-scan {
   margin-bottom: 4px;
+}
+
+/* ══════════════════════ 节点清单（出口分配） ══════════════════════ */
+
+/* 顶部现状：两行。
+   第一行左边是软件名、右边是数字，第二行是那句人话。
+   之前用 flex + baseline 让三者排一行，结果小字设了 flex:1 后被挤到
+   句子中间，而且基线和软件名对不齐 —— 网格两行是唯一稳定的排法。 */
+.pn-sum {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  /* 左右 16px 跟 .em-row / .em-trace 一致 —— 卡片里所有内容共用一条左基准线，
+     之前这里 0、节点行 8，两行文字对不齐。 */
+  padding: 12px 16px;
+}
+.pn-sum b {
+  grid-column: 1;
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pn-meta {
+  grid-column: 2;
+  justify-self: end;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--t4);
+  white-space: nowrap;
+}
+.pn-sum small {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--t3);
+  line-height: 1.6;
+}
+
+/* 分组：住宅 / 机房 / 链式 / 其他。类别顺序是固定的，
+   住宅永远在最上面 —— 那才是适合分给不同环境的。 */
+.pn-group + .pn-group {
+  margin-top: 14px;
+}
+.pn-ghead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 8px;
+}
+.pn-kind {
+  font-size: 11.5px;
+  font-weight: var(--w-medium);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--tl);
+  color: var(--t2);
+}
+/* 住宅用绿色，因为这是唯一"推荐"的类别；其余保持中性灰，不制造焦虑 */
+.pn-kind.k-residential {
+  background: rgba(78, 159, 99, 0.12);
+  color: #3f7f52;
+}
+.pn-count {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--t4);
+}
+.pn-hint {
+  font-size: 11.5px;
+  color: var(--t4);
+  margin-left: auto;
+}
+
+/* 节点行：单行，等宽。名字占主，类型和服务器是次要信息 */
+.pn-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 82px minmax(0, 150px);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 7px;
+  text-align: left;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.pn-row:hover {
+  background: var(--hv);
+}
+.pn-row.on {
+  background: var(--sel);
+}
+.pn-radio {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: var(--hair) solid var(--ln2);
+  transition: border-color var(--dur-snap) var(--ease-out), background var(--dur-snap) var(--ease-out);
+}
+.pn-radio.on {
+  border-color: var(--coral);
+  background: var(--coral);
+  box-shadow: inset 0 0 0 3px var(--pp);
+}
+.pn-name {
+  font-size: 12.5px;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pn-type,
+.pn-server {
+  font-size: 11px;
+  color: var(--t4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pn-server {
+  text-align: right;
+}
+
+/* 确认卡：说清"会发生什么"再让人点 */
+.pn-plan p {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--t2);
+}
+.pn-plan-h b {
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+}
+.pn-plan-warn {
+  color: var(--t3) !important;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--tl);
+  margin-top: 10px !important;
+}
+.pn-plan-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pn-plan-cur {
+  font-size: 11.5px;
+  color: var(--t4) !important;
+}
+
+/* 配置片段：等宽、可选中、跟正文明显分开。
+   这是要粘到别人配置文件里的东西，必须能逐字核对。 */
+.pn-snip {
+  margin-top: 12px;
+  border: var(--hair) solid var(--ln2);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.pn-snip-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  background: var(--tl);
+  font-size: 11.5px;
+  color: var(--t3);
+}
+.pn-code {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: var(--t1);
+  background: var(--pp);
+  overflow-x: auto;
+  user-select: text;
+  cursor: text;
 }
 
 /* 新建环境弹窗里的三步说明 */
@@ -3674,7 +4208,9 @@
   grid-template-columns: 18px var(--hs-k) minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 10px 0;
+  /* 固定行高：所有行一样高，列表才有节奏。
+     内容再多也只能在这一行里截断，不许撑高。 */
+  height: 44px;
   border-bottom: var(--hair) solid var(--ln);
 }
 .hs-row:last-child {
@@ -3710,22 +4246,36 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 值列：主值 + 副值排在同一行。
+   副值用小一号的灰字跟在后面，超出省略 —— 单行是行高一致的前提。 */
 .hs-v {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 7px;
   min-width: 0;
+  white-space: nowrap;
 }
 .hs-v b {
   font-size: 12.5px;
   font-weight: var(--w-medium);
+  flex: none;
+  max-width: 62%;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.hs-v small {
+.hs-v em {
+  font-style: normal;
   font-size: 11.5px;
   color: var(--t3);
-  line-height: 1.5;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 副值前面一个小圆点，代替原先的上下分行，视觉上仍能分开两段信息 */
+.hs-v em::before {
+  content: "·";
+  margin-right: 7px;
+  color: var(--t4);
 }
 .hs-row.st-warn .hs-v b {
   color: #a8792a;

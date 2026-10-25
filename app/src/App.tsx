@@ -1910,7 +1910,26 @@ export default function App() {
                 <button
                   className="btn danger"
                   onClick={() => {
-                    const next = ipGate.next;
+                    const g = ipGate;
+                    const next = g.next;
+                    /**
+                     * 留痕：用户明确选择在出口不对的情况下进入。
+                     *
+                     * 这一步不是走形式。真出事时（账号那边看到异地登录），
+                     * 需要有一条带时间戳的记录证明这是用户的决定，
+                     * 而且当时界面已经把风险写清楚了。
+                     */
+                    void window.claudeBuddy.auditAppend({
+                      kind: "force-enter",
+                      accountId: g.account.id,
+                      accountLabel: g.account.label,
+                      expected: g.expected,
+                      actual: g.current,
+                      note:
+                        g.kind === "mismatch"
+                          ? tr("出口 IP 与记录不符，用户选择仍然进入", "Exit IP mismatched the record; user chose to enter anyway")
+                          : tr("出口 IP 量不出来，用户选择仍然进入", "Exit IP could not be measured; user chose to enter anyway"),
+                    });
                     close();
                     setTimeout(next, 170);
                   }}

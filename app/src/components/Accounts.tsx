@@ -4,12 +4,14 @@ import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem, DesktopProbe
 import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, relTime, tierLabel, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
 import HealthSection from "./EnvHealth";
+import ProxyNodes from "./ProxyNodes";
 import BrowserSection from "./EnvBrowser";
 import Art from "./Art";
 import Modal from "./Modal";
 import Help, { Steps } from "./Help";
 import IpBadge from "./IpBadge";
 import NetReportCard from "./NetReport";
+import ExitGuide from "./ExitGuide";
 import LoginButton from "./LoginButton";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { tr } from "../lib/i18n";
@@ -663,6 +665,8 @@ export function EnvModal({
               {sec === "network" && (
                 <NetworkSection
                   account={account}
+                  peers={peers}
+                  slot={Math.max(1, peers.findIndex((a) => a.id === account.id) + 1)}
                   onSetProxy={onSetProxy}
                   onPatch={onPatch}
                   onIp={(ip) => {
@@ -1121,12 +1125,18 @@ function GeneralSection({
 
 function NetworkSection({
   account,
+  peers,
+  slot,
   onSetProxy,
   onPatch,
   onIp,
   onAlign,
 }: {
   account: Account;
+  /** 全部环境，用来做出口对比 */
+  peers: Account[];
+  /** 这个环境排第几（从 1 起），决定给它分配哪个入口端口 */
+  slot: number;
   onSetProxy: (p: ProxyConfig) => void;
   onPatch: (patch: Partial<Account>) => void;
   onIp: (ip: string) => void;
@@ -1135,6 +1145,7 @@ function NetworkSection({
   const p = account.proxy;
   const [scan, setScan] = useState<ProxyCandidate[] | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [guide, setGuide] = useState(false);
   const discover = async () => {
     setScanning(true);
     try {
@@ -1145,10 +1156,26 @@ function NetworkSection({
   };
   // 配过（有代理，或直连测过 IP）就不再摆大段引导，只留一个小的「重新探测」
   const configured = p.protocol !== "none" || Boolean(account.lastExitIp);
+
+  /**
+   * 有几组环境共用同一个出口。
+   * 只算测过的：没测过的不知道，不能算成"共用"，否则每个新环境都会被误报。
+   */
+  const sameExitGroups = (() => {
+    const seen = new Map<string, number>();
+    for (const a of peers) {
+      if (!a.lastExitIp) continue;
+      seen.set(a.lastExitIp, (seen.get(a.lastExitIp) ?? 0) + 1);
+    }
+    return [...seen.values()].filter((n) => n > 1);
+  })();
   return (
     <>
       <div className="em-sub">
         <span>{tr("出口体检", "Exit check")}</span>
+        <button className="det-k" onClick={() => setGuide(true)}>
+          {tr("指导", "Guide")}
+        </button>
       </div>
       <NetReportCard
         accountId={account.id}
@@ -1158,6 +1185,39 @@ function NetworkSection({
         onIp={onIp}
         onAlign={onAlign}
       />
+
+      {/* 多个环境时的出口对比：一眼看出谁和谁撞了。
+          只有一个环境就不显示 —— 没什么可比的，白占地方。 */}
+      {peers.length > 1 && (
+        <div className="em-card ex-cmp">
+          <div className="ex-cmp-h">
+            <span>{tr("出口对比", "Exit comparison")}</span>
+            <small>
+              {sameExitGroups.length > 0
+                ? tr(`${sameExitGroups.length} 组共用出口`, `${sameExitGroups.length} shared exit(s)`)
+                : tr("各自独立", "All separate")}
+            </small>
+          </div>
+          {peers.map((a) => {
+            const ip = a.lastExitIp;
+            const shared = ip ? peers.filter((x) => x.id !== a.id && x.lastExitIp === ip) : [];
+            return (
+              <div className={`ex-row${a.id === account.id ? " on" : ""}`} key={a.id}>
+                <span className="ex-dot" style={{ background: a.tint }} />
+                <span className="ex-name">{a.label}</span>
+                <span className="ex-ip mono">{ip ?? tr("未测", "—")}</span>
+                <span className={`ex-tag${shared.length ? " bad" : ip ? " ok" : ""}`}>
+                  {shared.length
+                    ? tr(`同 ${shared.map((s) => s.label).join("、")}`, `Same as ${shared.map((s) => s.label).join(", ")}`)
+                    : ip
+                      ? tr("独立", "Unique")
+                      : tr("未测", "Unmeasured")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="em-card">
         <Row
@@ -1194,6 +1254,9 @@ function NetworkSection({
           </button>
         )}
       </div>
+
+      {/* 节点清单：回答“我有哪些出口可选”，比“哪个端口能通”更贴近需求 */}
+      <ProxyNodes currentExitIp={account.lastExitIp ?? null} slot={slot} />
       {!configured && (
         <div className="em-tipbox">
           <span>
@@ -1346,6 +1409,8 @@ function NetworkSection({
           </Row>
         )}
       </div>
+
+      {guide && <ExitGuide onClose={() => setGuide(false)} />}
     </>
   );
 }

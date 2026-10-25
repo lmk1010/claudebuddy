@@ -28,6 +28,7 @@ const {
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const fsp = require("node:fs/promises");
 const { L } = require("./i18n.cjs");
 const os = require("node:os");
 const { execFile } = require("node:child_process");
@@ -1027,9 +1028,73 @@ function decodeProjectDir(name) {
  *  那里有 purge 参数和路径白名单校验。同一个 channel 不能注册两次，
  *  ipcMain.handle 重复注册会直接抛错，整个主进程起不来。 */
 
+// ─────────────────────────────────────────── 风险操作留痕
+
+/**
+ * 追加一条风险操作记录。
+ *
+ * 为什么需要：用户可以在出口 IP 不对、代理没开的情况下「仍然进入」。
+ * 那一刻真出了事（账号看到异地登录），光凭界面提示是说不清的 ——
+ * 得有一条带时间戳的记录，证明"这个选择是用户明确做的，而且当时界面
+ * 已经把风险写在脸上了"。
+ *
+ * 写 JSONL 而不是 JSON 数组：追加不重写整个文件，日志长了也不会变慢，
+ * 中途写坏一行也不影响前面。
+ */
+ipcMain.handle("audit:append", async (_e, entry) => {
+  try {
+    const file = path.join(app.getPath("userData"), "risk-log.jsonl");
+    const line = JSON.stringify({ at: new Date().toISOString(), ...entry }) + "\n";
+    await fsp.appendFile(file, line, "utf8");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err?.message ?? String(err) };
+  }
+});
+
+/** 读最近的记录，给界面上「发生过什么」用 */
+ipcMain.handle("audit:list", async (_e, { limit = 50 } = {}) => {
+  try {
+    const file = path.join(app.getPath("userData"), "risk-log.jsonl");
+    const text = await fsp.readFile(file, "utf8");
+    return text
+      .split("\n")
+      .filter(Boolean)
+      .slice(-limit)
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .reverse();
+  } catch {
+    return [];
+  }
+});
+
 // ─────────────────────────────────────────── 代理探测
 
 const proxyModule = require("./proxydetect.cjs");
+const nodeModule = require("./proxynodes.cjs");
+
+/**
+ * 列出代理软件里的节点。
+ *
+ * 跟 proxy:discover 的分工：那个回答「哪个端口能通」，
+ * 这个回答「有哪些节点可以拿来当独立出口」。
+ * 只读配置，不改任何文件；返回里不含凭据。
+ */
+ipcMain.handle("proxy:nodes", async () => {
+  try {
+    const d = nodeModule.detect();
+    return { info: d, summary: nodeModule.summary(d) };
+  } catch (e) {
+    return { info: null, summary: "", error: e?.message ?? String(e) };
+  }
+});
 
 /**
  * 找本机可用的代理。

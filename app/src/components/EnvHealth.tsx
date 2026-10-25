@@ -22,7 +22,13 @@ type State = "ok" | "warn" | "bad" | "info";
 
 const DOT: Record<State, string> = { ok: "ok", warn: "mid", bad: "bad", info: "info" };
 
-/** 一行检查项：状态点 · 名称 · 值 · 可选动作 */
+/**
+ * 一行检查项：状态点 · 名称 · 值 · 可选动作
+ *
+ * 值列是**单行**的：主值和副值用 · 内联，超出用省略号截断。
+ * 之前主值在上、副值在下，有副值的行就变成两行高，
+ * 一屏里行高参差不齐 —— 列表看着乱，扫读也失去节奏。
+ */
 function Row({
   state,
   label,
@@ -33,7 +39,7 @@ function Row({
   state: State;
   label: string;
   value: string;
-  /** 只有出问题时才写一句，正常项留空 */
+  /** 副值：同一行内跟在主值后面，不再单独占一行 */
   note?: string;
   action?: { label: string; run: () => void; disabled?: boolean };
 }) {
@@ -45,9 +51,9 @@ function Row({
       <span className="hs-k" title={label}>
         {label}
       </span>
-      <span className="hs-v">
+      <span className="hs-v" title={note ? `${value} · ${note}` : value}>
         <b className="mono">{value}</b>
-        {note && <small>{note}</small>}
+        {note && <em>{note}</em>}
       </span>
       {action ? (
         <button className="btn hs-act" onClick={action.run} disabled={action.disabled}>
@@ -215,20 +221,49 @@ export default function HealthSection({
           <Row
             state="bad"
             label={tr("风控", "Risk control")}
-            value={tr("暂时风控", "Temporarily restricted")}
-            note={tr("账号级状态，换本机凭据绕不过去；等它解除", "Account-level; local credentials will not get around it")}
+            value={tr("暂时风控", "Restricted")}
+            note={tr("账号级，换本机凭据绕不过", "Account-level; local credentials cannot bypass")}
           />
         )}
         <Row state={loginRow.state} label={tr("登录", "Sign-in")} value={loginRow.value} note={loginRow.note} action={loginRow.action} />
         <Row state={exitRow.state} label={tr("出口", "Exit")} value={exitRow.value} note={exitRow.note} action={exitRow.action} />
         <Row state={deviceRow.state} label={tr("设备码", "Device ID")} value={deviceRow.value} note={deviceRow.note} action={deviceRow.action} />
 
+        {/* ── 已生效的防护 ──
+            这几项不靠检测，是软件在起进程时写死的：
+            只要会话是从这里开的，就一定生效。列出来是为了让人
+            能指着屏幕说"我们做了什么"，而不是只有开发者知道。 */}
+        <Row
+          state="ok"
+          label={tr("配置隔离", "Config")}
+          value={`~/${account.configDir}`}
+          note={tr("目录、凭据各一份", "Own dir and credentials")}
+        />
+        <Row
+          state="ok"
+          label={tr("终端画像", "Terminal")}
+          value={account.terminal?.term || "xterm-256color"}
+          note={`${account.terminal?.lang || "en_US.UTF-8"} · ${account.terminal?.tz || "Asia/Shanghai"}`}
+        />
+        <Row
+          state="ok"
+          label={tr("遥测上报", "Telemetry")}
+          value={tr("已关闭", "Off")}
+          note={tr("Sentry 与产品遥测", "Sentry and product telemetry")}
+        />
+        <Row
+          state="ok"
+          label={tr("云凭据", "Cloud creds")}
+          value={tr("已清除", "Cleared")}
+          note={tr("AWS / GCP / Vertex", "AWS, GCP, Vertex")}
+        />
+
         {/* 痕迹是这个号自己产生的，本来就正常 —— 只给入口，不当风险 */}
         <Row
           state="ok"
-          label={tr("痕迹", "Traces")}
+          label={tr("本环境痕迹", "Traces")}
           value={localTraces.length ? tr(`${localTraces.length} 项 · ${kb(localSize)}`, `${localTraces.length} · ${kb(localSize)}`) : tr("无", "None")}
-          note={localTraces.length ? tr("属于这个环境自己", "This environment's own") : undefined}
+          note={localTraces.length ? tr("本环境独有", "Own only") : undefined}
           action={
             localTraces.length
               ? { label: busy ? "…" : tr("清", "Clear"), run: () => onClearTraces(localTraces.map((t) => t.key)), disabled: busy }
@@ -239,23 +274,23 @@ export default function HealthSection({
           <Row
             state="info"
             label={tr("整机日志", "Machine logs")}
-            value={kb(machineTraces.reduce((s, t) => s + t.size, 0))}
-            note={tr("所有环境共用", "Shared by all environments")}
+            value={kb(machineTraces.reduce((sum, t) => sum + t.size, 0))}
+            note={tr("所有环境共用", "Shared by all")}
             action={{ label: busy ? "…" : tr("清", "Clear"), run: () => onClearTraces(machineTraces.map((t) => t.key)), disabled: busy }}
           />
         )}
 
         <Row
+          state={stunDetected ? "bad" : "ok"}
+          label={tr("UDP / STUN", "UDP / STUN")}
+          value={stunDetected ? tr("检测到外发", "Detected") : tr("没有外发", "None")}
+          note={stunDetected ? tr("代理盖不住 UDP", "Proxies miss UDP") : tr("本应用已堵死", "Sealed in this app")}
+        />
+        <Row
           state={desktopRunning ? "warn" : "ok"}
           label={tr("桌面端", "Desktop")}
           value={desktopRunning ? tr("运行中", "Running") : tr("没在运行", "Not running")}
-          note={desktopRunning ? tr("它和所有环境共用整机身份，测试前先退出", "It shares this Mac's identity with every environment; quit it before testing") : undefined}
-        />
-        <Row
-          state={stunDetected ? "bad" : "ok"}
-          label={tr("UDP / STUN", "UDP / STUN")}
-          value={stunDetected ? tr("检测到 STUN", "STUN detected") : tr("没有外发", "None")}
-          note={stunDetected ? tr("STUN 走 UDP，代理盖不住；本应用已堵死", "STUN uses UDP, which proxies miss; this app is sealed") : undefined}
+          note={desktopRunning ? tr("与所有环境共用整机身份", "Shares this Mac's identity") : undefined}
         />
       </div>
     </>

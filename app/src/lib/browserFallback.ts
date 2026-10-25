@@ -126,6 +126,9 @@ export function installBrowserFallback(): void {
 
     /* 代理探测：浏览器里没有本机网络能力 */
     proxyDiscover: async () => ({ list: [], directIp: null }),
+    proxyNodes: async () => ({ info: null, summary: "", error: "browser preview" }),
+    auditAppend: async () => ({ ok: true }),
+    auditList: async () => [],
     proxyTest: async () => ({ ok: false, ip: null, reason: unsupported }),
 
     /* 环境自检：浏览器里查不了真实环境，全部标成未知 */

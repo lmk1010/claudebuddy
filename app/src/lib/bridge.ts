@@ -437,6 +437,64 @@ export interface ProxyDiscovery {
   directIp: string | null;
 }
 
+/** 代理软件里的一个节点。**不含凭据** —— 主进程只取 name/type/server。 */
+export interface ProxyNode {
+  name: string;
+  /** hysteria2 / vless / ss / vmess … */
+  type: string;
+  /** 服务器地址（域名或 IP），用于区分同名节点 */
+  server: string;
+  /** 按名字推断的类别，判不出来就是 other */
+  kind: "residential" | "datacenter" | "chained" | "other";
+}
+
+/** 已存在的独立入口（mihomo 的 listeners），一个入口就是一个出口 */
+export interface ProxyListener {
+  name: string;
+  port: number;
+  proxy?: string;
+  type?: string;
+}
+
+export interface ProxyNodeInfo {
+  /** Sparkle / Clash Verge … */
+  app: string;
+  appId: string;
+  /** 生效配置的绝对路径 */
+  configPath: string;
+  profileName: string;
+  nodes: ProxyNode[];
+  listeners: ProxyListener[];
+  /** 当前开了哪几个入口；mixed 是主力端口 */
+  ports: { mixed: number; http: number; socks: number };
+}
+
+export interface ProxyNodesResult {
+  info: ProxyNodeInfo | null;
+  summary: string;
+  error?: string;
+}
+
+/**
+ * 一条风险操作记录。
+ *
+ * 只记"用户明知风险还是做了"的选择，不记日常操作 ——
+ * 记太细就没人看，记关键的才在真出事时能对上号。
+ */
+export interface RiskLogEntry {
+  at?: string;
+  /** 动作：force-enter / same-exit 等 */
+  kind: string;
+  accountId: string;
+  accountLabel: string;
+  /** 当时期望的出口 */
+  expected?: string | null;
+  /** 当时实际量到的出口 */
+  actual?: string | null;
+  /** 人话说明，直接展示 */
+  note?: string;
+}
+
 export interface ActivityRow {
   id: string;
   sessionSeconds: number;
@@ -499,6 +557,12 @@ export interface ClaudeBuddyBridge {
 
   /* 代理探测 */
   proxyDiscover(id?: string): Promise<ProxyDiscovery>;
+  /** 列出代理软件里的节点（只读，不含凭据） */
+  proxyNodes(): Promise<ProxyNodesResult>;
+  /** 追加一条风险操作记录（用户明确选择“仍然进入”之类） */
+  auditAppend(entry: RiskLogEntry): Promise<{ ok: boolean; reason?: string }>;
+  /** 读最近的风险记录，新的在前 */
+  auditList(limit?: number): Promise<RiskLogEntry[]>;
   proxyTest(proxy: {
     host: string;
     port: number;
