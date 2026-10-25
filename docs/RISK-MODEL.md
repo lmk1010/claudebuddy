@@ -1,7 +1,6 @@
 # ClaudeBuddy 隔离模型
 
-> 依据：对客户端遥测行为的实测（681 行，含 331 条遥测实证）
-> 与 macOS seatbelt profile 的对照（326 行，含 Anthropic 自己的 seatbelt profile）。
+> 依据：对客户端遥测行为的实测（含 331 条字段实证），以及 macOS seatbelt profile 的对照。
 > 本文只写"软件真的做了什么"，以及"为什么做不到的就不假装做到"。
 
 ---

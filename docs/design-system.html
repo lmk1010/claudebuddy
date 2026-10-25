@@ -1017,7 +1017,7 @@ no text, no letters, minimal and calm.  Scene: …</pre></details>
     return `<div class="lights"><i></i><i></i><i></i><span class="sp">${ic('panel')}</span></div>
       <div class="new">${ic('plus')}新建会话<span class="kbd">⌘N</span></div>${nav}
       <div class="gl"><span>最近</span><span>${kind === 'empty' ? '' : recent.length}</span></div>${rows}
-      <div class="me"><span class="av">M</span><div class="who">Alex<small>.claude-main · Max</small></div><span class="g">${ic('gear')}</span></div>`;
+      <div class="me"><span class="av">A</span><div class="who">Alex<small>.claude-main · Max</small></div><span class="g">${ic('gear')}</span></div>`;
   };
   document.querySelectorAll('[data-tpl]').forEach((w) => {
     w.append(document.getElementById(w.dataset.tpl).content.cloneNode(true));

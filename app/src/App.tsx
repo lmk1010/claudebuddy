@@ -776,7 +776,7 @@ export default function App() {
       });
       return;
     }
-    // 家目录的目录名就是用户名，几个会话全叫同一个名字 分不清 —— 直接叫「主目录」
+    // 家目录的目录名就是用户名，几个会话全叫同一个名字分不清 —— 直接叫「主目录」
     const base = cwd === home ? tr("主目录", "Home") : prettyName(cwd);
     const win: ShellWindow = {
       id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
