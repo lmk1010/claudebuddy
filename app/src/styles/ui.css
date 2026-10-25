@@ -80,6 +80,35 @@
   width: 560px;
 }
 
+/* 对话框底部按钮：右对齐，和正文之间留一条分隔 */
+.dlg-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+/* 对话框里的标题和说明 */
+.dlg-sm h3 {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--t1);
+}
+.dlg-sm p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--t2);
+}
+/* 文字按钮的危险态：删除这类不可逆动作用红字，不用红底（红底太吵） */
+.det-k.danger {
+  color: #b04a4a;
+}
+.det-k.danger:hover {
+  color: #c64545;
+}
+
 /* ══════════════════════ 配置指导（轮播） ══════════════════════ */
 
 /* 宽度 520：正文一行 30 来个字，读着不累；再宽就成横向扫读了。
@@ -429,6 +458,454 @@
   background: rgba(198, 69, 69, 0.1);
   color: #b04a4a;
 }
+
+/* ══════════════════════ TUN 模式警告 ══════════════════════ */
+
+/* 这条比普通提示重：它不是"建议"，是"你下面配的东西现在不生效"。
+   用告警底色 + 左侧竖条，跟卡片明显区分开，扫一眼就知道要看。 */
+.tun-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  border: var(--hair) solid rgba(198, 69, 69, 0.28);
+  background: rgba(198, 69, 69, 0.06);
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--t2);
+}
+.tun-warn svg {
+  flex: none;
+  margin-top: 2px;
+  color: #b04a4a;
+}
+.tun-warn b {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: #b04a4a;
+}
+
+/* 只是连了 VPN、流量没走 utun —— 中性提示，不制造焦虑 */
+.tun-note {
+  padding: 9px 13px;
+  margin-bottom: 12px;
+  border-radius: 9px;
+  background: var(--tl);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--t3);
+}
+
+/* ══════════════════════ 出口列表 ══════════════════════ */
+
+/* 一行一个出口：单选点 · 名字和地址 · IP。
+   和 .em-row 同一套内边距（16px），卡片里所有内容共用一条左基准线。 */
+.ex-item {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  text-align: left;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.ex-item:hover {
+  background: var(--hv);
+}
+.ex-item.on {
+  background: var(--sel);
+}
+.ex-item + .ex-item,
+.ex-item-wrap + .ex-item,
+.ex-item + .ex-item-wrap {
+  border-top: var(--hair) solid var(--ln);
+}
+.ex-radio {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: var(--hair) solid var(--ln2);
+  transition: border-color var(--dur-snap) var(--ease-out), background var(--dur-snap) var(--ease-out);
+}
+.ex-item.on .ex-radio {
+  border-color: var(--coral);
+  background: var(--coral);
+  box-shadow: inset 0 0 0 3px var(--bg);
+}
+.ex-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ex-main b {
+  font-size: 12.5px;
+  font-weight: var(--w-medium);
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ex-main small {
+  font-size: 11px;
+  color: var(--t4);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ex-item .ex-ip {
+  font-size: 11.5px;
+  color: var(--t4);
+  white-space: nowrap;
+}
+.ex-item .ex-ip.ok {
+  color: #3f7f52;
+}
+/* 共用出口的 IP 标红：这是要用户注意的那一个信息 */
+.ex-item .ex-ip.bad {
+  color: #b04a4a;
+}
+/* 实测失败：不是「未测」，是「测了但连不上」—— 两者含义完全不同，
+   所以颜色也不同：失败用告警色，未测保持灰。 */
+.ex-item .ex-ip.fail {
+  color: #b04a4a;
+}
+/* 待配置：建了但还没测通过。用中性的琥珀色 —— 它不是错误，
+   只是"还差一步"，用红色会让人以为坏了。 */
+.ex-item .ex-ip.pend {
+  color: #a8792a;
+}
+/* 值不可信（TUN 模式）：中性灰 + 删除线感，表示"有数但别信" */
+.ex-item .ex-ip.unk {
+  color: var(--t4);
+  text-decoration: line-through;
+  text-decoration-color: var(--ln2);
+}
+
+/* 「怎么配」这类下一步动作，要比其他小动作显眼一点 */
+.det-k.pri {
+  color: var(--coral);
+}
+.det-k.pri:hover {
+  color: var(--t1);
+}
+
+/* ── 配置弹窗 ── */
+.cfg-lead {
+  margin: 0 0 14px !important;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--t2) !important;
+}
+/* 步骤列表：编号用等宽数字，跟正文拉开，读起来像清单 */
+.cfg-steps {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.85;
+  color: var(--t2);
+}
+.cfg-steps li {
+  margin-bottom: 5px;
+}
+.cfg-steps li::marker {
+  color: var(--t4);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* 标题右侧两个动作并排 */
+.ex-head-acts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 测量失败的原因：直接挂在那一行下面，说清是端口没开还是线路挂了 */
+.ex-fail {
+  padding: 0 16px 10px 40px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #b04a4a;
+}
+
+/* ── 归属核验 ──
+   国家 · 城市 · ISP 一行，右边是"两源一致"的结论。
+   这一行的作用是把"我知道这个 IP"升级成"我知道这个 IP 是哪"。 */
+.ex-geo {
+  padding: 0 16px 9px 40px;
+  font-size: 11px;
+  line-height: 1.65;
+}
+.ex-geo-main {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ex-geo-main b {
+  font-size: 11.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t2);
+}
+.ex-geo-main span {
+  color: var(--t3);
+}
+.ex-geo-main small {
+  color: var(--t4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+/* 结论标签：三种状态三种颜色，跟出口 IP 那栏的语义一致 */
+.ex-geo-tag {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.ex-geo.v-ok .ex-geo-tag {
+  background: rgba(78, 159, 99, 0.12);
+  color: #3f7f52;
+}
+.ex-geo.v-bad .ex-geo-tag {
+  background: rgba(198, 69, 69, 0.1);
+  color: #b04a4a;
+}
+.ex-geo.v-unk .ex-geo-tag {
+  background: var(--tl);
+  color: var(--t4);
+}
+/* 不一致/未核验的原因：第二行，小一号 */
+.ex-geo-why {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--t4);
+}
+
+/* 共用提示：直接挂在那一行下面，不另起一张卡 */
+.ex-warn {
+  padding: 0 16px 10px 40px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #b04a4a;
+}
+
+/* 行内的小动作：平时不占地方，hover 才明显 */
+/* 行内小动作：缩进对齐到文字起点（16 padding + 14 radio + 10 gap = 40）。
+   上面补 4px 让它和主行分开 —— 之前 padding-top 是 0，紧贴着像错位。 */
+.ex-acts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 16px 10px 40px;
+}
+.ex-rename {
+  height: 24px;
+  font-size: 12px;
+  padding: 0 7px;
+}
+
+/* ── 新建出口弹窗 ──
+   比普通对话框宽：左边节点列表要放得下名字 + 类型。 */
+.dlg.xp {
+  width: 560px;
+  max-height: calc(100vh - 120px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.xp-head {
+  padding: 18px 20px 0;
+}
+.xp-head b {
+  display: block;
+  font-size: 15px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.xp-head small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--t3);
+}
+.xp-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 14px 20px 0;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--tl);
+}
+.xp-tabs button {
+  flex: 1;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--t3);
+  transition: background var(--dur-snap) var(--ease-out), color var(--dur-snap) var(--ease-out);
+}
+.xp-tabs button.on {
+  background: var(--pp);
+  color: var(--t1);
+  box-shadow: 0 1px 2px rgba(20, 20, 19, 0.06);
+}
+.xp-body,
+.xp-manual {
+  padding: 14px 20px 0;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+.xp-manual p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--t3);
+}
+.xp-empty {
+  padding: 28px 20px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--t4);
+  text-align: center;
+}
+.xp-src {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+.xp-src span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.xp-src b {
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+}
+.xp-src small {
+  font-size: 11.5px;
+  color: var(--t4);
+}
+/* 节点列表可滚：十几个节点在一屏里放不下，让它自己滚而不是撑高弹窗 */
+.xp-nodes {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 0 6px;
+}
+.xp-group + .xp-group {
+  margin-top: 10px;
+}
+.xp-ghead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 6px;
+}
+.xp-node {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  text-align: left;
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.xp-node:hover {
+  background: var(--hv);
+}
+.xp-node.on {
+  background: var(--sel);
+}
+.xp-next {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--tl);
+}
+.xp-next-h b {
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.xp-next p {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--t3);
+}
+.xp-port {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--t3);
+}
+.xp-port .em-in {
+  width: 88px;
+}
+
+/* 端口状态：紧跟在输入框后面，一眼能对上 */
+.xp-ps {
+  font-size: 11.5px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.xp-ps.s-wait {
+  color: var(--t4);
+  background: var(--tl);
+}
+.xp-ps.s-ok {
+  color: #3f7f52;
+  background: rgba(78, 159, 99, 0.12);
+}
+.xp-ps.s-bad {
+  color: #b04a4a;
+  background: rgba(198, 69, 69, 0.1);
+}
+
+/* 端口没开时的说明：不是报错，是"下一步做什么"。
+   用中性底 + 告警色文字，读起来是提示而不是失败。 */
+.xp-block {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(198, 69, 69, 0.05);
+  font-size: 11.5px;
+  line-height: 1.75;
+  color: #b04a4a;
+}
+.xp-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px 18px;
+  border-top: var(--hair) solid var(--ln);
+  margin-top: 14px;
+}
 .dlg-h {
   display: flex;
   align-items: center;
@@ -715,6 +1192,27 @@
   border-radius: 12px;
   background: var(--bg);
   overflow: hidden;
+}
+/* 相邻卡片之间留一口气。
+   之前 em-card 没有外边距，两块贴在一起，边界看着像一条粗线。 */
+.em-card + .em-card {
+  margin-top: 10px;
+}
+
+/**
+ * 嵌套块 —— 「出口方式」选了代理之后才展开的那部分。
+ *
+ * 左侧一条竖线 + 缩进，读作"这是上面那个选择的结果"。
+ * 之前这块和「出口方式」平铺成两张卡，看不出父子关系。
+ */
+.em-nest {
+  margin: 0 16px 12px 16px;
+  padding-left: 14px;
+  border-left: 2px solid var(--ln2);
+}
+/* 嵌套里的小标题离上一行近一点，别用外层的 24px */
+.em-sub.nest-sub {
+  margin-top: 14px;
 }
 .em-row {
   display: flex;
@@ -4868,6 +5366,12 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 默认 profile 的第二行补充：说明配置文件也在清理范围内。
+   用比正文更淡的色，只在需要时出现，不抢主信息的注意力。 */
+.cl-nm .cl-extra {
+  color: var(--t3);
+  opacity: 0.85;
 }
 .cl-num {
   text-align: right;

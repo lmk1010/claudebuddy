@@ -14,7 +14,12 @@ import { IconCheck, IconCopy, IconDots, IconFolder, IconKey, IconRefresh, IconSe
  * 几十个根本没法看。现在一行一个，能筛、能搜、能多选，批量清。
  *
  * 语义不变：目录移到 ~/.claude-buddy-trash（能捞回），Keychain 凭据删掉（不可恢复）。
- * 默认目录（~/.claude）不会被挪走，只能清它的登录凭据 —— 确认框里会单独点名。
+ *
+ * 默认 profile（~/.claude + 家目录的 ~/.claude.json）**也能整块清掉**。
+ * 它是唯一能绕开隔离的入口：裸跑 claude 用的就是它，不走任何环境的代理、
+ * 身份和终端画像；而且常常指向一个已经废掉的号。清掉之后裸 claude 会重新
+ * 生成一套全新身份 —— 那不是更安全，只是把同一个问题换了个壳。
+ * 所以确认框里要把这句话说透：真正干净的状态是只用本软件启动会话。
  */
 
 type Filter = "all" | "clean" | "signed-out" | "ok";
@@ -202,6 +207,12 @@ export default function CleanPage({
         accountIds: list.flatMap((it) => (it.type === "dir" ? [it.a.id] : [])),
         services: list.flatMap((it) => (it.type === "orphan" ? [it.service] : [])),
         allowMainKeychain: list.some((it) => (it.type === "dir" && it.a.kind === "default") || it.type === "orphan"),
+        /**
+         * 默认 profile 也允许清，但只在用户明确选了它时才放行。
+         * 主进程那边还会再要一次这个标志 —— 界面的勾选不能单独决定，
+         * 否则一次误点就能把主配置挪走。
+         */
+        allowDefault: list.some((it) => it.type === "dir" && it.a.kind === "default"),
       });
       setLast(r);
       setSel(new Set());
@@ -221,7 +232,7 @@ export default function CleanPage({
           { label: tr("在访达中打开", "Show in Finder"), icon: <IconFolder size={14} />, run: () => void window.claudeBuddy.reveal(it.a.path) },
           { label: tr("复制路径", "Copy path"), icon: <IconCopy size={14} />, run: () => void navigator.clipboard.writeText(it.a.path).catch(() => {}) },
           "sep",
-          { label: it.a.kind === "default" ? tr("清掉登录凭据…", "Remove sign-in credentials…") : tr("清理…", "Clean up…"), icon: <IconTrash size={14} />, danger: true, run: () => setConfirm([it]) },
+          { label: tr("清理…", "Clean up…"), icon: <IconTrash size={14} />, danger: true, run: () => setConfirm([it]) },
         ]
       : [
           { label: tr("复制条目名", "Copy entry name"), icon: <IconCopy size={14} />, run: () => void navigator.clipboard.writeText(it.service).catch(() => {}) },
@@ -354,8 +365,14 @@ export default function CleanPage({
               {tr("删了就没了，要重新登录。", " are gone once deleted and you must sign in again.")}
             </p>
             <p>
-              <b>{tr("默认目录", "The default folder")}</b>
-              {tr("（~/.claude）不会被挪走，只清它的登录凭据。「建议清理」= 空壳目录和无人认领的凭据，放心清。", " (~/.claude) is never moved; only its sign-in credentials are removed. \"Suggested\" means empty folders and unclaimed credentials, which are safe to clean.")}
+              <b>{tr("默认 profile", "The default profile")}</b>
+              {tr(
+                "（~/.claude 加家目录的 ~/.claude.json）可以整块清掉。它是唯一能绕开隔离的入口 —— 裸跑 claude 用的就是它。清掉之后请在终端里改用本软件启动会话，不要直接跑 claude。",
+                " (~/.claude plus ~/.claude.json in your home directory) can be removed as a whole. It is the only path that bypasses isolation — running claude directly uses it. After cleaning, launch sessions through this app instead of running claude directly.",
+              )}
+            </p>
+            <p>
+              {tr("「建议清理」= 空壳目录和无人认领的凭据，放心清。", "\"Suggested\" means empty folders and unclaimed credentials, which are safe to clean.")}
             </p>
           </Help>
           <span className="sv-sp" />
@@ -455,6 +472,18 @@ export default function CleanPage({
                             {kindOf(it.a.kind)}
                             {it.a.tier ? ` · ${tierLabel(it.a.tier)}` : ""}
                           </small>
+                          {/**
+                           * 默认 profile 的配置在目录外面。
+                           * 不显示的话，用户看到「4.9 GB」会以为只有这些，
+                           * 实际清的时候还会动家目录那份带账号记录的配置。
+                           */}
+                          {it.a.configPath && (
+                            <small className="cl-extra">
+                              {tr("另含 ", "plus ")}
+                              <span className="mono">{shortPath(it.a.configPath)}</span>
+                              {it.a.configSize ? ` · ${bytes(it.a.configSize)}` : ""}
+                            </small>
+                          )}
                         </span>
                       </span>
                       <span className="cl-st">
@@ -566,17 +595,38 @@ export default function CleanPage({
   );
 }
 
-/** 确认框里把每一项会发生什么写清楚，尤其是「默认目录只清凭据」和「凭据不可恢复」 */
+/**
+ * 确认框里把每一项会发生什么写清楚。
+ *
+ * 默认目录单独一段，语气比其他项重：它清掉的是"裸跑 claude 用的那套身份"，
+ * 清完不是"少了一个号"，而是"这台机器上只剩软件里那几个隔离环境"。
+ * 这句话必须说透，否则用户会以为只是删了个目录。
+ */
 function ConfirmBody({ list, busy }: { list: Item[]; busy: number }) {
   const dirs = list.filter((it): it is Extract<Item, { type: "dir" }> => it.type === "dir");
   const def = dirs.find((it) => it.a.kind === "default");
   const moved = dirs.filter((it) => it.a.kind !== "default");
   const orphans = list.filter((it) => it.type === "orphan");
-  const live = dirs.filter((it) => it.a.state === "ok");
+  const live = dirs.filter((it) => it.a.state === "ok" && it.a.kind !== "default");
   return (
     <div className="cl-confirm">
       {moved.length > 0 && <p>{tr(`· ${moved.length} 个目录移到 ~/.claude-buddy-trash（能捞回），它们的 Keychain 凭据一并删除。`, `· ${moved.length} folders will be moved to ~/.claude-buddy-trash (recoverable), and their Keychain credentials deleted.`)}</p>}
-      {def && <p>{tr(`· 默认目录 ~/.claude 不挪走，只删掉它的登录凭据（${def.a.email ?? "当前账号"} 会掉登录）。`, `· The default folder ~/.claude stays in place; only its sign-in credentials are deleted (${def.a.email ?? "the current account"} will be signed out).`)}</p>}
+      {def && (
+        <>
+          <p>
+            {tr(
+              `· 默认 profile 会整块移走：~/.claude 目录，以及家目录的 ~/.claude.json（里面躺着 ${def.a.email ?? "当前账号"} 的账号记录、设备码、会话历史）。`,
+              `· The default profile is moved as a whole: the ~/.claude folder plus ~/.claude.json in your home directory (which holds ${def.a.email ?? "the current account"}'s account record, device ID and session history).`,
+            )}
+          </p>
+          <p className="warn">
+            {tr(
+              "清完之后，直接在终端里跑 claude 会重新生成一套全新身份 —— 那不是更安全，只是把同一个问题换了个壳。真正干净的状态是：只用本软件启动会话，每个环境各走各的身份和出口。",
+              "After cleaning, running claude directly in a terminal will generate a brand-new identity — that is not safer, it just re-creates the same problem under a new shell. The clean state is: only launch sessions through this app, each environment with its own identity and exit.",
+            )}
+          </p>
+        </>
+      )}
       {orphans.length > 0 && <p>{tr(`· 删除 ${orphans.length} 条无人认领的 Keychain 凭据。`, `· ${orphans.length} unclaimed Keychain credentials will be deleted.`)}</p>}
       {live.length > 0 && (
         <p className="warn">

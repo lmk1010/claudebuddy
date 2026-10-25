@@ -51,6 +51,7 @@ import {
   prettyName,
   compareEnvironments,
   suggestDistinctTerminal,
+  migrateExits,
   type Account,
   type AccountStatusSnapshot,
   type BuddyState,
@@ -92,6 +93,7 @@ import "./styles/guide.css";
 
 const EMPTY_STATE: BuddyState = {
   accounts: [defaultAccount()],
+  exits: [],
   windows: [],
   activeWindowId: null,
   activeAccountId: null,
@@ -273,16 +275,18 @@ export default function App() {
                 .map((w) => (w.cwd === i.home && w.title === prettyName(i.home) ? { ...w, title: tr("主目录", "Home") } : w))
             : [];
         const keptActive = wins.some((w) => w.id === raw.activeWindowId);
-        setState({
-          ...EMPTY_STATE,
-          ...raw,
-          accounts: accs,
-          windows: wins,
-          activeWindowId: raw.restoreSessions !== false && keptActive ? (raw.activeWindowId ?? null) : null,
-          activeAccountId: raw.activeAccountId ?? raw.accounts[0]?.id ?? null,
-          theme: isTheme(raw.theme) ? raw.theme : "system",
-          view: isView(raw.view) && !(raw.restoreSessions === false && raw.view === "session") ? raw.view : "home",
-        });
+        setState(
+          migrateExits({
+            ...EMPTY_STATE,
+            ...raw,
+            accounts: accs,
+            windows: wins,
+            activeWindowId: raw.restoreSessions !== false && keptActive ? (raw.activeWindowId ?? null) : null,
+            activeAccountId: raw.activeAccountId ?? raw.accounts[0]?.id ?? null,
+            theme: isTheme(raw.theme) ? raw.theme : "system",
+            view: isView(raw.view) && !(raw.restoreSessions === false && raw.view === "session") ? raw.view : "home",
+          }),
+        );
       } else {
         setState((s) => ({ ...s, theme: i.darkMode ? "dark" : "light" }));
       }
@@ -762,17 +766,33 @@ export default function App() {
      * 强制代理的硬闸。
      *
      * 首页那个按钮只是其中一个人口，侧栏、右键、历史会话都能开会话，
-     * 所以拦截只能放在这里——否则“必须走代理”就只是句口号。
+     * 所以拦截只能放在这里——否则"必须走代理"就只是句口号。
+     *
+     * 判据是「出口实测过、且测通了」，不是「填了 host」。
+     * 之前只查 host 有值，于是用户填了个还没开的端口也被放行，
+     * 会话起来却连不上 —— 那正是这条闸要防的情况。
      */
     const px = account.proxy;
-    if (account.enforceProxy && !(px && px.protocol !== "none" && px.host)) {
+    const ex = (stateRef.current.exits ?? []).find((x) => x.id === account.exitId);
+    const hasExit = Boolean(px && px.protocol !== "none" && px.host);
+    // 出口自己测到过 IP 才算可用；没测过或测失败都不算
+    const exitVerified = Boolean(ex?.lastIp);
+
+    if (account.enforceProxy && (!hasExit || !exitVerified)) {
       setEditor({ id: account.id, section: "network" });
       setToast({
-        title: tr("这个环境还没配出口", "No exit configured yet"),
-        body: tr(
-          "它设了必须走代理才允许开会话，所以这次没有启动。先在网络出口里配一个可用的线路。",
-          "It is set to require a proxy before a session can start, so nothing was launched. Configure a working route first.",
-        ),
+        title: hasExit
+          ? tr("这个出口还没验证过", "This exit is not verified yet")
+          : tr("这个环境还没配出口", "No exit configured yet"),
+        body: hasExit
+          ? tr(
+              "它设了必须走代理才允许开会话。到网络出口里点「实测出口」，测通了再开会话。",
+              "It requires a proxy before a session can start. Go to Exits, hit Measure exit, and start the session once it responds.",
+            )
+          : tr(
+              "它设了必须走代理才允许开会话，所以这次没有启动。先在网络出口里配一个可用的线路。",
+              "It is set to require a proxy before a session can start, so nothing was launched. Configure a working route first.",
+            ),
       });
       return;
     }
@@ -1598,7 +1618,45 @@ export default function App() {
             leak={leak}
             onLoadTraces={() => loadTraces(drawerAccount.id)}
             onLoadKeychain={loadKeychain}
-            onSetProxy={(p) => setProxy(drawerAccount.id, p)}
+            exits={state.exits ?? []}
+            onUseExit={(exitId) => {
+              const ex = (state.exits ?? []).find((e) => e.id === exitId);
+              // exitId 和 proxy 一起写：proxy 是启动进程实际用的那份，必须同步
+              patchAccount(drawerAccount.id, {
+                exitId,
+                proxy: ex ? { ...ex.proxy } : { protocol: "none", host: "", port: 0 },
+                /**
+                 * 换出口要清掉旧基线。
+                 *
+                 * lastExitIp 是「这个环境上次在**某条线路**上测到的出口」。
+                 * 换了出口还留着它，会话启动时的比对就会拿旧线路的 IP
+                 * 去比新线路，每次开会话都弹"出口变了"。
+                 * 新出口的 IP 由它自己实测后写回 exit.lastIp，
+                 * 环境这边的基线等下一次实测再建立。
+                 */
+                lastExitIp: ex?.lastIp,
+              });
+            }}
+            onCreateExit={(draft) => {
+              const id = `x-${Date.now().toString(36)}`;
+              setState((s) => ({ ...s, exits: [...(s.exits ?? []), { ...draft, id }] }));
+              // 新建完直接给当前环境用上，省一次点击
+              patchAccount(drawerAccount.id, { exitId: id, proxy: { ...draft.proxy } });
+            }}
+            onRenameExit={(id, label) =>
+              setState((s) => ({ ...s, exits: (s.exits ?? []).map((e) => (e.id === id ? { ...e, label } : e)) }))
+            }
+            onDeleteExit={(id) =>
+              setState((s) => ({ ...s, exits: (s.exits ?? []).filter((e) => e.id !== id) }))
+            }
+            onMeasureExit={(id, ip) =>
+              setState((s) => ({
+                ...s,
+                exits: (s.exits ?? []).map((e) =>
+                  e.id === id ? { ...e, lastIp: ip ?? undefined, checkedAt: ip ? Date.now() : e.checkedAt } : e,
+                ),
+              }))
+            }
             onRefresh={() => refreshAccount(drawerAccount.id)}
             onCancelLogin={() => {
               const tid = loginTerm[drawerAccount.id];

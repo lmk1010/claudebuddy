@@ -300,6 +300,12 @@ export interface CleanupAccount {
    * · empty 真正的空壳（没凭据、没对话记录）
    */
   state: "ok" | "signed-out" | "empty";
+  /**
+   * 默认 profile 的配置文件在目录外面（家目录的 `~/.claude.json`）。
+   * 只报目录大小会让用户以为"就这么多"，实际还有一份带账号记录的配置。
+   */
+  configPath?: string;
+  configSize?: number;
 }
 
 export interface CleanupSurvey {
@@ -475,6 +481,54 @@ export interface ProxyNodesResult {
   error?: string;
 }
 
+/** 一个出口的核验结果 */
+export interface ExitVerifySide {
+  ip: string;
+  country: string;
+  city: string;
+  isp: string;
+}
+
+/**
+ * 出口核验结论。
+ *
+ * consistent 是核心：
+ *   true  —— 两个服务都对上，可以信
+ *   false —— 对不上，线路可能在切换，或者某个来源是旧的
+ *   null  —— 只拿到一个来源（或都没拿到），无法交叉验证
+ *
+ * 后两种都不该显示成“配好了”，界面必须如实呈现。
+ */
+export interface ExitVerify {
+  ok: boolean;
+  consistent: boolean | null;
+  reason: string | null;
+  primary: ExitVerifySide | null;
+  secondary: ExitVerifySide | null;
+}
+
+/**
+ * TUN 模式检测结果。
+ *
+ * active 为 true 时，给每个环境注入的 HTTPS_PROXY 会被整机透明代理绕过，
+ * 界面上不能再显示“这个环境走 7901”这种假象。
+ */
+export interface TunProbe {
+  active: boolean;
+  /** utun0 之类 */
+  iface?: string | null;
+  /** fake-ip 地址，如 198.18.0.1 */
+  ip?: string | null;
+  /** 去公网实际走哪个接口 */
+  publicRoute?: string | null;
+  /** 挂在 utun 上的分片路由条数 */
+  shards?: number;
+  /** 有 utun 但流量没走它 —— 可能只是 VPN */
+  partial?: boolean;
+  reason?: string | null;
+  error?: string;
+}
+
 /**
  * 一条风险操作记录。
  *
@@ -553,12 +607,20 @@ export interface ClaudeBuddyBridge {
     accountIds?: string[];
     services?: string[];
     allowMainKeychain?: boolean;
+    /** 默认 profile（~/.claude）也能清，但必须显式打开 */
+    allowDefault?: boolean;
   }): Promise<CleanupResult>;
 
   /* 代理探测 */
   proxyDiscover(id?: string): Promise<ProxyDiscovery>;
   /** 列出代理软件里的节点（只读，不含凭据） */
   proxyNodes(): Promise<ProxyNodesResult>;
+  /** 当前是否 TUN 模式 —— 为 true 时进程级代理变量不生效 */
+  tunProbe(): Promise<TunProbe>;
+  /** 端口在不在监听 —— 新建出口前必须问，否则会建出连不上的出口 */
+  portOpen(p: { host: string; port: number }): Promise<{ open: boolean }>;
+  /** 出口核验：两个独立服务交叉验证，不一致就是不一致 */
+  exitVerify(key: string): Promise<ExitVerify>;
   /** 追加一条风险操作记录（用户明确选择“仍然进入”之类） */
   auditAppend(entry: RiskLogEntry): Promise<{ ok: boolean; reason?: string }>;
   /** 读最近的风险记录，新的在前 */

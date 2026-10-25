@@ -1028,6 +1028,56 @@ function decodeProjectDir(name) {
  *  那里有 purge 参数和路径白名单校验。同一个 channel 不能注册两次，
  *  ipcMain.handle 重复注册会直接抛错，整个主进程起不来。 */
 
+/**
+ * 端口在不在监听。
+ *
+ * 新建出口时必须先问这一句，否则会出现「填了 7901、出口建出来了、
+ * 但那个端口根本没开」—— 一键配置变成配置了个寂寞。
+ * 先确认端口活着，再让用户建出口。
+ */
+ipcMain.handle("proxy:port-open", async (_e, { host = "127.0.0.1", port } = {}) => {
+  if (!port) return { open: false };
+  try {
+    return { open: await proxyModule.isListening(Number(port), host) };
+  } catch {
+    return { open: false };
+  }
+});
+
+/**
+ * 出口核验：两个独立服务交叉验证。
+ *
+ * 跟 proxy:test 的分工：那个只回答"这个端口通不通、IP 是多少"，
+ * 这个回答"这个 IP 的国家/城市/ISP 到底是什么，两个来源对不对得上"。
+ * 后者用来判断"我以为配到了美国住宅，实际是不是"。
+ */
+ipcMain.handle("exit:verify", async (_e, { key } = {}) => {
+  try {
+    return await exitVerify.verifyCached(String(key ?? "default"));
+  } catch (e) {
+    return { ok: false, consistent: null, reason: e?.message ?? String(e), primary: null, secondary: null };
+  }
+});
+
+// ─────────────────────────────────────────── TUN 检测
+
+const tunModule = require("./tun.cjs");
+const exitVerify = require("./exitverify.cjs");
+
+/**
+ * 当前是不是 TUN 模式。
+ *
+ * 这个结果直接决定"多出口能不能用"：TUN 接管整机流量时，
+ * 进程级 HTTPS_PROXY 会被绕过，给每个环境配的端口等于白配。
+ */
+ipcMain.handle("tun:probe", async () => {
+  try {
+    return tunModule.probe();
+  } catch (e) {
+    return { active: false, partial: false, reason: null, error: e?.message ?? String(e) };
+  }
+});
+
 // ─────────────────────────────────────────── 风险操作留痕
 
 /**
@@ -1833,7 +1883,25 @@ ipcMain.handle("account:netReport", async (_e, { id }) => {
   }
   let ip = tr.ip || null;
   if (!ip) ip = (await acct.checkExitIp(a))?.ip ?? null;
-  if (!ip) return { ok: false, reason: L("拿不到出口 IP：代理不可达或网络不通", "Unable to get the exit IP: proxy unreachable or no network") };
+  /**
+   * 量不到出口时的说明。
+   *
+   * 必须说清"测的是这个环境配的那条线路"，不是"你这台电脑现在什么 IP"——
+   * 两者不是一回事，混着说会让人以为检测没意义。实际意义很具体：
+   * 这个环境开会话时会走这条线路，线路不通就等于开不了。
+   */
+  if (!ip) {
+    const via = a.proxy && a.proxy.protocol !== "none" ? `${a.proxy.host}:${a.proxy.port}` : null;
+    return {
+      ok: false,
+      reason: via
+        ? L(
+            `这个环境配的线路 ${via} 连不上 —— 端口没开，或者代理软件没运行`,
+            `This environment's route ${via} is unreachable — the port is closed or the proxy app is not running`,
+          )
+        : L("直连也连不上外网，先检查本机网络", "Even a direct connection failed. Check this Mac's network first"),
+    };
+  }
 
   const [info, risk] = await Promise.all([
     lookupIpInfo(ip),

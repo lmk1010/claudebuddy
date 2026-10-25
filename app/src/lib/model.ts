@@ -80,6 +80,34 @@ export interface ProxyConfig {
   noProxy?: string;
 }
 
+/**
+ * 一个具名的出口配置。
+ *
+ * 为什么要有这一层：出口（代理端口）是可以被多个环境复用的，而"哪个环境
+ * 走哪个出口"是另一件事。之前把它塞在每个环境自己的 proxy 字段里，结果
+ * 界面上只能看到"这个环境填了什么端口"，看不到"这台机器一共有几个出口、
+ * 谁在跟谁共用"—— 发现问题也没地方换。
+ *
+ * 拆成独立实体之后：
+ *   · 出口列表是这台机器的事实，和环境数量无关
+ *   · 环境只记一个 exitId 指向它
+ *   · 换出口 = 改一个 id，不用重填端口
+ */
+export interface Exit {
+  id: string;
+  /** 用户起的名字，默认从节点名或端口生成 */
+  label: string;
+  proxy: ProxyConfig;
+  /** 来源节点名（只是备注，改配置时能对上是哪个） */
+  node?: string;
+  /** 来源代理软件，例如 Sparkle */
+  app?: string;
+  /** 上次实测的出口 IP */
+  lastIp?: string;
+  /** 上次实测时间 */
+  checkedAt?: number;
+}
+
 /** 身份（~/.claude.json 里的两个 64 位 hex） */
 export interface Identity {
   userID: string | null;
@@ -163,6 +191,14 @@ export interface Account {
 
   /** 网络出口 */
   proxy: ProxyConfig;
+  /**
+   * 这个环境用哪个出口（state.exits 里的 id）。
+   *
+   * 和 proxy 的关系：proxy 是实际生效的那份配置（启动进程要用），
+   * exitId 是"它来自哪个可复用的出口"。改 exitId 时把 proxy 同步过去，
+   * 保证两者永远一致。
+   */
+  exitId?: string;
   /** 要求必须先有可用出口才允许开会话 —— 没配就拦，不只是一个黄字提醒 */
   enforceProxy?: boolean;
   /** 上次测到的出口 IP，用于发现 IP 跳变 */
@@ -209,6 +245,13 @@ export interface ShellWindow {
 
 export interface BuddyState {
   accounts: Account[];
+  /**
+   * 这台机器上配置过的出口。
+   *
+   * 独立于环境存在：一个出口可以被多个环境共用，也可以暂时没人用。
+   * 环境通过 exitId 指向其中一个。
+   */
+  exits: Exit[];
   windows: ShellWindow[];
   activeWindowId: string | null;
   activeAccountId: string | null;
@@ -585,6 +628,71 @@ export function tierLabel(tier: string | null | undefined): string {
 export function proxyLabel(p: ProxyConfig): string {
   const url = proxyUrl(p);
   return url ?? tr("直连", "Direct");
+}
+
+/** 一个出口的默认名字：有节点名就用节点名，否则用 host:port */
+export function exitLabel(e: Exit): string {
+  if (e.label) return e.label;
+  if (e.node) return e.node;
+  return `${e.proxy.host}:${e.proxy.port}`;
+}
+
+/** 出口的 key：同一个 host:port 就是同一个出口，用来去重 */
+export function exitKey(p: ProxyConfig): string {
+  if (p.protocol === "none" || !p.host) return "direct";
+  return `${p.protocol}://${p.host}:${p.port}`;
+}
+
+/**
+ * 老存档升级：把每个环境身上散着的 proxy 收成独立的出口条目。
+ *
+ * 规则：同一个 host:port 只建一条，多个环境指向它 —— 这正是"共用出口"
+ * 该有的样子，也让界面第一次能如实显示"这两个环境走同一个出口"。
+ * 直连不建条目（它就是"没有出口"）。
+ */
+export function migrateExits(state: BuddyState): BuddyState {
+  if (Array.isArray(state.exits) && state.exits.length > 0) {
+    // 已经有出口了，只补上还没关联的环境
+    const byKey = new Map(state.exits.map((e) => [exitKey(e.proxy), e]));
+    let changed = false;
+    const accounts = state.accounts.map((a) => {
+      if (a.exitId) return a;
+      const k = exitKey(a.proxy);
+      if (k === "direct") return a;
+      const hit = byKey.get(k);
+      if (!hit) return a;
+      changed = true;
+      return { ...a, exitId: hit.id };
+    });
+    return changed ? { ...state, accounts } : state;
+  }
+
+  const exits: Exit[] = [];
+  const byKey = new Map<string, Exit>();
+  const accounts = state.accounts.map((a) => {
+    const k = exitKey(a.proxy);
+    if (k === "direct") return a;
+    let hit = byKey.get(k);
+    if (!hit) {
+      hit = {
+        id: `x-${k.replace(/[^a-z0-9]+/gi, "-")}`,
+        label: `${a.proxy.host}:${a.proxy.port}`,
+        proxy: { ...a.proxy },
+        /**
+         * 刻意不继承 a.lastExitIp。
+         *
+         * 那个值是环境当时测到的，但它可能是环境走**别的线路**时测的 ——
+         * 抄到出口上就等于凭空给这个出口编了个 IP，界面上会显示一个
+         * 与实际不符的值。没实测过就留空，显示「未测」。
+         */
+      };
+      byKey.set(k, hit);
+      exits.push(hit);
+    }
+    return { ...a, exitId: hit.id };
+  });
+
+  return { ...state, accounts, exits };
 }
 
 // ─────────────────────────────────────────── 格式化

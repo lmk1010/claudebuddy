@@ -97,7 +97,14 @@ function listKeychainServices() {
 
 /** 读 .claude.json 里的账号档案。读不到就当没有，不猜。 */
 function readProfileMeta(dir) {
+  /**
+   * 默认 profile 的配置文件在目录外面（家目录的 `.claude.json`），
+   * 目录里那份是残留的空壳。只看目录会读不到账号 —— 界面就显示不出
+   * "这个默认目录里躺的是哪个号"，用户没法判断该不该清。
+   */
+  const isDefault = path.resolve(dir) === path.join(HOME, ".claude");
   const candidates = [
+    ...(isDefault ? [path.join(HOME, ".claude.json")] : []),
     path.join(dir, ".claude.json"),
     path.join(dir, "claude.json"),
   ];
@@ -265,6 +272,16 @@ function survey() {
         lastActive,
         sessions,
         state,
+        /**
+         * 默认 profile 的配置文件在目录外面（家目录的 `.claude.json`）。
+         * 只报目录大小会让用户以为"就 4.9G"，实际还有一份带账号记录的配置。
+         * 这里把它一起量出来，界面才能如实说"清掉会动两处"。
+         */
+        configPath: src.kind === "default" ? path.join(HOME, ".claude.json") : undefined,
+        configSize:
+          src.kind === "default" && fs.existsSync(path.join(HOME, ".claude.json"))
+            ? fs.statSync(path.join(HOME, ".claude.json")).size
+            : undefined,
       });
     }
   }
@@ -375,7 +392,7 @@ function unregisterCodexProfile(profileName) {
  * 顺序很重要：先删登记、再挪目录、最后删凭据。
  * 万一中途失败，凭据还在，用户还能重新登录找回这个号。
  */
-function purge({ accountIds = [], services = [], allowMainKeychain = false } = {}) {
+function purge({ accountIds = [], services = [], allowMainKeychain = false, allowDefault = false } = {}) {
   const snap = survey();
   const byId = new Map(snap.accounts.map((a) => [a.id, a]));
 
@@ -402,18 +419,55 @@ function purge({ accountIds = [], services = [], allowMainKeychain = false } = {
   for (const id of accountIds) {
     const a = byId.get(id);
     if (!a) continue;
-    // 默认目录指向用户自己的主配置，永远不动
-    if (a.kind === "default") {
-      failed.push({ id, reason: L("默认目录是 ~/.claude，不提供删除", "The default directory is ~/.claude and cannot be deleted") });
+    /**
+     * 默认目录也能清，但必须显式确认。
+     *
+     * 早前这里直接拒绝，理由是"那是用户自己的主配置"。但这个保守设计
+     * 反而削弱了产品本身的价值：
+     *
+     *   · 默认目录是唯一能绕开隔离的入口 —— 裸跑 `claude` 用的就是它，
+     *     不走任何环境的代理、身份、终端画像
+     *   · 它常常指向一个已经废掉的号（用户换了环境却没清默认），
+     *     留着就是一个随时会被误触的死号身份
+     *
+     * 清掉之后裸 `claude` 会重新生成一套全新身份 —— 那也不是"安全"，
+     * 只是把同一个问题换了个新壳。真正干净的状态是：只用本软件启动。
+     * 这一点必须在界面上说清楚，不能让人以为清完还能随便裸跑。
+     */
+    if (a.kind === "default" && !allowDefault) {
+      failed.push({ id, reason: L("默认目录需要显式确认才能清理", "The default folder needs explicit confirmation to clean") });
       continue;
     }
     if (DRY_RUN) {
       moved.push({ id, dest: `${TRASH_ROOT}/${L("(演练，未移动)", "(dry run, not moved)")}` });
+      /**
+       * 演练也要把配置文件那一项报出来 —— 否则用户看到的计划里只有目录，
+       * 实际执行时却多动了一处，对不上账。
+       */
+      if (a.kind === "default" && fs.existsSync(path.join(HOME, ".claude.json"))) {
+        moved.push({ id: `${id}/config`, dest: `${TRASH_ROOT}/${L("(演练，未移动)", "(dry run, not moved)")}` });
+      }
       continue;
     }
     const r = moveToTrash(a.path);
     if (r.ok) moved.push({ id, dest: r.dest });
     else failed.push({ id, reason: r.reason });
+
+    /**
+     * 默认 profile 还有第二处：家目录的 `.claude.json`。
+     *
+     * 目录和配置文件是分开的 —— 只挪目录，配置还在，账号记录、
+     * userID、machineID 照样留在原地。所以清默认必须两处一起处理，
+     * 否则"清干净了"只是看着干净。
+     */
+    if (a.kind === "default") {
+      const cfg = path.join(HOME, ".claude.json");
+      if (fs.existsSync(cfg)) {
+        const rc = moveToTrash(cfg);
+        if (rc.ok) moved.push({ id: `${id}/config`, dest: rc.dest });
+        else failed.push({ id: `${id}/config`, reason: rc.reason });
+      }
+    }
   }
 
   // 3) 最后删凭据

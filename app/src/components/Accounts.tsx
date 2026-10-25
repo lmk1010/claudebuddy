@@ -1,21 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { Account, AccountStatusSnapshot, ProxyConfig } from "../lib/model";
+import type { Account, AccountStatusSnapshot } from "../lib/model";
 import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem, DesktopProbe, LeakReport } from "../lib/bridge";
-import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, relTime, tierLabel, type SimilarityReport } from "../lib/model";
+import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, relTime, tierLabel, type Exit, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
 import HealthSection from "./EnvHealth";
-import ProxyNodes from "./ProxyNodes";
+import ExitList from "./ExitList";
 import BrowserSection from "./EnvBrowser";
 import Art from "./Art";
 import Modal from "./Modal";
 import Help, { Steps } from "./Help";
-import IpBadge from "./IpBadge";
 import NetReportCard from "./NetReport";
 import ExitGuide from "./ExitGuide";
 import LoginButton from "./LoginButton";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { tr } from "../lib/i18n";
-import type { ProxyCandidate } from "../lib/bridge";
 import {
   IconCheck,
   IconClock,
@@ -485,7 +483,6 @@ export function EnvModal({
   onCheckExit,
   onLoadTraces,
   onLoadKeychain,
-  onSetProxy,
   onOpenTerminal,
   onRefresh,
   onCancelLogin,
@@ -496,6 +493,12 @@ export function EnvModal({
   sessions,
   onLoadSessions,
   onOpenSession,
+  exits,
+  onUseExit,
+  onCreateExit,
+  onRenameExit,
+  onDeleteExit,
+  onMeasureExit,
 }: {
   account: Account;
   status: AccountStatusSnapshot | undefined;
@@ -521,7 +524,6 @@ export function EnvModal({
   leak: LeakReport | null;
   onLoadTraces: () => void;
   onLoadKeychain: () => void;
-  onSetProxy: (p: ProxyConfig) => void;
   onOpenTerminal: () => void;
   onRefresh: () => void;
   onCancelLogin: () => void;
@@ -532,6 +534,15 @@ export function EnvModal({
   sessions: SessionSummary[] | undefined;
   onLoadSessions: () => void;
   onOpenSession: (s: SessionSummary) => void;
+  /** 这台机器配过的出口 */
+  exits: Exit[];
+  /** 把这个环境切到某个出口；undefined = 直连 */
+  onUseExit: (exitId: string | undefined) => void;
+  onCreateExit: (exit: Omit<Exit, "id">) => void;
+  onRenameExit: (id: string, label: string) => void;
+  onDeleteExit: (id: string) => void;
+  /** 实测到出口的真实 IP 后写回 */
+  onMeasureExit: (id: string, ip: string | null) => void;
 }) {
   // 同上：没测过就是未知，不是未登录
   const auth = status?.auth ?? "unknown";
@@ -666,8 +677,12 @@ export function EnvModal({
                 <NetworkSection
                   account={account}
                   peers={peers}
-                  slot={Math.max(1, peers.findIndex((a) => a.id === account.id) + 1)}
-                  onSetProxy={onSetProxy}
+                  exits={exits}
+                  onUseExit={onUseExit}
+                  onCreateExit={onCreateExit}
+                  onRenameExit={onRenameExit}
+                  onDeleteExit={onDeleteExit}
+                  onMeasureExit={onMeasureExit}
                   onPatch={onPatch}
                   onIp={(ip) => {
                     onPatch({ lastExitIp: ip, lastExitCheckedAt: Date.now() });
@@ -1126,8 +1141,12 @@ function GeneralSection({
 function NetworkSection({
   account,
   peers,
-  slot,
-  onSetProxy,
+  exits,
+  onUseExit,
+  onCreateExit,
+  onRenameExit,
+  onDeleteExit,
+  onMeasureExit,
   onPatch,
   onIp,
   onAlign,
@@ -1135,27 +1154,21 @@ function NetworkSection({
   account: Account;
   /** 全部环境，用来做出口对比 */
   peers: Account[];
-  /** 这个环境排第几（从 1 起），决定给它分配哪个入口端口 */
-  slot: number;
-  onSetProxy: (p: ProxyConfig) => void;
+  /** 这台机器配过的出口 */
+  exits: Exit[];
+  /** 把这个环境切到某个出口；undefined = 直连 */
+  onUseExit: (exitId: string | undefined) => void;
+  onCreateExit: (exit: Omit<Exit, "id">) => void;
+  onRenameExit: (id: string, label: string) => void;
+  onDeleteExit: (id: string) => void;
+  /** 实测到出口的真实 IP 后写回 */
+  onMeasureExit: (id: string, ip: string | null) => void;
   onPatch: (patch: Partial<Account>) => void;
   onIp: (ip: string) => void;
   onAlign: (t: { tz?: string; lang?: string }) => void;
 }) {
   const p = account.proxy;
-  const [scan, setScan] = useState<ProxyCandidate[] | null>(null);
-  const [scanning, setScanning] = useState(false);
   const [guide, setGuide] = useState(false);
-  const discover = async () => {
-    setScanning(true);
-    try {
-      setScan((await window.claudeBuddy.proxyDiscover(account.id)).list);
-    } finally {
-      setScanning(false);
-    }
-  };
-  // 配过（有代理，或直连测过 IP）就不再摆大段引导，只留一个小的「重新探测」
-  const configured = p.protocol !== "none" || Boolean(account.lastExitIp);
 
   /**
    * 有几组环境共用同一个出口。
@@ -1199,8 +1212,22 @@ function NetworkSection({
             </small>
           </div>
           {peers.map((a) => {
-            const ip = a.lastExitIp;
-            const shared = ip ? peers.filter((x) => x.id !== a.id && x.lastExitIp === ip) : [];
+            /**
+             * 优先用出口实测到的 IP，其次才是环境自己记录的。
+             *
+             * 出口上的值是「通过这个端口真测出来的」，可信；
+             * 环境上的 lastExitIp 可能是它还在别的线路上时留下的。
+             * 对比的目的就是看「现在谁和谁撞」，所以要用前者。
+             */
+            const exit = exits.find((e) => e.id === a.exitId);
+            const ip = exit?.lastIp ?? a.lastExitIp;
+            const shared = ip
+              ? peers.filter((x) => {
+                  if (x.id === a.id) return false;
+                  const xExit = exits.find((e) => e.id === x.exitId);
+                  return (xExit?.lastIp ?? x.lastExitIp) === ip;
+                })
+              : [];
             return (
               <div className={`ex-row${a.id === account.id ? " on" : ""}`} key={a.id}>
                 <span className="ex-dot" style={{ background: a.tint }} />
@@ -1246,169 +1273,24 @@ function NetworkSection({
         </Row>
       </div>
 
-      <div className="em-sub">
-        <span>{tr("线路", "Route")}</span>
-        {configured && (
-          <button className="det-k" onClick={() => void discover()} disabled={scanning}>
-            {scanning ? tr("探测中…", "Detecting…") : tr("探测本机代理", "Detect local proxies")}
-          </button>
-        )}
-      </div>
-
-      {/* 节点清单：回答“我有哪些出口可选”，比“哪个端口能通”更贴近需求 */}
-      <ProxyNodes currentExitIp={account.lastExitIp ?? null} slot={slot} />
-      {!configured && (
-        <div className="em-tipbox">
-          <span>
-            <b>{tr("不知道该填什么？", "Not sure what to enter?")}</b>
-            {tr(
-              "点「自动探测」，会把本机正在跑的代理（Clash、V2RayN、Surge 等）都找出来，并实测每个能不能通、出口 IP 是多少，挑一个点「用这个」就行。",
-              "Click “Auto-detect” to find the proxies running on this Mac (Clash, V2RayN, Surge and more), test whether each one works and what its exit IP is, then pick one and click “Use this”.",
-            )}
-          </span>
-          <button className="btn pri" onClick={() => void discover()} disabled={scanning}>
-            <IconRefresh />
-            {scanning ? tr("探测中…", "Detecting…") : scan ? tr("重新探测", "Detect again") : tr("自动探测", "Auto-detect")}
-          </button>
-        </div>
-      )}
-
-      {scan && (
-        <div className="em-card em-scan">
-          {scan.length === 0 ? (
-            <div className="em-empty" style={{ border: 0 }}>
-              {tr(
-                "没找到本机代理。没开梯子的话就选「直连」；开了还找不到，到下面手动填端口。",
-                "No local proxy found. If you don't use a proxy, choose “Direct”. If you do and it isn't found, enter the port manually below.",
-              )}
-            </div>
-          ) : (
-            scan.map((c) => {
-              const cur = p.protocol === c.protocol && p.host === c.host && p.port === c.port;
-              return (
-                <div className="em-row" key={`${c.protocol}-${c.host}-${c.port}`}>
-                  <span className="em-row-t">
-                    <b>
-                      {c.label}
-                      <span className={`pill ${c.ok ? "p-ok" : "p-idle"}`} style={{ marginLeft: 8 }}>
-                        {c.ok ? tr("能通", "Reachable") : tr("不通", "Unreachable")}
-                      </span>
-                    </b>
-                    <small className="mono">
-                      {c.protocol}://{c.host}:{c.port}
-                      {c.ip ? tr(` · 出口 ${c.ip}`, ` · Exit ${c.ip}`) : c.reason ? ` · ${c.reason}` : ""}
-                    </small>
-                    {c.ip && (
-                      <small>
-                        <IpBadge ip={c.ip} compact />
-                      </small>
-                    )}
-                  </span>
-                  <span className="em-row-c">
-                    <button
-                      className={`btn${cur ? " ghost" : ""}`}
-                      disabled={cur || !c.ok}
-                      onClick={() => {
-                        onSetProxy({ protocol: c.protocol, host: c.host, port: c.port, noProxy: "localhost,127.0.0.1,::1" });
-                        // 探测时已经量过这个候选的出口，直接记下来，才能和别的环境对比
-                        if (c.ip) onIp(c.ip);
-                      }}
-                    >
-                      {cur ? tr("正在用", "In use") : tr("用这个", "Use this")}
-                    </button>
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      <div className="em-card">
-        <Row
-          title={tr("出口方式", "Exit method")}
-          desc={tr("直连，或者走本机的代理", "Direct, or through a local proxy")}
-          tip={
-            <Help title={tr("直连还是代理？", "Direct or proxy?")} wide>
-              <p>
-                <b>{tr("直连", "Direct")}</b>
-                {tr(
-                  "：用你电脑当前的网络直接出去。没开梯子、或者开了「全局/TUN 模式」时选这个。",
-                  ": goes out through your Mac's current network. Choose this if you don't use a proxy, or if you use global / TUN mode.",
-                )}
-              </p>
-              <p>
-                <b>SOCKS5 / HTTP</b>
-                {tr(
-                  "：只让这个环境走指定的代理端口，别的程序不受影响。多个号各走各的线路，靠的就是这个。",
-                  ": sends only this environment through the given proxy port, leaving other apps alone. This is how multiple accounts each get their own route.",
-                )}
-              </p>
-              <p>{tr("常见端口：", "Common ports:")}</p>
-              <Steps
-                items={[
-                  tr(
-                    "Clash / Clash Verge：HTTP 7890，SOCKS5 7891（混合端口 7890 两种都行）",
-                    "Clash / Clash Verge: HTTP 7890, SOCKS5 7891 (mixed port 7890 supports both)",
-                  ),
-                  tr("V2RayN：SOCKS5 10808，HTTP 10809", "V2RayN: SOCKS5 10808, HTTP 10809"),
-                  tr("Surge / ShadowRocket Mac：HTTP 6152，SOCKS5 6153", "Surge / Shadowrocket for Mac: HTTP 6152, SOCKS5 6153"),
-                ]}
-              />
-            </Help>
-          }
-        >
-          <div className="seg">
-            <button className={p.protocol === "none" ? "on" : ""} onClick={() => onSetProxy({ protocol: "none", host: "", port: 0 })}>
-              {tr("直连", "Direct")}
-            </button>
-            <button
-              className={p.protocol === "socks5" ? "on" : ""}
-              onClick={() =>
-                onSetProxy({
-                  protocol: "socks5",
-                  host: p.host || "127.0.0.1",
-                  port: p.port || 1080,
-                  noProxy: p.noProxy || "localhost,127.0.0.1,::1",
-                })
-              }
-            >
-              SOCKS5
-            </button>
-            <button
-              className={p.protocol === "http" ? "on" : ""}
-              onClick={() =>
-                onSetProxy({
-                  protocol: "http",
-                  host: p.host || "127.0.0.1",
-                  port: p.port || 7890,
-                  noProxy: p.noProxy || "localhost,127.0.0.1,::1",
-                })
-              }
-            >
-              HTTP
-            </button>
-          </div>
-        </Row>
-        {p.protocol !== "none" && (
-          <Row title={tr("代理地址", "Proxy address")} desc={tr("主机和端口，失焦后保存", "Host and port. Saved when you leave the field")}>
-            <span className="em-proxy" key={p.protocol}>
-              <input
-                className="em-in"
-                defaultValue={p.host}
-                placeholder="127.0.0.1"
-                onBlur={(e) => onSetProxy({ ...p, host: e.target.value.trim() })}
-              />
-              <input
-                className="em-in em-port"
-                defaultValue={p.port || ""}
-                placeholder={tr("端口", "Port")}
-                onBlur={(e) => onSetProxy({ ...p, port: Number(e.target.value.replace(/\D/g, "")) || 0 })}
-              />
-            </span>
-          </Row>
-        )}
-      </div>
+      {/**
+       * 出口列表 —— 这台机器有几个出口、各自什么 IP、谁在用、能不能换。
+       *
+       * 上一版把「出口方式」和「节点清单」平铺成两张卡，结果是：
+       * 十几个节点堆在设置页里读不完，而真正要回答的"我有几个出口"
+       * 反而看不出来；更要紧的是发现两个环境共用 IP 之后没地方换。
+       * 现在列表在前、选节点放进「新建出口」弹窗。
+       */}
+      <ExitList
+        exits={exits}
+        accounts={peers}
+        currentExitId={account.exitId}
+        onUse={onUseExit}
+        onCreate={onCreateExit}
+        onRename={onRenameExit}
+        onDelete={onDeleteExit}
+        onMeasure={onMeasureExit}
+      />
 
       {guide && <ExitGuide onClose={() => setGuide(false)} />}
     </>

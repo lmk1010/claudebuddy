@@ -88,6 +88,28 @@ function isListening(port, host = "127.0.0.1") {
  * 这是唯一可信的判据：端口开着不代表能出网（可能是别的服务），
  * 公司代理可能还要认证。所以必须实际走一次。
  */
+/**
+ * 端口在不在监听。
+ *
+ * 用来把"失败"分成两种，因为处理方式完全不同：
+ *   · 端口没开 → 代理软件没运行，或者没配这个 listener
+ *   · 端口开着但出不去 → 线路挂了 / 节点不通 / 要认证
+ * 只说"连不上"等于什么都没说。
+ */
+function portOpen(host, port, timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    const sock = net.connect({ host, port });
+    const done = (ok) => {
+      sock.destroy();
+      resolve(ok);
+    };
+    sock.setTimeout(timeoutMs);
+    sock.once("connect", () => done(true));
+    sock.once("timeout", () => done(false));
+    sock.once("error", () => done(false));
+  });
+}
+
 function testProxy(proxy, timeoutMs = 8000) {
   return new Promise((resolve) => {
     const url =
@@ -99,8 +121,22 @@ function testProxy(proxy, timeoutMs = 8000) {
       "curl",
       ["-sS", "--max-time", String(Math.ceil(timeoutMs / 1000)), "-x", url, "https://api.ipify.org?format=json"],
       { timeout: timeoutMs + 2000 },
-      (err, stdout) => {
-        if (err) return resolve({ ok: false, reason: L("连不上", "Unable to connect") });
+      async (err, stdout) => {
+        if (err) {
+          const open = await portOpen(proxy.host, proxy.port);
+          return resolve({
+            ok: false,
+            reason: open
+              ? L(
+                  `${proxy.host}:${proxy.port} 端口开着，但连不上外网 —— 线路挂了，或者这个端口没绑到可用节点`,
+                  `${proxy.host}:${proxy.port} is listening but cannot reach the internet — the route is down, or this port is not bound to a working node`,
+                )
+              : L(
+                  `${proxy.host}:${proxy.port} 端口没开 —— 代理软件没运行，或者没配这个 listener`,
+                  `${proxy.host}:${proxy.port} is not listening — the proxy app is not running, or this listener is not configured`,
+                ),
+          });
+        }
         try {
           const j = JSON.parse(String(stdout));
           if (j.ip) return resolve({ ok: true, ip: j.ip });
