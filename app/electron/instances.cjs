@@ -30,6 +30,90 @@ const PORT_BASE = 7950;
 /** 控制端口另开一段，避免和 mixed-port 抢 */
 const CTL_BASE = 8450;
 
+/**
+ * 跨进程锁。
+ *
+ * `running` 这个 Map 只在**本进程内**有效。同时开两个应用窗口（开发版 + 安装版，
+ * 用户双击两次图标）时，两边都会给同一个出口跑 managedBoot —— 各自看到的
+ * `running` 都是空的，于是第二个也会启动一个实例。
+ *
+ * 实测后果不是「多一个进程」这么轻：
+ *   · 第二个实例发现 7950 被占，pickPort 给了它 7951
+ *   · 它**重写了同一份 config.yaml**，把 mixed-port 改成 7951
+ *   · 再把 7951 写回 state.json
+ *   · 然后其中一个进程被关掉 —— 出口就指着没人监听的 7951，彻底断掉
+ *
+ * 所以启动前必须先抢锁。锁里同时记「谁拉起的」（owner，应用进程）和
+ * 「拉起了谁」（pid，mihomo 进程），两者的存活要分开判断。
+ */
+function lockFile(exitId) {
+  return path.join(dirOf(exitId), "instance.lock");
+}
+
+/** 进程还在不在。信号 0 只做存在性检查，不发信号 */
+function isAlive(pid) {
+  if (!pid || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readLock(exitId) {
+  try {
+    return JSON.parse(fs.readFileSync(lockFile(exitId), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function writeLock(exitId, info) {
+  try {
+    fs.writeFileSync(lockFile(exitId), JSON.stringify(info), { mode: 0o600 });
+  } catch {
+    /* 写不进去不致命：锁是防重复的，不是数据 */
+  }
+}
+
+function clearLock(exitId) {
+  try {
+    fs.unlinkSync(lockFile(exitId));
+  } catch {
+    /* 没有就算了 */
+  }
+}
+
+/**
+ * 抢锁。拿不到就抛错，并且把原因说清楚。
+ *
+ * 两种情况要分开处理：
+ *   · 持有者（应用进程）还活着 → 真的有人占着，拒绝
+ *   · 持有者已经死了 → 那是上次崩溃/被强杀留下的孤儿 mihomo，清掉再接管
+ */
+function acquireLock(exitId) {
+  const held = readLock(exitId);
+  if (!held) return;
+
+  const ownerAlive = held.owner && held.owner !== process.pid && isAlive(held.owner);
+  if (ownerAlive) {
+    throw new Error(
+      `出口「${exitId}」正被另一个应用实例使用（进程 ${held.owner}）。关掉那个窗口再试，或者重启应用。`,
+    );
+  }
+
+  // 持有者已死：清掉孤儿 mihomo，别让它继续占着端口
+  if (held.pid && isAlive(held.pid)) {
+    try {
+      process.kill(held.pid, "SIGTERM");
+    } catch {
+      /* 刚好自己退了 */
+    }
+  }
+  clearLock(exitId);
+}
+
 /** 运行中的实例：exitId → { proc, port, node, subId, dir } */
 const running = new Map();
 
@@ -150,6 +234,9 @@ async function start({ exitId, subId, node, onLog } = {}) {
   if (!exitId) throw new Error("缺少 exitId");
   if (!subId || !node) throw new Error("缺少订阅或节点");
 
+  // 先抢锁：另一个应用实例正在用这个出口的话，直接拒绝，别去动它的配置
+  acquireLock(exitId);
+
   await stop(exitId);
 
   const bin = await kernel.ensure();
@@ -195,12 +282,33 @@ async function start({ exitId, subId, node, onLog } = {}) {
   }
 
   running.set(exitId, { proc, port, node, subId, dir, pid: proc.pid, ctlPort, secret });
+  /**
+   * 起来了才写锁。
+   * 中途失败（配置校验不过、没监听上）不写 —— 否则会留下一个
+   * 指向不存在实例的锁，下次启动被自己挡住。
+   */
+  writeLock(exitId, {
+    owner: process.pid,
+    pid: proc.pid,
+    port,
+    ctlPort,
+    exitId,
+    startedAt: Date.now(),
+  });
   return { ok: true, exitId, port, pid: proc.pid, host: "127.0.0.1", node };
 }
 
 /** 停一个实例。已经停了也算成功 */
 async function stop(exitId) {
   const r = running.get(exitId);
+  /**
+   * 锁只由**自己的**实例清理。
+   * 别的进程占着这个出口时，我们无权删它的锁 —— 删了它下次会以为没人用，
+   * 于是又多起一个实例，正是这个锁要防的事。
+   */
+  const held = readLock(exitId);
+  if (!held || held.owner === process.pid) clearLock(exitId);
+
   if (!r) return { ok: true, already: true };
   running.delete(exitId);
   try {
@@ -343,12 +451,21 @@ function clearConnections(exitId) {
 
 /** 应用退出时全停。不清理的话 mihomo 会成孤儿进程一直跑着 */
 function stopAll() {
-  for (const [, r] of running) {
+  for (const [exitId, r] of running) {
     try {
       r.proc.kill("SIGTERM");
     } catch {
       /* 已经没了 */
     }
+    /**
+     * 退出时把自己的锁一起删掉。
+     *
+     * 不删的话，下次启动会看到一把「持有者已死」的锁 —— 那一步虽然会
+     * 自动清理，但中间要多绕一圈（还得去 kill 一个已经不存在的 pid）。
+     * 正常退出就干脆收干净。
+     */
+    const held = readLock(exitId);
+    if (!held || held.owner === process.pid) clearLock(exitId);
   }
   running.clear();
 }
