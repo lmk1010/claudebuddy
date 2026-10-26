@@ -11,7 +11,9 @@ import CleanPage from "./components/CleanPage";
 import NetTestPage from "./components/NetTestPage";
 import Guide from "./components/Guide";
 import { setLang, systemLang, tr } from "./lib/i18n";
-import { resetNetReports } from "./components/NetReport";
+import { askDetect } from "./lib/detect";
+import DetectGate from "./components/DetectGate";
+import { invalidateNetReport, resetNetReports } from "./components/NetReport";
 import { setPendingPrompt } from "./lib/pendingPrompt";
 import { browserLabel, loadBrowsers } from "./components/LoginButton";
 import Onboarding from "./components/Onboarding";
@@ -326,6 +328,24 @@ export default function App() {
 
   /** 跑环境自检 —— 启动时、装完之后、用户手动点，都走这里 */
   const runCheckup = useCallback(async () => {
+    /**
+     * 先问，再发。
+     *
+     * 自检会连 api.anthropic.com（真带身份）、cloudflare-dns 和 dns.google，
+     * 留下的 DNS 查询记录本身也是痕迹。这一步比体检更重，更得说清楚。
+     */
+    const allow = await askDetect({
+      targets: ["api.anthropic.com", "cloudflare-dns.com", "dns.google", "storage.googleapis.com"],
+      exposes: tr(
+        "本机出口 IP、DNS 查询记录，以及一条带当前身份的 API 探测请求。",
+        "This Mac's exit IP, DNS query records, and one API probe carrying the current identity.",
+      ),
+      why: tr(
+        "自检用来确认 [CC] 装了没有、登录着没有、线路通不通、DNS 有没有泄露。",
+        "The checkup confirms [CC] is installed and signed in, the route works, and DNS is not leaking.",
+      ),
+    });
+    if (!allow) return;
     setCheckingUp(true);
     try {
       setCheckup(await window.claudeBuddy.checkupRun());
@@ -761,7 +781,7 @@ export default function App() {
   } | null>(null);
 
   // ── 建会话
-  const spawnNow = useCallback((account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string) => {
+  const spawnNow = useCallback((account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string, rawCommand?: string) => {
     /**
      * 强制代理的硬闸。
      *
@@ -807,6 +827,7 @@ export default function App() {
       startedAt: Date.now(),
       lastActivityAt: Date.now(),
       permission: stateRef.current.permission,
+      ...(rawCommand ? { rawCommand } : {}),
     };
     if (firstPrompt) setPendingPrompt(win.id, firstPrompt);
     setState((s) => ({
@@ -858,6 +879,35 @@ export default function App() {
     if (cached && Date.now() - cached.at < EXIT_TTL) {
       seen = cached;
     } else {
+      /**
+       * 开会话前这道核对要往外发请求，所以先问。
+       *
+       * 拒绝就**跳过核对、照常开会话** —— 这道闸门是保护措施，
+       * 不是使用前提。拒绝的人只是选择自己承担"出口可能变了"的风险，
+       * 不该因此连会话都开不了。但要说清楚跳过了什么。
+       */
+      const allow = await askDetect({
+        targets: ["api.ipify.org", "ip-api.com"],
+        exposes: tr(
+          `环境「${account.label}」当前的出口 IP 与请求时间。`,
+          `The current exit IP of environment “${account.label}”, plus the request time.`,
+        ),
+        why: tr(
+          `开会话前核对一下出口还是不是上次那个 ${expected}。变了就提醒你，避免在陌生的 IP 上开会话。`,
+          `Verify the exit still matches the recorded ${expected} before starting a session, so you are not signing in from an unfamiliar IP.`,
+        ),
+      });
+      if (!allow) {
+        setToast({
+          title: tr("已跳过出口核对", "Exit check skipped"),
+          body: tr(
+            `这次没确认出口还是不是 ${expected}。会话照常在开。`,
+            `Did not confirm the exit is still ${expected}. The session starts anyway.`,
+          ),
+        });
+        run();
+        return;
+      }
       let r: { ok: boolean; ip: string | null } | null = null;
       try {
         r = await Promise.race([
@@ -894,8 +944,8 @@ export default function App() {
   }, []);
 
   const spawnWindow = useCallback(
-    (account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string) => {
-      void gateExit(account, () => spawnNow(account, cwd, runsClaude, firstPrompt));
+    (account: Account, cwd: string, runsClaude: boolean, firstPrompt?: string, rawCommand?: string) => {
+      void gateExit(account, () => spawnNow(account, cwd, runsClaude, firstPrompt, rawCommand));
     },
     [spawnNow, gateExit],
   );
@@ -1070,21 +1120,34 @@ export default function App() {
    * 想手动改的，去账号详情里改。
    */
   const addAccount = useCallback(
-    (label: string): Account => {
-      const taken = state.accounts.map((a) => a.configDir);
-      const base = createAccount(label, taken, nextTint(state.accounts.map((a) => a.tint)));
-      const used = state.accounts.map((a) => a.terminal).filter(Boolean);
-      const acc: Account = { ...base, terminal: suggestDistinctTerminal(base, used) };
-      setState((s) => ({
-        ...s,
-        accounts: [...s.accounts, acc],
-        activeAccountId: acc.id,
-      }));
-      setToast({ title: tr(`已创建 ${acc.label}`, `Created ${acc.label}`), body: tr(`~/${acc.configDir} · 设备码与画像已独立分配`, `~/${acc.configDir} · Device ID and profile assigned separately`) });
-      return acc;
-    },
-    [state.accounts],
-  );
+      (label: string): Account => {
+        const taken = state.accounts.map((a) => a.configDir);
+        const base = createAccount(label, taken, nextTint(state.accounts.map((a) => a.tint)));
+        const used = state.accounts.map((a) => a.terminal).filter(Boolean);
+        /**
+         * 按设置里的默认代理方式，自动指到一个现成的出口上。
+         *
+         * 「默认方式」只决定起点，不负责创建出口 —— 如果选的方式下还没有出口，
+         * 就落回直连，而不是给用户一个指向不存在端口的出口。
+         */
+        const pref = state.defaultProxyMode ?? "managed";
+        const pool = (state.exits ?? []).filter((e) => (pref === "managed" ? Boolean(e.managed) : !e.managed));
+        const pick = pref === "direct" ? undefined : pool[0];
+        const acc: Account = {
+          ...base,
+          terminal: suggestDistinctTerminal(base, used),
+          ...(pick ? { exitId: pick.id, proxy: { ...pick.proxy } } : {}),
+        };
+        setState((s) => ({
+          ...s,
+          accounts: [...s.accounts, acc],
+          activeAccountId: acc.id,
+        }));
+        setToast({ title: tr(`已创建 ${acc.label}`, `Created ${acc.label}`), body: tr(`~/${acc.configDir} · 设备码与画像已独立分配`, `~/${acc.configDir} · Device ID and profile assigned separately`) });
+        return acc;
+      },
+      [state.accounts, state.exits, state.defaultProxyMode],
+    );
 
   const importDir = useCallback(
     (configDir: string, label: string) => {
@@ -1227,6 +1290,23 @@ export default function App() {
 
   const checkExit = useCallback(
     async (id: string) => {
+      /**
+       * 先问，再发。这条路会从这个环境的线路打 ipify / ip-api，
+       * 把出口 IP 报给它们 —— 和别处的检测一样，得用户点头。
+       */
+      const acct = state.accounts.find((a) => a.id === id);
+      const allow = await askDetect({
+        targets: ["api.ipify.org", "ip-api.com"],
+        exposes: tr(
+          `环境「${acct?.label ?? id}」的出口 IP 与归属，以及请求时间。`,
+          `The exit IP and location of environment “${acct?.label ?? id}”, plus the request time.`,
+        ),
+        why: tr(
+          "这一步会从这个环境自己的线路发一次请求，确认它到底从哪个 IP 出去。",
+          "This sends one request through the environment's own route to confirm which IP it exits from.",
+        ),
+      });
+      if (!allow) return;
       setChecking((c) => ({ ...c, [id]: true }));
       const r = await window.claudeBuddy.accountCheckExit(id);
       setChecking((c) => ({ ...c, [id]: false }));
@@ -1350,10 +1430,76 @@ export default function App() {
   }, [activeWindow, goNew, menu, palette, requestCloseWindow, spawnWindow, state.accounts, state.view, update]);
 
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3200);
-    return () => clearTimeout(t);
-  }, [toast]);
+      if (!toast) return;
+      const t = setTimeout(() => setToast(null), 3200);
+      return () => clearTimeout(t);
+    }, [toast]);
+
+    /**
+     * 托管出口：应用启动后把实例拉回来。
+     *
+     * mihomo 实例不跨应用生命周期 —— 退出时会被 stopAll 收走，所以每次启动
+     * 都得重新起。端口是实例分配的，起来后要把真实端口同步回出口本身
+     * 和用它的环境，否则会话会指着一个已经不存在的旧端口。
+     *
+     * 只跑一次（managedBoot）：state.exits 每次改动都重跑会把实例反复重启。
+     */
+    const managedBoot = useRef(false);
+    useEffect(() => {
+      if (managedBoot.current) return;
+      const list = (state.exits ?? []).filter((e) => e.managed);
+      if (list.length === 0) return;
+      managedBoot.current = true;
+      void (async () => {
+        let live: string[] = [];
+        try {
+          live = (await window.claudeBuddy.exitInstances()).map((r) => r.exitId);
+        } catch {
+          /* 主进程是旧版本，没有这个 handler —— 当作一个实例都没有 */
+        }
+        for (const e of list) {
+          if (live.includes(e.id)) continue;
+          const r = await window.claudeBuddy.exitStart({
+            exitId: e.id,
+            subId: e.managed!.subId,
+            node: e.managed!.node,
+          });
+          if (!r.ok || !r.port) {
+            /**
+             * 实例没起来**必须说出来**。
+             *
+             * 之前这里直接 continue：用户只看到出口没有 IP、也不报错，
+             * 完全不知道是节点失效、内核没装、还是端口被占。
+             * 出口是会自动恢复的东西，静默失败比报错更糟 —— 用户会以为配好了。
+             */
+            setToast({
+              title: tr(`出口「${e.label}」没起来`, `Exit “${e.label}” failed to start`),
+              body: r.reason ?? tr("实例启动失败，去出口列表点「重启实例」看原因", "Start failed. Hit Restart in the exit list to see why."),
+            });
+            continue;
+          }
+          const port = r.port;
+          const host = r.host ?? "127.0.0.1";
+          setState((s) => ({
+            ...s,
+            exits: (s.exits ?? []).map((x) => (x.id === e.id ? { ...x, proxy: { ...x.proxy, port } } : x)),
+            accounts: s.accounts.map((a) =>
+              a.exitId === e.id ? { ...a, proxy: { ...a.proxy, host, port } } : a,
+            ),
+          }));
+          /**
+           * 实例就绪了 —— 把启动期那次失败的体检结果丢掉。
+           *
+           * 应用刚起来那几秒实例还没监听端口，首页已经去测了，测出来是"不通"。
+           * 不清缓存的话它会继续显示红字，而实际线路已经能用了。
+           */
+          for (const a of stateRef.current.accounts) {
+            if (a.exitId === e.id) invalidateNetReport(a.id);
+          }
+        }
+      })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.exits]);
 
   // 开发期钩子：主进程可以直接推一个窗口进来
   useEffect(() => {
@@ -1403,6 +1549,24 @@ export default function App() {
             onScanProxy={() => void scanProxy()}
             onSetProxy={setProxy}
             onCheckExit={checkExit}
+            /**
+             * 引导里建托管出口。
+             *
+             * 只作用在当前这个环境上 —— 引导时用户就是在配这一个环境，
+             * 没有"同时给多个环境"这回事。
+             */
+            onCreateExit={(draft) => {
+              if (!activeAccount) return;
+              const id = draft.id ?? `x-${Date.now().toString(36)}`;
+              const { id: _dropped, ...rest } = draft;
+              setState((s) => ({
+                ...s,
+                exits: [...(s.exits ?? []), { ...rest, id }],
+                accounts: s.accounts.map((a) =>
+                  a.id === activeAccount.id ? { ...a, exitId: id, proxy: { ...draft.proxy } } : a,
+                ),
+              }));
+            }}
             onFinish={() => {
               update({ onboarded: true, view: "home" });
               void refreshAll();
@@ -1481,6 +1645,7 @@ export default function App() {
             username={username}
             accounts={state.accounts}
             activeAccount={activeAccount}
+            exits={state.exits ?? []}
             status={status}
             runningBy={state.windows.reduce<Record<string, number>>((m, w) => {
               m[w.accountId] = (m[w.accountId] ?? 0) + 1;
@@ -1638,11 +1803,14 @@ export default function App() {
               });
             }}
             onCreateExit={(draft) => {
-              const id = `x-${Date.now().toString(36)}`;
-              setState((s) => ({ ...s, exits: [...(s.exits ?? []), { ...draft, id }] }));
-              // 新建完直接给当前环境用上，省一次点击
-              patchAccount(drawerAccount.id, { exitId: id, proxy: { ...draft.proxy } });
-            }}
+                          // 托管出口由弹窗先起实例、拿真端口，id 也是它生成的 ——
+                          // 那个 id 同时是实例目录名，必须和出口 id 一致，重启后才能认回来
+                          const id = draft.id ?? `x-${Date.now().toString(36)}`;
+                          const { id: _ignored, ...rest } = draft;
+                          setState((s) => ({ ...s, exits: [...(s.exits ?? []), { ...rest, id }] }));
+                          // 新建完直接给当前环境用上，省一次点击
+                          patchAccount(drawerAccount.id, { exitId: id, proxy: { ...draft.proxy } });
+                        }}
             onRenameExit={(id, label) =>
               setState((s) => ({ ...s, exits: (s.exits ?? []).map((e) => (e.id === id ? { ...e, label } : e)) }))
             }
@@ -1650,14 +1818,59 @@ export default function App() {
               setState((s) => ({ ...s, exits: (s.exits ?? []).filter((e) => e.id !== id) }))
             }
             onMeasureExit={(id, ip) =>
-              setState((s) => ({
-                ...s,
-                exits: (s.exits ?? []).map((e) =>
-                  e.id === id ? { ...e, lastIp: ip ?? undefined, checkedAt: ip ? Date.now() : e.checkedAt } : e,
-                ),
-              }))
-            }
+                          setState((s) => ({
+                            ...s,
+                            exits: (s.exits ?? []).map((e) =>
+                              e.id === id ? { ...e, lastIp: ip ?? undefined, checkedAt: ip ? Date.now() : e.checkedAt } : e,
+                            ),
+                          }))
+                        }
+                        /**
+                         * 托管实例重启后端口变了。
+                         *
+                         * 出口和用它的环境都得改到新端口，否则它们还指着已经被收走的旧端口 ——
+                         * 表现就是"前几天还好好的，今天会话连不上了"。
+                         */
+                        onRepairExit={(id, port, host) =>
+                          setState((s) => ({
+                            ...s,
+                            exits: (s.exits ?? []).map((e) => (e.id === id ? { ...e, proxy: { ...e.proxy, host, port } } : e)),
+                            accounts: s.accounts.map((a) => (a.exitId === id ? { ...a, proxy: { ...a.proxy, host, port } } : a)),
+                          }))
+                        }
+                        /** 托管出口换了节点：subId/node 一起改，否则重启后会按旧节点拉实例 */
+                        onSwapNode={(id, subId, node) =>
+                          setState((s) => ({
+                            ...s,
+                            exits: (s.exits ?? []).map((e) =>
+                              e.id === id ? { ...e, managed: { subId, node }, node, label: e.label } : e,
+                            ),
+                          }))
+                        }
             onRefresh={() => refreshAccount(drawerAccount.id)}
+            /**
+             * 开一个**真终端**自己验。
+             *
+             * 界面上那个 IP 是应用测的，用户凭什么信？给他一个普通 shell，
+             * 环境变量、curl、任何命令都能自己跑 —— 验证手段不该只有"信我们"。
+             *
+             * 进来先自动跑一条自测：打印代理变量 + 当前出口 IP，
+             * 然后落到普通 shell，想继续查什么都能查。
+             */
+            onOpenShell={() => {
+              const cmd = [
+                `echo ""`,
+                `echo "── 这个环境的代理设置 ──"`,
+                `echo "HTTPS_PROXY=$HTTPS_PROXY"`,
+                `echo ""`,
+                `echo "── 实际出口 IP ──"`,
+                `curl -s --max-time 10 https://api.ipify.org; echo`,
+                `echo ""`,
+                `echo "（下面是普通 shell，想自己再验就继续敲）"`,
+              ].join("; ");
+              spawnWindow(drawerAccount, home, false, undefined, cmd);
+              setEditor(null);
+            }}
             onCancelLogin={() => {
               const tid = loginTerm[drawerAccount.id];
               void window.claudeBuddy.accountCloseLogin(drawerAccount.id, tid);
@@ -1800,6 +2013,9 @@ export default function App() {
                 accountLabel={activeAccount?.label ?? "—"}
                 accountEmail={activeAccount ? status[activeAccount.id]?.email : undefined}
                 proxy={activeAccount?.proxy}
+                exitIp={
+                  (activeAccount && (exitIp[activeAccount.id] ?? activeAccount.lastExitIp)) || null
+                }
                 stats={stats}
                 threshold={state.rhythmThreshold}
                 usage={usage}
@@ -1999,6 +2215,14 @@ export default function App() {
           )}
         </Modal>
       )}
+
+      {/*
+       * 检测确认闸门。挂在最外层、只在需要时自己渲染。
+       *
+       * 它不在某个页面里，是因为检测可能从任何地方发起：环境详情、
+       * 出口列表、引导、启动时的自检。放在根部才能保证"每一个都拦得住"。
+       */}
+      <DetectGate />
 
       {toast && (
         <div className="toast">

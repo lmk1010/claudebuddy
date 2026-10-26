@@ -209,13 +209,23 @@ export default function HealthSection({
         <span className="hs-num">{h.score}</span>
         <span className="hs-meta">
           <b>
-            {h.level === "blocked" ? tr("被风控", "Restricted") : h.level === "risk" ? tr("有风险", "At risk") : tr("就绪", "Ready")}
+            {h.level === "blocked"
+              ? tr("被风控", "Restricted")
+              : h.level === "risk"
+                ? tr("有风险", "At risk")
+                : h.level === "setup"
+                  ? tr("待配置", "Needs setup")
+                  : tr("就绪", "Ready")}
           </b>
           <small>{h.reasons[0] ?? tr("没有发现问题", "Nothing wrong")}</small>
         </span>
       </div>
 
       <div className="hs-rows">
+        {/* 三类：安全（账号/出口/设备码）→ 环境隔离 → 应用与痕迹。
+            之前 10 行完全平铺，「登录」和「整机日志体积」占同样的份量，
+            用户扫不出哪件要管、哪件只是看看。 */}
+        <div className="hs-group">{tr("安全", "Security")}</div>
         {/* 风控跟凭据是两条轴，各占一行 —— 上一版绑在一起，凭据一掉风控就看不见了 */}
         {account.heldAt && (
           <Row
@@ -233,6 +243,7 @@ export default function HealthSection({
             这几项不靠检测，是软件在起进程时写死的：
             只要会话是从这里开的，就一定生效。列出来是为了让人
             能指着屏幕说"我们做了什么"，而不是只有开发者知道。 */}
+        <div className="hs-group">{tr("环境隔离", "Environment isolation")}</div>
         <Row
           state="ok"
           label={tr("配置隔离", "Config")}
@@ -245,6 +256,7 @@ export default function HealthSection({
           value={account.terminal?.term || "xterm-256color"}
           note={`${account.terminal?.lang || "en_US.UTF-8"} · ${account.terminal?.tz || "Asia/Shanghai"}`}
         />
+        <div className="hs-group">{tr("应用与痕迹", "App & traces")}</div>
         <Row
           state="ok"
           label={tr("遥测上报", "Telemetry")}

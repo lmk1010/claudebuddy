@@ -29,6 +29,8 @@ interface Props {
   accountLabel: string;
   accountEmail?: string | null;
   proxy?: ProxyConfig;
+  /** 这个环境实测到的公网出口 IP。null = 还没测过 */
+  exitIp?: string | null;
   stats: RhythmStats | null;
   /** 设置里的节奏阈值（次/分） */
   threshold: number;
@@ -59,6 +61,7 @@ export default function Inspector({
   accountLabel,
   accountEmail,
   proxy,
+  exitIp,
   stats,
   threshold,
   usage,
@@ -188,7 +191,11 @@ export default function Inspector({
           </div>
           <div>
             <span>{tr("出口", "Exit")}</span>
-            <b className="mono">{proxy ? proxyLabel(proxy) : tr("直连", "Direct")}</b>
+            {/* 显示**公网出口 IP**，不是本机端口。
+                http://127.0.0.1:7950 对用户没意义 —— 他要看的是 Claude 看到的那个 IP。 */}
+            <b className="mono" title={proxy ? proxyLabel(proxy) : undefined}>
+              {!proxy ? tr("直连", "Direct") : (exitIp ?? tr("未测", "Not measured"))}
+            </b>
           </div>
           <div>
             <span>{tr("目录", "Folder")}</span>
@@ -246,7 +253,9 @@ export default function Inspector({
           <span>
             <IconGlobe size={11} /> {tr("出口", "Exit")}
           </span>
-          <b className="mono">{proxy ? proxyLabel(proxy) : tr("直连", "Direct")}</b>
+          <b className="mono" title={proxy ? proxyLabel(proxy) : undefined}>
+            {!proxy ? tr("直连", "Direct") : (exitIp ?? tr("未测", "Not measured"))}
+          </b>
         </div>
       </section>
     </aside>

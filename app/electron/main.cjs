@@ -205,7 +205,7 @@ function claudeCommand(command, permission, prompt) {
 function spawnTerm(opts) {
   if (!pty) throw new Error(L("node-pty 不可用", "node-pty is unavailable"));
 
-  const { id, account, cwd, cols, rows, command } = opts;
+  const { id, account, cwd, cols, rows, command, rawCommand } = opts;
 
   /**
    * 已经有一个活着的同 id 终端：不要另起一个。
@@ -231,9 +231,11 @@ function spawnTerm(opts) {
    * -l -i 保证 .zprofile / .zshrc 照常加载（nvm、conda 的 PATH 才在）；
    * claude 退出后 exec 一个普通登录 shell，终端留着继续用。
    */
-  const args = command
-    ? ["-l", "-i", "-c", `${claudeCommand(command, opts.permission, opts.prompt)}; exec ${JSON.stringify(userShell)} -l`]
-    : ["-l"];
+  const args = rawCommand
+    ? ["-l", "-i", "-c", `${rawCommand}; exec ${JSON.stringify(userShell)} -l`]
+    : command
+      ? ["-l", "-i", "-c", `${claudeCommand(command, opts.permission, opts.prompt)}; exec ${JSON.stringify(userShell)} -l`]
+      : ["-l"];
 
   const p = pty.spawn(userShell, args, {
     name: "xterm-256color",
@@ -1176,6 +1178,160 @@ ipcMain.handle("proxy:test", async (_e, proxy) => {
   return { ok: r.ok, ip: r.ip ?? null, reason: r.reason ?? null };
 });
 
+// ─────────────────────────────────────────── 托管出口（自带 mihomo 内核）
+
+const kernelModule = require("./kernel.cjs");
+const subModule = require("./subscription.cjs");
+const instanceModule = require("./instances.cjs");
+
+/**
+ * 内核状态。没装过就返回 ready:false，界面据此显示「下载内核」。
+ *
+ * 内核是这个功能的地基：没有它，「一个环境一个出口」就只能退回
+ * 「让用户自己去改 Clash 配置」——那正是我们要干掉的东西。
+ */
+ipcMain.handle("kernel:status", async () => {
+  try {
+    return await kernelModule.status();
+  } catch (e) {
+    return { ready: false, error: e?.message ?? String(e) };
+  }
+});
+
+/** 下载并安装内核。进度通过 kernel:log 推给界面 */
+ipcMain.handle("kernel:install", async () => {
+  try {
+    let last = -1;
+    const r = await kernelModule.install((got, total) => {
+      const pct = Math.floor((got / total) * 100);
+      if (pct !== last && mainWindow && !mainWindow.isDestroyed()) {
+        last = pct;
+        mainWindow.webContents.send("kernel:log", { pct });
+      }
+    });
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
+/** 订阅列表（含各自节点，节点里不含凭据） */
+ipcMain.handle("sub:list", async () => {
+  try {
+    return { list: await subModule.list() };
+  } catch (e) {
+    return { list: [], reason: e?.message ?? String(e) };
+  }
+});
+
+ipcMain.handle("sub:add", async (_e, { url, label } = {}) => {
+  try {
+    const r = await subModule.add(String(url ?? "").trim(), label);
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
+ipcMain.handle("sub:refresh", async (_e, { id } = {}) => {
+  try {
+    const r = await subModule.refresh(String(id));
+    return { ok: true, ...r };
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
+/**
+ * 导入本地 YAML —— 不一定非得有订阅地址。
+ *
+ * 很多人手里本来就有一份 Clash 配置，逼他去找订阅链接是多余的一步。
+ * 用系统文件框而不是让他手打路径：打错路径是最没意义的失败。
+ */
+ipcMain.handle("sub:importYaml", async () => {
+  try {
+    const r = await dialog.showOpenDialog(mainWindow, {
+      title: L("选择 Clash / mihomo 配置文件", "Choose a Clash / mihomo config"),
+      filters: [
+        { name: L("配置文件", "Config files"), extensions: ["yaml", "yml", "conf", "json", "txt"] },
+        { name: L("全部文件", "All files"), extensions: ["*"] },
+      ],
+      properties: ["openFile"],
+    });
+    if (r.canceled || !r.filePaths?.[0]) return { ok: false, canceled: true };
+    const file = r.filePaths[0];
+    const text = await fsp.readFile(file, "utf8");
+    const label = path.basename(file, path.extname(file));
+    const res = await subModule.importText(text, label);
+    return { ok: true, ...res };
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
+ipcMain.handle("sub:remove", async (_e, { id } = {}) => {
+  try {
+    return await subModule.remove(String(id));
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
+/**
+ * 起一个托管出口。
+ *
+ * 这是我们自己拉起的 mihomo 实例：一个独立的 -d 目录、一个独立端口、
+ * 只绑订阅里的那一个节点。跟用户本机跑着的代理软件互不干涉，
+ * 也不碰系统代理 —— 所以「启动客户端，所有隔离 IP 就位」是真的。
+ */
+ipcMain.handle("exit:start", async (_e, { exitId, subId, node } = {}) => {
+  try {
+    return await instanceModule.start({
+      exitId,
+      subId,
+      node,
+      onLog: (text) => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("exit:log", { exitId, text });
+      },
+    });
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
+ipcMain.handle("exit:stop", async (_e, { exitId } = {}) => {
+  try {
+    return await instanceModule.stop(String(exitId));
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
+/** 正在跑的托管实例 —— 应用启动时用它把上次的实例认回来 */
+ipcMain.handle("exit:instances", async () => instanceModule.list());
+
+/**
+ * 实时连接 —— 「过代理的链接」的证据。
+ *
+ * 数据来自这个实例自己的 mihomo API，不是猜的：目标域名、链路、上下行字节
+ * 都是内核记的账。没有这个，用户只能看着一个 IP 数字猜"到底走没走代理"。
+ */
+ipcMain.handle("exit:connections", async (_e, { exitId } = {}) => {
+  try {
+    return await instanceModule.connections(String(exitId));
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e), list: [], up: 0, down: 0 };
+  }
+});
+
+ipcMain.handle("exit:clear-connections", async (_e, { exitId } = {}) => {
+  try {
+    return await instanceModule.clearConnections(String(exitId));
+  } catch (e) {
+    return { ok: false, reason: e?.message ?? String(e) };
+  }
+});
+
 // ─────────────────────────────────────────── 环境自检
 
 const checkupModule = require("./checkup.cjs");
@@ -1892,14 +2048,35 @@ ipcMain.handle("account:netReport", async (_e, { id }) => {
    */
   if (!ip) {
     const via = a.proxy && a.proxy.protocol !== "none" ? `${a.proxy.host}:${a.proxy.port}` : null;
+    /**
+     * 分清「端口没开」和「端口开着但出不去」。
+     *
+     * 之前两种情况都说"端口没开，或者代理软件没运行"，对托管出口尤其误导：
+     * 实例可能只是还在启动（几百毫秒到两秒），用户看到"端口没开"会以为要自己去配。
+     * 先探一下端口，说话才对得上事实。
+     */
+    const open = via ? await instanceModule.isListening(a.proxy.port) : false;
     return {
       ok: false,
-      reason: via
-        ? L(
-            `这个环境配的线路 ${via} 连不上 —— 端口没开，或者代理软件没运行`,
-            `This environment's route ${via} is unreachable — the port is closed or the proxy app is not running`,
-          )
-        : L("直连也连不上外网，先检查本机网络", "Even a direct connection failed. Check this Mac's network first"),
+      /**
+       * starting 让界面能把"还在起"和"真的不通"分开说。
+       *
+       * 托管实例是异步拉起来的，应用刚开那两秒端口确实还没监听 ——
+       * 那不是故障，是正常过程。把它显示成红色的「出口不通」，
+       * 用户会去排查一个根本不存在的问题。
+       */
+      starting: Boolean(via) && !open,
+      reason: !via
+        ? L("直连也连不上外网，先检查本机网络", "Even a direct connection failed. Check this Mac's network first")
+        : open
+          ? L(
+              `线路 ${via} 在监听，但流量出不去 —— 节点可能已失效，换一个节点试试`,
+              `${via} is listening but traffic cannot get out — the node may be dead. Try another node.`,
+            )
+          : L(
+              `线路 ${via} 还没开始监听 —— 实例正在启动，或者它已经退出了`,
+              `${via} is not listening yet — the instance is still starting, or it has exited`,
+            ),
     };
   }
 
@@ -2457,5 +2634,17 @@ app.on("window-all-closed", () => {
   // 终端宿主：最后一个窗口关掉就该退出，macOS 也这样 ——
   // 留着后台进程跑 PTY 不是这个应用该有的行为
   for (const id of [...terms.keys()]) killTerm(id);
+  // 托管出口：mihomo 是我们拉起的子进程，不主动收会变成孤儿一直占着端口
+  instanceModule.stopAll();
   app.quit();
+});
+
+/**
+ * 退出前再兜一次底。
+ *
+ * window-all-closed 在 macOS 的某些退出路径（Cmd+Q / 菜单退出）不会触发，
+ * 只在那儿清会漏掉实例。before-quit 是最后一道。
+ */
+app.on("before-quit", () => {
+  instanceModule.stopAll();
 });

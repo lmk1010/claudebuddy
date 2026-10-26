@@ -24,6 +24,8 @@ export interface SpawnOpts {
   cols: number;
   rows: number;
   command?: string;
+  /** 不经 claude，直接跑一条 shell 命令，跑完落到普通 shell */
+  rawCommand?: string;
   /** 启动 claude 时的权限模式；主进程只认白名单 */
   permission?: string;
   /** 第一句话，作为 claude 的启动参数（主进程负责转义） */
@@ -405,6 +407,10 @@ export interface NetTest {
 export interface NetReport {
   ok: boolean;
   reason?: string;
+  /** 端口还没开始监听（托管实例正在起）—— 不是故障，不要报成「不通」 */
+  starting?: boolean;
+  /** 用户取消了这次检测。不是错误，也不代表线路有问题 */
+  blocked?: boolean;
   ip?: string;
   at?: number;
   info?: IpInfo | null;
@@ -479,6 +485,83 @@ export interface ProxyNodesResult {
   info: ProxyNodeInfo | null;
   summary: string;
   error?: string;
+}
+
+/** mihomo 内核的状态。没装过就 ready:false，界面显示「下载内核」 */
+export interface KernelStatus {
+  ready: boolean;
+  path: string;
+  version: string | null;
+  /** 本机该下的资源名，例如 mihomo-darwin-arm64-v1.19.33.gz */
+  asset: string;
+  url?: string;
+  error?: string;
+}
+
+/** 订阅元数据。**地址算敏感信息**，只在主进程留存，这里只给标签和统计 */
+export interface SubscriptionMeta {
+  id: string;
+  label: string;
+  /** 订阅地址的主机名。完整地址带 token，不出主进程 */
+  host?: string;
+  /** sub = 从订阅地址拉的；file = 导入的本地 YAML（不能刷新，要重新导入） */
+  source?: "sub" | "file";
+  addedAt: number;
+  updatedAt: number;
+  count: number;
+}
+
+/** 订阅 + 它解析出来的节点（节点不含凭据） */
+export interface Subscription extends SubscriptionMeta {
+  nodes: ProxyNode[];
+}
+
+/** 一个跑起来的托管实例 */
+export interface ManagedExit {
+  exitId: string;
+  port: number;
+  pid: number;
+  node: string;
+  subId: string;
+}
+
+export interface ManagedExitResult {
+  ok: boolean;
+  exitId?: string;
+  port?: number;
+  pid?: number;
+  host?: string;
+  node?: string;
+  reason?: string;
+}
+
+/** 一条经过代理的连接。字段都是 mihomo 内核自己记的账，不是猜的 */
+export interface ExitConnection {
+  id: string;
+  /** 目标域名；拿不到域名时是 IP */
+  host: string;
+  type: string;
+  network: string;
+  destIp: string;
+  destPort: string;
+  source: string;
+  /** 走的节点链，例如 ["HY2-VPS-443-稳健"] */
+  chains: string[];
+  rule: string;
+  rulePayload: string;
+  up: number;
+  down: number;
+  start: string;
+}
+
+export interface ExitConnections {
+  ok: boolean;
+  reason?: string;
+  list: ExitConnection[];
+  /** 实例启动以来的累计字节 */
+  up: number;
+  down: number;
+  count?: number;
 }
 
 /** 一个出口的核验结果 */
@@ -626,10 +709,32 @@ export interface ClaudeBuddyBridge {
   /** 读最近的风险记录，新的在前 */
   auditList(limit?: number): Promise<RiskLogEntry[]>;
   proxyTest(proxy: {
-    host: string;
-    port: number;
-    protocol: "http" | "socks5";
-  }): Promise<{ ok: boolean; ip: string | null; reason: string | null }>;
+      host: string;
+      port: number;
+      protocol: "http" | "socks5";
+    }): Promise<{ ok: boolean; ip: string | null; reason: string | null }>;
+
+    /* 托管出口：我们自己拉起的 mihomo 实例，一个环境一个出口 */
+    /** 内核是否就绪；未就绪时给下载地址与目标文件名 */
+    kernelStatus(): Promise<KernelStatus>;
+    /** 下载并安装内核（几十 MB，首次较慢） */
+    kernelInstall(): Promise<{ ok: boolean; path?: string; version?: string; reason?: string }>;
+    onKernelLog(cb: (p: { pct: number }) => void): () => void;
+    subList(): Promise<{ list: Subscription[]; reason?: string }>;
+    subAdd(p: { url: string; label?: string }): Promise<{ ok: boolean; sub?: SubscriptionMeta; nodes?: ProxyNode[]; reason?: string }>;
+    /** 导入本地 Clash / mihomo 的 YAML 文件（开系统文件框） */
+    subImportYaml(): Promise<{ ok: boolean; canceled?: boolean; sub?: SubscriptionMeta; nodes?: ProxyNode[]; reason?: string }>;
+    subRefresh(p: { id: string }): Promise<{ ok: boolean; sub?: SubscriptionMeta; nodes?: ProxyNode[]; reason?: string }>;
+    subRemove(p: { id: string }): Promise<{ ok: boolean; reason?: string }>;
+    /** 起一个托管出口：一个独立 mihomo 实例 + 独立端口，只绑这个节点 */
+    exitStart(p: { exitId: string; subId: string; node: string }): Promise<ManagedExitResult>;
+    exitStop(p: { exitId: string }): Promise<{ ok: boolean; reason?: string }>;
+    /** 正在跑的托管实例 */
+    exitInstances(): Promise<ManagedExit[]>;
+    /** 这个出口的实时连接 + 累计流量（来自实例自己的 mihomo API） */
+    exitConnections(p: { exitId: string }): Promise<ExitConnections>;
+    exitClearConnections(p: { exitId: string }): Promise<{ ok: boolean; reason?: string }>;
+    onExitLog(cb: (p: { exitId: string; text: string }) => void): () => void;
   /** browser：登录用哪个浏览器（browsersList 里的 id），不给就用系统默认 */
   accountLogin(id: string, browser?: string): Promise<LoginHandle>;
   /** 本机能用来登录的浏览器、用户资料、隐私窗口 */

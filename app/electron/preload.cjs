@@ -47,6 +47,31 @@ contextBridge.exposeInMainWorld("claudeBuddy", {
   auditList: (limit) => ipcRenderer.invoke("audit:list", { limit }),
   proxyTest: (proxy) => ipcRenderer.invoke("proxy:test", proxy),
 
+    /* ── 托管出口（自带 mihomo 内核）── */
+    kernelStatus: () => ipcRenderer.invoke("kernel:status"),
+    kernelInstall: () => ipcRenderer.invoke("kernel:install"),
+    onKernelLog: (cb) => {
+      const h = (_e, p) => cb(p);
+      ipcRenderer.on("kernel:log", h);
+      return () => ipcRenderer.off("kernel:log", h);
+    },
+    subList: () => ipcRenderer.invoke("sub:list"),
+    subAdd: (p) => ipcRenderer.invoke("sub:add", p),
+      /** 导入本地 YAML：开系统文件框，不用用户手打路径 */
+      subImportYaml: () => ipcRenderer.invoke("sub:importYaml"),
+    subRefresh: (p) => ipcRenderer.invoke("sub:refresh", p),
+    subRemove: (p) => ipcRenderer.invoke("sub:remove", p),
+    exitStart: (p) => ipcRenderer.invoke("exit:start", p),
+    exitStop: (p) => ipcRenderer.invoke("exit:stop", p),
+    exitInstances: () => ipcRenderer.invoke("exit:instances"),
+      exitConnections: (p) => ipcRenderer.invoke("exit:connections", p),
+      exitClearConnections: (p) => ipcRenderer.invoke("exit:clear-connections", p),
+    onExitLog: (cb) => {
+      const h = (_e, p) => cb(p);
+      ipcRenderer.on("exit:log", h);
+      return () => ipcRenderer.off("exit:log", h);
+    },
+
   /* ── 环境自检 ── */
   checkupRun: () => ipcRenderer.invoke("checkup:run"),
   checkupInstall: () => ipcRenderer.invoke("checkup:install"),

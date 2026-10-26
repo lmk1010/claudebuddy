@@ -9,10 +9,12 @@ import {
   IconTrash,
   IconFile,
   IconRefresh,
+  IconGlobe,
 } from "./iconAliases";
 import Help from "./Help";
 import About from "./About";
 import UpdatePage from "./UpdatePage";
+import SettingsNetwork from "./SettingsNetwork";
 import { systemLang, tr } from "../lib/i18n";
 
 interface Props {
@@ -22,7 +24,7 @@ interface Props {
   cat: SettingsCat;
 }
 
-export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "clean" | "guide" | "update" | "about";
+export type SettingsCat = "general" | "appearance" | "terminal" | "keys" | "network" | "clean" | "guide" | "update" | "about";
 
 export type CatItem = { id: SettingsCat; label: string; icon: typeof IconSettings };
 
@@ -43,6 +45,12 @@ export const SETTINGS_GROUPS: { title: string; items: CatItem[] }[] = [
       { id: "appearance", get label() { return tr("外观", "Appearance"); }, icon: IconSun },
       { id: "terminal", get label() { return tr("终端", "Terminal"); }, icon: IconTerminal },
       { id: "keys", get label() { return tr("快捷键", "Shortcuts"); }, icon: IconGrid },
+    ],
+  },
+  {
+    get title() { return tr("网络", "Network"); },
+    items: [
+      { id: "network", get label() { return tr("节点来源", "Node sources"); }, icon: IconGlobe },
     ],
   },
   {
@@ -116,6 +124,8 @@ export default function Settings({ state, update, cat }: Props) {
               </Row>
             </>
           )}
+
+          {cat === "network" && <SettingsNetwork state={state} update={update} />}
 
           {cat === "appearance" && (
             <>

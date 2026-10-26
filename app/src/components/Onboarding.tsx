@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import type { Account, AccountStatusSnapshot } from "../lib/model";
+import type { Account, AccountStatusSnapshot, Exit, ProxyMode } from "../lib/model";
+import { PROXY_MODES } from "../lib/model";
 import type { CheckupResult, ProxyCandidate, ScannedDir } from "../lib/bridge";
 import LoginConsole from "./LoginConsole";
 import LoginButton from "./LoginButton";
 import Art from "./Art";
 import IpBadge from "./IpBadge";
-import { IconCopy, IconRefresh } from "./iconAliases";
+import ExitSubscribe from "./ExitSubscribe";
+import { IconCheck, IconCopy, IconRefresh } from "./iconAliases";
 import { tr } from "../lib/i18n";
 
 /**
@@ -70,6 +72,8 @@ interface Props {
   onScanProxy: () => void;
   onSetProxy: (id: string, proxy: Account["proxy"]) => void;
   onCheckExit: (id: string) => void;
+  /** 在引导里直接建一个托管出口（App 托管那条路） */
+  onCreateExit: (exit: Omit<Exit, "id"> & { id?: string }) => void;
   onFinish: () => void;
   /** 有值时显示「返回应用」—— 重新进引导的老用户用 */
   onExit?: () => void;
@@ -84,6 +88,17 @@ export default function Onboarding(p: Props) {
   const [openScan, setOpenScan] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [manual, setManual] = useState({ host: "", port: "" });
+  /**
+   * 第 3 步先选"走哪条路"，再给那一条路上的内容。
+   *
+   * 之前这一步上来就是"探测到的代理 + 直连"，等于默认替用户选了
+   * 「用你自己的代理」—— 而多数人第一次用的时候并没有配好代理。
+   * 现在三种方式平权摆出来，默认落在直连（一定可用）。
+   */
+  const [obMode, setObMode] = useState<ProxyMode>("direct");
+  const [subPick, setSubPick] = useState<{ subId: string; node: string; label: string } | null>(null);
+  const [obErr, setObErr] = useState<string | null>(null);
+  const [obStarting, setObStarting] = useState(false);
 
   const st = p.activeAccount ? p.status[p.activeAccount.id] : undefined;
   const loggedIn = st?.auth === "signedIn";
@@ -91,6 +106,38 @@ export default function Onboarding(p: Props) {
   const hasProxy = Boolean(px && px.protocol !== "none");
   const ip = p.activeAccount ? p.exitIp[p.activeAccount.id] : null;
   const blocked = !p.checkup?.ok;
+
+  /**
+   * 在引导里建一个托管出口。
+   *
+   * 和新建出口弹窗里是同一套顺序：先起实例拿到真端口，再记进环境。
+   * 引导里也必须这样做 —— 否则用户"完成引导"之后拿到的是一个指向
+   * 不存在端口的出口，第一次开会话就失败。
+   */
+  const createManagedInOb = async () => {
+    const acc = p.activeAccount;
+    if (!subPick || !acc) return;
+    setObStarting(true);
+    setObErr(null);
+    const exitId = `x-${Date.now().toString(36)}`;
+    try {
+      const r = await window.claudeBuddy.exitStart({ exitId, subId: subPick.subId, node: subPick.node });
+      if (!r.ok || !r.port) {
+        setObErr(r.reason ?? tr("实例启动失败", "Failed to start the instance"));
+        return;
+      }
+      p.onCreateExit({
+        id: exitId,
+        label: subPick.label,
+        node: subPick.node,
+        proxy: { protocol: "http", host: r.host ?? "127.0.0.1", port: r.port, noProxy: "localhost,127.0.0.1,::1" },
+        managed: { subId: subPick.subId, node: subPick.node },
+      });
+      setSubPick(null);
+    } finally {
+      setObStarting(false);
+    }
+  };
 
   // 装好之后自动回到检查屏
   useEffect(() => {
@@ -384,12 +431,55 @@ export default function Onboarding(p: Props) {
           <>
             <p>
               {tr(
-                "已经自动找过本机代理了。选一个用，或者保持直连。",
-                "Local proxies have been detected. Pick one, or stay on a direct connection.",
+                "这个环境走哪条路出去？三种方式都能用，之后在环境设置里随时能换。",
+                "How should this environment go out? All three work, and you can switch later in the environment settings.",
               )}
             </p>
 
-            {p.scanningProxy && !p.proxyCandidates ? (
+            {/* 三种方式 —— 和「网络出口」页上的是同一套概念、同一套配色 */}
+            <div className="pm-cards ob-modes">
+              {PROXY_MODES.map((m) => {
+                const on = obMode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    className={`pm-card${on ? " on" : ""}`}
+                    onClick={() => setObMode(m.id)}
+                    data-mode={m.id}
+                  >
+                    <span className="pm-t">
+                      <b>{tr(m.zh, m.en)}</b>
+                      {m.id === "managed" && <em>{tr("推荐", "Recommended")}</em>}
+                      {on && (
+                        <span className="pm-on">
+                          <IconCheck size={11} />
+                        </span>
+                      )}
+                    </span>
+                    <small>{tr(m.dzh, m.den)}</small>
+                  </button>
+                );
+              })}
+            </div>
+
+            {obMode === "managed" && (
+              <div className="ob-flow">
+                <ExitSubscribe selected={subPick} onPick={setSubPick} />
+                {obErr && <div className="xp-err">{obErr}</div>}
+                <button
+                  className="btn pri ob-go"
+                  disabled={!subPick || obStarting}
+                  onClick={() => void createManagedInOb()}
+                >
+                  <IconCheck size={11} />
+                  {obStarting ? tr("启动中…", "Starting…") : tr("创建这个出口", "Create this exit")}
+                </button>
+              </div>
+            )}
+
+            {obMode === "own" && (
+              <>
+                {p.scanningProxy && !p.proxyCandidates ? (
               <div className="ob-wait" style={{ marginTop: 8 }}>
                 <span className="spinner" />
                 {tr("正在检测本机代理…", "Detecting local proxies…")}
@@ -510,6 +600,17 @@ export default function Onboarding(p: Props) {
                     "Not sure about the port? Check “HTTP proxy port” in your proxy app's settings.",
                   )}
                 </div>
+              </div>
+            )}
+              </>
+            )}
+
+            {obMode === "direct" && (
+              <div className="ob-note">
+                {tr(
+                  "就用这台电脑当前的网络，不经过任何代理。之后想换，在环境设置里随时能改。",
+                  "Use this Mac's own network, no proxy. You can change this anytime in the environment settings.",
+                )}
               </div>
             )}
 

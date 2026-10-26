@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Account, AccountStatusSnapshot } from "../lib/model";
 import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem, DesktopProbe, LeakReport } from "../lib/bridge";
-import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, relTime, tierLabel, type Exit, type SimilarityReport } from "../lib/model";
+import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, proxyModeOf, relTime, tierLabel, type Exit, type ProxyMode, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
 import HealthSection from "./EnvHealth";
 import ExitList from "./ExitList";
+import ExitPicker from "./ExitPicker";
+import ProxyModeCard from "./ProxyModeCard";
 import BrowserSection from "./EnvBrowser";
 import Art from "./Art";
 import Modal from "./Modal";
@@ -19,6 +21,7 @@ import {
   IconClock,
   IconClose,
   IconCopy,
+  IconChevronDown,
   IconDots,
   IconFile,
   IconGear,
@@ -173,7 +176,7 @@ export default function Accounts(p: Props) {
                 const h = healthOf(a, s, undefined, p.accounts);
                 return (
                   <span
-                    className={`pill ${h.level === "blocked" ? "p-bad" : h.level === "risk" ? "p-warn" : "p-ok"}`}
+                    className={`pill ${h.level === "risk" || h.level === "blocked" ? "p-bad" : "p-ok"}`}
                     title={h.reasons.length ? h.reasons.join("；") : tr("一切就绪", "All good")}
                   >
                     {h.score} · {a.heldAt ? AUTH_LABEL.suspended : AUTH_LABEL[auth]}
@@ -374,9 +377,25 @@ export type EnvSection = "health" | "general" | "network" | "browser" | "fingerp
  * 再往下才是具体怎么调。
  * 之前七项（身份、画像、痕迹、删除各占一格）太碎，同一件事要在两三个菜单里找。
  */
-const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof IconGear }[] = [
+/** 抽屉导航的三个层面。安全 → 环境 → 应用，从“出事代价最大”排到最小 */
+type EnvGroup = "security" | "env" | "app";
+
+const ENV_GROUPS: { id: EnvGroup; zh: string; en: string }[] = [
+  { id: "security", zh: "安全", en: "Security" },
+  { id: "env", zh: "环境", en: "Environment" },
+  { id: "app", zh: "应用", en: "App" },
+];
+
+/**
+ * 环境抽屉的导航。
+ *
+ * 分成三组而不是七项平铺：用户要先知道哪个是大的、哪个是小的。
+ * 之前「健康评分」和「清理」在列表里看起来一样重，扫读时没有落点。
+ */
+const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof IconGear; group: EnvGroup }[] = [
   {
     id: "health",
+    group: "security",
     get label() {
       return tr("健康评分", "Health score");
     },
@@ -386,17 +405,8 @@ const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof Icon
     icon: IconWarning,
   },
   {
-    id: "general",
-    get label() {
-      return tr("通用", "General");
-    },
-    get desc() {
-      return tr("名字、标识色和登录", "Name, color and sign-in");
-    },
-    icon: IconGear,
-  },
-  {
     id: "network",
+    group: "security",
     get label() {
       return tr("网络出口", "Network exit");
     },
@@ -409,17 +419,8 @@ const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof Icon
     icon: IconGlobe,
   },
   {
-    id: "browser",
-    get label() {
-      return tr("浏览器授权", "Browser for auth");
-    },
-    get desc() {
-      return tr("这个环境用哪个浏览器授权，记住它", "Which browser this environment authorizes with");
-    },
-    icon: IconKey,
-  },
-  {
     id: "fingerprint",
+    group: "security",
     get label() {
       return tr("设备指纹", "Device fingerprint");
     },
@@ -432,7 +433,30 @@ const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof Icon
     icon: IconShield,
   },
   {
+    id: "general",
+    group: "env",
+    get label() {
+      return tr("通用", "General");
+    },
+    get desc() {
+      return tr("名字、标识色和登录", "Name, color and sign-in");
+    },
+    icon: IconGear,
+  },
+  {
+    id: "browser",
+    group: "env",
+    get label() {
+      return tr("浏览器授权", "Browser for auth");
+    },
+    get desc() {
+      return tr("这个环境用哪个浏览器授权，记住它", "Which browser this environment authorizes with");
+    },
+    icon: IconKey,
+  },
+  {
     id: "sessions",
+    group: "env",
     get label() {
       return tr("历史会话", "Session history");
     },
@@ -443,6 +467,7 @@ const SECTIONS: { id: EnvSection; label: string; desc: string; icon: typeof Icon
   },
   {
     id: "clean",
+    group: "app",
     get label() {
       return tr("清理", "Clean up");
     },
@@ -499,6 +524,9 @@ export function EnvModal({
   onRenameExit,
   onDeleteExit,
   onMeasureExit,
+  onRepairExit,
+  onSwapNode,
+  onOpenShell,
 }: {
   account: Account;
   status: AccountStatusSnapshot | undefined;
@@ -538,12 +566,18 @@ export function EnvModal({
   exits: Exit[];
   /** 把这个环境切到某个出口；undefined = 直连 */
   onUseExit: (exitId: string | undefined) => void;
-  onCreateExit: (exit: Omit<Exit, "id">) => void;
+  onCreateExit: (exit: Omit<Exit, "id"> & { id?: string }) => void;
   onRenameExit: (id: string, label: string) => void;
   onDeleteExit: (id: string) => void;
   /** 实测到出口的真实 IP 后写回 */
   onMeasureExit: (id: string, ip: string | null) => void;
-}) {
+    /** 托管实例重启后端口变了，回写出口和用它的环境 */
+    onRepairExit: (id: string, port: number, host: string) => void;
+    /** 托管出口换了节点 —— 把 subId/node 写回出口本身 */
+    onSwapNode: (id: string, subId: string, node: string) => void;
+    /** 开一个空白终端（不经 claude）自己测网络 */
+    onOpenShell: () => void;
+  }) {
   // 同上：没测过就是未知，不是未登录
   const auth = status?.auth ?? "unknown";
   const [sec, setSec] = useState<EnvSection>(initialSection);
@@ -559,9 +593,45 @@ export function EnvModal({
   // 左侧选中底色：量出当前项的位置，滑过去而不是跳过去
   const navRef = useRef<HTMLDivElement>(null);
   const [ind, setInd] = useState<{ top: number; height: number } | null>(null);
+  /**
+   * 指示条的位置要按**相对导航容器**算，不能用 el.offsetTop。
+   *
+   * offsetTop 是相对「最近的定位祖先」的，而 .em-nav 自身没有 padding 时两者恰好相等；
+   * 一旦容器有了 padding（或中间插了分组标题这类非定位元素），两个基准就错开，
+   * 指示条会整块偏上几像素 —— 看着像“选中框没框住”。
+   * 用两个 getBoundingClientRect 相减，基准就只有一个：视口。
+   */
   useLayoutEffect(() => {
-    const el = navRef.current?.querySelector<HTMLElement>(`[data-sec="${sec}"]`);
-    if (el) setInd({ top: el.offsetTop, height: el.offsetHeight });
+    const nav = navRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const el = nav.querySelector<HTMLElement>(`[data-sec="${sec}"]`);
+      if (!el) return;
+      /**
+       * 用 offsetTop，不用 getBoundingClientRect 相减。
+       *
+       * 指示条是 `position: absolute`，它的原点就是导航容器的 padding box；
+       * offsetTop 也是相对同一个定位祖先算的 —— 两个口径一致，直接相等。
+       *
+       * 而 rect 相减量的是**视觉位置**，会把分组标题的 margin-top、外边距塌陷
+       * 一起算进那个差值里。分组标题一旦有 margin，两者就差出 10px、20px，
+       * 指示条整块冲到相邻项上 —— 这正是「选中的项和底框对不上」的成因。
+       */
+      setInd({ top: el.offsetTop, height: el.offsetHeight });
+    };
+    measure();
+    /**
+     * 布局一变就要重算：字体加载完、窗口缩放、分组标题出现都会让按钮挪位置，
+     * 而指示条还停在旧坐标上。它不报错，只是看着别扭，所以更容易漏。
+     */
+    const ro = new ResizeObserver(measure);
+    ro.observe(nav);
+    for (const child of nav.children) ro.observe(child);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, [sec]);
 
   // 进到需要数据的分类时自动去读，不让用户再点一次「加载」
@@ -590,18 +660,25 @@ export function EnvModal({
 
             <div className="em-nav" ref={navRef}>
               {ind && <i className="em-ind" style={{ transform: `translateY(${ind.top}px)`, height: ind.height }} />}
-              {SECTIONS.map((s) => (
-                <button
-                  key={s.id}
-                  data-sec={s.id}
-                  className={sec === s.id ? "on" : ""}
-                  onClick={() => go(s.id)}
-                >
-                  <s.icon size={15} />
-                  <span>{s.label}</span>
-                  {s.id === "general" && auth === "signedOut" && <em className="em-badge" title={tr("还没登录", "Not signed in yet")} />}
-                </button>
-              ))}
+              {SECTIONS.map((s, i) => {
+                // 组标题：只在进入新的一组时画一次
+                const newGroup = i === 0 || SECTIONS[i - 1].group !== s.group;
+                const g = ENV_GROUPS.find((x) => x.id === s.group)!;
+                return (
+                  <Fragment key={s.id}>
+                    {newGroup && <div className="em-nav-g">{tr(g.zh, g.en)}</div>}
+                    <button
+                      data-sec={s.id}
+                      className={sec === s.id ? "on" : ""}
+                      onClick={() => go(s.id)}
+                    >
+                      <s.icon size={15} />
+                      <span>{s.label}</span>
+                      {s.id === "general" && auth === "signedOut" && <em className="em-badge" title={tr("还没登录", "Not signed in yet")} />}
+                    </button>
+                  </Fragment>
+                );
+              })}
             </div>
 
             <div className="em-foot">
@@ -610,15 +687,15 @@ export function EnvModal({
                 const h = healthOf(account, status, undefined, [account]);
                 return (
                   <span
-                    className={`pill ${h.level === "blocked" ? "p-bad" : h.level === "risk" ? "p-warn" : "p-ok"}`}
-                    title={h.reasons.length ? h.reasons.join("；") : tr("一切就绪", "All good")}
-                  >
-                    {h.score} · {account.heldAt ? AUTH_LABEL.suspended : AUTH_LABEL[auth]}
-                  </span>
-                );
-              })()}
-            </div>
-          </aside>
+                    className={`pill ${h.level === "risk" || h.level === "blocked" ? "p-bad" : "p-ok"}`}
+                                        title={h.reasons.length ? h.reasons.join("；") : tr("一切就绪", "All good")}
+                                      >
+                                        {h.score} · {account.heldAt ? AUTH_LABEL.suspended : AUTH_LABEL[auth]}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                              </aside>
 
           <section className="em-main">
             <div className="em-head">
@@ -683,6 +760,9 @@ export function EnvModal({
                   onRenameExit={onRenameExit}
                   onDeleteExit={onDeleteExit}
                   onMeasureExit={onMeasureExit}
+                  onRepairExit={onRepairExit}
+                  onSwapNode={onSwapNode}
+                  onOpenShell={onOpenShell}
                   onPatch={onPatch}
                   onIp={(ip) => {
                     onPatch({ lastExitIp: ip, lastExitCheckedAt: Date.now() });
@@ -964,7 +1044,15 @@ function GeneralSection({
       done: netDone,
       title: tr("配网络出口", "Set up network exit"),
       desc: netDone
-        ? `${proxyLabel(account.proxy)}${ipKnown ? tr(` · 出口 ${exitIp ?? account.lastExitIp}`, ` · Exit ${exitIp ?? account.lastExitIp}`) : ""}`
+        ? ipKnown
+          ? tr(
+              `出口 ${exitIp ?? account.lastExitIp} · 本机 ${proxyLabel(account.proxy)}`,
+              `Exit ${exitIp ?? account.lastExitIp} · local ${proxyLabel(account.proxy)}`,
+            )
+          : tr(
+              `${proxyLabel(account.proxy)} · 还没测到出口 IP`,
+              `${proxyLabel(account.proxy)} · exit IP not measured yet`,
+            )
         : tr(
             "多个号最好各走各的线路。用梯子的话点进去「自动探测」，不用梯子选「直连」",
             "With multiple accounts, give each its own route. If you use a proxy, open it and click “Auto-detect”. Otherwise choose “Direct”",
@@ -1147,6 +1235,9 @@ function NetworkSection({
   onRenameExit,
   onDeleteExit,
   onMeasureExit,
+  onRepairExit,
+  onSwapNode,
+  onOpenShell,
   onPatch,
   onIp,
   onAlign,
@@ -1158,17 +1249,60 @@ function NetworkSection({
   exits: Exit[];
   /** 把这个环境切到某个出口；undefined = 直连 */
   onUseExit: (exitId: string | undefined) => void;
-  onCreateExit: (exit: Omit<Exit, "id">) => void;
+  onCreateExit: (exit: Omit<Exit, "id"> & { id?: string }) => void;
   onRenameExit: (id: string, label: string) => void;
   onDeleteExit: (id: string) => void;
   /** 实测到出口的真实 IP 后写回 */
   onMeasureExit: (id: string, ip: string | null) => void;
+  /** 托管实例重启后端口变了，回写出口和用它的环境 */
+  onRepairExit: (id: string, port: number, host: string) => void;
+  /** 托管出口换了节点 */
+  onSwapNode: (id: string, subId: string, node: string) => void;
+  /** 开一个空白终端自己测网络 */
+  onOpenShell: () => void;
   onPatch: (patch: Partial<Account>) => void;
   onIp: (ip: string) => void;
   onAlign: (t: { tz?: string; lang?: string }) => void;
 }) {
   const p = account.proxy;
   const [guide, setGuide] = useState(false);
+  /**
+   * 点了「还没有出口的那种方式」时要弹新建。
+   * 单独一个 state 而不是复用 ExitList 的 picking：两者打开的时机不同，
+   * 一个是从「代理方式」卡进来（已经定了走哪条路），一个是从出口列表进来。
+   */
+  const [pickingMode, setPickingMode] = useState<ProxyMode | null>(null);
+  /**
+   * 体检默认收起。
+   *
+   * 它是"看"的东西，不是"操作"的东西 —— 展开时那张卡有分数块、三栏指标、
+   * 数据来源，一大块。放在首屏会把"选出口"挤到折叠以下，每次都要滑。
+   * 收成一行标题，想知道再点开。
+   */
+  const [showCheck, setShowCheck] = useState(false);
+
+  /** 这个环境现在走哪种方式 —— 页面最上面要说的就是这件事 */
+  const mode = proxyModeOf(account, exits);
+
+  /**
+   * 切换代理方式。
+   *
+   * 切到某条路时，如果那条路上已经有出口就直接切过去 —— 用户点「App 托管」
+   * 的意思通常是“用我托管的那条线路”，而不是“给我再建一个”。
+   * 没有才弹新建：这时候建是唯一能做的事。
+   */
+  const pickMode = (m: ProxyMode) => {
+    if (m === "direct") {
+      onUseExit(undefined);
+      return;
+    }
+    const pool = exits.filter((e) => (m === "managed" ? Boolean(e.managed) : !e.managed));
+    if (pool.length > 0) {
+      onUseExit(pool[0].id);
+      return;
+    }
+    setPickingMode(m);
+  };
 
   /**
    * 有几组环境共用同一个出口。
@@ -1184,12 +1318,47 @@ function NetworkSection({
   })();
   return (
     <>
+      {/* 第一件事：这个环境走哪条线，以及**换一个出口**。
+          方式压成一行，出口列表紧随其后 —— 上面一行、下面就是可点的出口，
+          不用再滚到底才能选。体检是参考，沉到后面。 */}
+      <ProxyModeCard mode={mode} onPick={pickMode} exits={exits} />
+
+      {/**
+       * 出口列表 —— 这台机器有几个出口、各自什么 IP、谁在用、能不能换。
+       *
+       * 提到体检前面：它是这一页唯一要"操作"的东西，其余都是看。
+       */}
+      <ExitList
+        exits={exits}
+        accounts={peers}
+        currentExitId={account.exitId}
+        onUse={onUseExit}
+        onCreate={onCreateExit}
+        onRename={onRenameExit}
+        onDelete={onDeleteExit}
+        onMeasure={onMeasureExit}
+        onRepaired={onRepairExit}
+        onSwapNode={onSwapNode}
+        onOpenShell={onOpenShell}
+      />
+
+      {/* 体检：默认收起。首屏只留"方式 + 出口列表"两件要动的事 */}
       <div className="em-sub">
-        <span>{tr("出口体检", "Exit check")}</span>
+        <button className="em-sub-t" onClick={() => setShowCheck((v) => !v)}>
+          <span>{tr("出口体检", "Exit check")}</span>
+          <small>
+            {account.lastExitIp
+              ? tr(`本机看到 ${account.lastExitIp}`, `This Mac sees ${account.lastExitIp}`)
+              : tr("还没测过", "Not measured yet")}
+          </small>
+          <IconChevronDown size={13} className={`em-sub-c${showCheck ? " rot" : ""}`} />
+        </button>
         <button className="det-k" onClick={() => setGuide(true)}>
           {tr("指导", "Guide")}
         </button>
       </div>
+      {showCheck && (
+        <>
       <NetReportCard
         accountId={account.id}
         proxyKey={proxyLabel(p)}
@@ -1245,6 +1414,8 @@ function NetworkSection({
           })}
         </div>
       )}
+        </>
+      )}
 
       <div className="em-card">
         <Row
@@ -1273,26 +1444,21 @@ function NetworkSection({
         </Row>
       </div>
 
-      {/**
-       * 出口列表 —— 这台机器有几个出口、各自什么 IP、谁在用、能不能换。
-       *
-       * 上一版把「出口方式」和「节点清单」平铺成两张卡，结果是：
-       * 十几个节点堆在设置页里读不完，而真正要回答的"我有几个出口"
-       * 反而看不出来；更要紧的是发现两个环境共用 IP 之后没地方换。
-       * 现在列表在前、选节点放进「新建出口」弹窗。
-       */}
-      <ExitList
-        exits={exits}
-        accounts={peers}
-        currentExitId={account.exitId}
-        onUse={onUseExit}
-        onCreate={onCreateExit}
-        onRename={onRenameExit}
-        onDelete={onDeleteExit}
-        onMeasure={onMeasureExit}
-      />
+              {/* 从「代理方式」卡进来的新建：已经定了走哪条路，弹窗直接落在那条路上 */}
+              {pickingMode && (
+                <ExitPicker
+                  onClose={() => setPickingMode(null)}
+                  initialWho={pickingMode === "managed" ? "managed" : "local"}
+                  onCreate={(exit) => {
+                    onCreateExit(exit);
+                    setPickingMode(null);
+                  }}
+                />
+              )}
 
-      {guide && <ExitGuide onClose={() => setGuide(false)} />}
+              {/* 指导按当前方式给不同内容 —— 托管已经自己起实例开端口了，
+                  再教用户去改 listeners 配置就是误导 */}
+              {guide && <ExitGuide onClose={() => setGuide(false)} mode={mode} />}
     </>
   );
 }

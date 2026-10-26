@@ -5,6 +5,7 @@ import { useContextMenu } from "./ContextMenu";
 import Help from "./Help";
 import { IconRefresh, IconWarning } from "./iconAliases";
 import { tr } from "../lib/i18n";
+import { askDetect } from "../lib/detect";
 
 /** 同一个环境、同一条线路，5 分钟内切回来不重测 */
 const cache = new Map<string, { key: string; at: number; r: NetReport }>();
@@ -13,6 +14,19 @@ const cache = new Map<string, { key: string; at: number; r: NetReport }>();
 export function resetNetReports() {
   cache.clear();
 }
+
+/**
+ * 丢掉一个环境的体检缓存，下次渲染就重测。
+ *
+ * 托管出口的实例是**异步起来**的：应用刚启动那几秒，实例还没监听端口，
+ * 这时候测必然失败。如果把这个失败缓存住，实例起来了界面还写着「出口不通」——
+ * 用户看到的就是"明明在跑却说我不通"。所以实例就绪后要主动清掉。
+ */
+export function invalidateNetReport(accountId: string) {
+  cache.delete(accountId);
+  listeners.forEach((f) => f());
+}
+
 const TTL = 5 * 60 * 1000;
 
 /** 函数而不是常量：文案要跟着当前语言走 */
@@ -38,29 +52,62 @@ function kindName(k: string): string | undefined {
 const inflight = new Map<string, Promise<NetReport>>();
 const listeners = new Set<() => void>();
 
+/**
+ * 发起一次体检。
+ *
+ * **先问，再发**。体检不是免费的：它会带着这个环境的出口 IP 去打
+ * api.*（那是真带身份），再去 ip-api / proxycheck 这类站点查归属 ——
+ * 那些站点会记录来源地址。用户必须知道这件事并点头。
+ *
+ * 拒绝就到此为止，不"那我小心点测一下"。
+ */
 function fetchReport(accountId: string, key: string): Promise<NetReport> {
   const running = inflight.get(accountId);
   if (running) return running;
-  const p = window.claudeBuddy
-    .netReport(accountId)
-    .catch((e): NetReport => {
-      const msg = e instanceof Error ? e.message : String(e);
-      // 开发时界面热更新了、后台没重启，会出现这个；给人话而不是原始报错
-      return { ok: false, reason: /No handler registered/.test(msg) ? tr("应用后台是旧版本，重启应用后再试", "The app backend is outdated. Restart the app and try again") : msg };
-    })
-    .then((r) => {
+  const p = (async (): Promise<NetReport> => {
+    const allow = await askDetect({
+      targets: ["api.anthropic.com", "ip-api.com", "proxycheck.io", "ipinfo.io", "ipwho.is"],
+      exposes: tr(
+        "这个环境的出口 IP、城市、运营商、时区，以及请求时间。上面每个站点都会记录来源地址。",
+        "This environment's exit IP, city, carrier and time zone, plus the request time. Every site above records the source address.",
+      ),
+      why: tr(
+        "体检会告诉你 Claude 服务器看到的出口是哪个、有没有被标成代理、时区跟出口对得上不。不测就只能靠猜。",
+        "A check tells you which exit Claude's servers see, whether it is flagged as a proxy, and whether the time zone matches. Without it you are guessing.",
+      ),
+    });
+    if (!allow) {
+      return { ok: false, blocked: true, reason: tr("你取消了这次检测", "You cancelled this check") } as NetReport;
+    }
+    try {
+      const r = await window.claudeBuddy.netReport(accountId);
       cache.set(accountId, { key, at: Date.now(), r });
-      inflight.delete(accountId);
       listeners.forEach((f) => f());
       return r;
-    });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // 开发时界面热更新了、后台没重启，会出现这个；给人话而不是原始报错
+      const r: NetReport = {
+        ok: false,
+        reason: /No handler registered/.test(msg)
+          ? tr("应用后台是旧版本，重启应用后再试", "The app backend is outdated. Restart the app and try again")
+          : msg,
+      };
+      return r;
+    } finally {
+      inflight.delete(accountId);
+    }
+  })();
   inflight.set(accountId, p);
   return p;
 }
 
 /**
- * 读一个环境的出口体检（带缓存）。会话顶栏、首页输入框这些小地方用它显示一个分数，
- * 不用每处都自己去测；在「网络出口」里重测后，这些地方跟着更新。
+ * 读一个环境的出口体检（带缓存）。
+ *
+ * **不自动测**。以前 stale 就会自己发请求，但那意味着用户什么都没点，
+ * 我们已经在往外报这个环境的出口 IP 了 —— 跟"检测前必须确认"直接矛盾。
+ * 现在只读已有结果；要测得由用户点（走 fetchReport，里面有确认弹窗）。
  */
 export function useNetReport(accountId: string | null | undefined, proxyKey: string): NetReport | null {
   const [, bump] = useState(0);
@@ -72,18 +119,27 @@ export function useNetReport(accountId: string | null | undefined, proxyKey: str
     };
   }, []);
   const hit = accountId ? cache.get(accountId) : undefined;
-  const stale = !hit || !hit.key.startsWith(`${proxyKey}|`) || Date.now() - hit.at > TTL;
-  useEffect(() => {
-    if (accountId && stale) void fetchReport(accountId, `${proxyKey}|`);
-  }, [accountId, proxyKey, stale]);
   return hit && hit.key.startsWith(`${proxyKey}|`) ? hit.r : null;
 }
 
-/** 一小枚：🇺🇸 100 纯净。测着时显示「测出口…」，测不通显示「出口不通」 */
+/** 主动测一次（已包含确认弹窗）。给那些想点一下就测的小地方用 */
+export function measureNetReport(accountId: string, proxyKey: string) {
+  return fetchReport(accountId, `${proxyKey}|`);
+}
+
+/** 一小枚：🇺🇸 100 纯净。没测过就显示「未检测」，不自动发请求 */
 export function NetScore({ accountId, proxyKey }: { accountId: string | null | undefined; proxyKey: string }) {
   const r = useNetReport(accountId, proxyKey);
-  if (!r) return <span className="nsc dim">{tr("测出口…", "Testing exit…")}</span>;
-  if (!r.ok) return <span className="nsc bad">{tr("出口不通", "Exit unreachable")}</span>;
+  if (!r) return <span className="nsc dim">{tr("未检测", "Not checked")}</span>;
+  if (!r.ok && r.blocked) return <span className="nsc dim">{tr("未检测", "Not checked")}</span>;
+  /**
+   * 实例还在启动 ≠ 不通。
+   *
+   * 托管实例是异步拉起来的，应用刚开那两秒端口确实没监听。
+   * 这时候标红「出口不通」，用户会去排查一个根本不存在的问题。
+   */
+  if (!r.ok && r.starting) return <span className="nsc dim">{tr("出口启动中…", "Exit starting…")}</span>;
+  if (!r.ok) return <span className="nsc bad" title={r.reason}>{tr("出口不通", "Exit unreachable")}</span>;
   const v = verdict(r.score ?? 0);
   return (
     <span className={`nsc ${v.tone}`} title={tr(`${r.ip} · 信任分 ${r.score}（${v.text}）`, `${r.ip} · Trust score ${r.score} (${v.text})`)}>
@@ -132,7 +188,6 @@ export default function NetReportCard({
   const fresh = hit && hit.key === `${proxyKey}|${tz}` && Date.now() - hit.at < TTL ? hit.r : null;
   const [r, setR] = useState<NetReport | null>(fresh);
   const [busy, setBusy] = useState(false);
-  // 进来时记下的上一次出口，用来判断这次是不是跳了
   const prevIp = useRef(lastIp);
   const menu = useContextMenu();
 
@@ -150,13 +205,32 @@ export default function NetReportCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, proxyKey, tz]);
 
-  // 进来就测；线路改了也重测
-  useEffect(() => {
-    if (!fresh) void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run]);
+  /**
+   * **不自动测**。
+   *
+   * 之前这里挂载就 run()，也就是用户刚点开「网络出口」我们已经在往外
+   * 报这个环境的出口 IP 了。检测本身是有代价的（第三方站点会记录来源），
+   * 必须用户点头才发。所以进来只读缓存，要测由人点。
+   */
 
-  if (!r || (busy && !r.ok)) {
+  if (!r) {
+    return (
+      <div className="nr nr-idle">
+        <span>
+          {tr(
+            "还没检测过。检测会向 ip-api、proxycheck 和 api.anthropic.com 发请求，把出口 IP 报给它们。",
+            "Not checked yet. A check sends requests to ip-api, proxycheck and api.anthropic.com, disclosing the exit IP to them.",
+          )}
+        </span>
+        <button className="btn pri" onClick={() => void run()} disabled={busy}>
+          <IconRefresh size={12} />
+          {busy ? tr("检测中…", "Checking…") : tr("开始检测", "Run the check")}
+        </button>
+      </div>
+    );
+  }
+
+  if (busy && !r.ok) {
     return (
       <div className="nr nr-loading">
         <span className="nr-spin" />
@@ -166,6 +240,17 @@ export default function NetReportCard({
   }
 
   if (!r.ok) {
+    // 用户自己取消的，不是故障 —— 不要红字警告，也不要催重试
+    if (r.blocked) {
+      return (
+        <div className="nr nr-idle">
+          <span>{tr("已取消，没有发出任何请求。", "Cancelled. Nothing was sent.")}</span>
+          <button className="btn" onClick={() => void run()} disabled={busy}>
+            {tr("现在检测", "Check now")}
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="nr nr-fail">
         <IconWarning size={15} />

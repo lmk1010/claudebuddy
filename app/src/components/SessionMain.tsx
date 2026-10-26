@@ -4,7 +4,7 @@ import { IconEdit } from "./Rename";
 import type { Account, BuddyState, GitInfo, ShellWindow } from "../lib/model";
 import { fmtDuration, proxyLabel } from "../lib/model";
 import TerminalView from "./TerminalView";
-import { NetScore } from "./NetReport";
+import { NetScore, useNetReport } from "./NetReport";
 import TermSettings from "./TermSettings";
 import { TERM_PADDING } from "../lib/termThemes";
 import { tr } from "../lib/i18n";
@@ -90,6 +90,16 @@ export default function SessionMain({
   }, [accounts]);
 
   const running = active ? Date.now() - active.startedAt : 0;
+  /**
+   * 出口 IP 和分数取同一份报告。
+   *
+   * 和其他地方一样：IP 从 state 取、分数从报告取的话，两个数据源刷新节奏不同，
+   * 中间会出现"显示 A 的 IP、配 B 的分数"。同一个 hook 内部有缓存和合并，
+   * 和旁边那个 <NetScore> 共享同一份结果，不会多发请求。
+   */
+  const shAcct = active ? accountById.get(active.accountId) : undefined;
+  const shReport = useNetReport(shAcct?.id, shAcct ? proxyLabel(shAcct.proxy) : "");
+  const shExitIp = shReport?.ip ?? shAcct?.lastExitIp ?? null;
   const [renaming, setRenaming] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null);
   const [tset, setTset] = useState<DOMRect | null>(null);
@@ -113,11 +123,21 @@ export default function SessionMain({
             <button
               className="sh-net"
               onClick={() => onEditNetwork(active.accountId)}
-              title={tr("这个环境的网络出口 · 点开看体检", "This environment's network exit · click for health check")}
+              title={
+                shAcct
+                  ? tr(
+                      `Claude 看到的出口 IP${shExitIp ? `：${shExitIp}` : "（还没测到）"} · 本机线路 ${proxyLabel(shAcct.proxy)} · 点开看体检`,
+                      `Exit IP Claude sees${shExitIp ? `: ${shExitIp}` : " (not measured yet)"} · local route ${proxyLabel(shAcct.proxy)} · click for health check`,
+                    )
+                  : tr("这个环境的网络出口 · 点开看体检", "This environment's network exit · click for health check")
+              }
             >
               <IconGlobe size={12} />
-              <span className="mono">{proxyLabel(accountById.get(active.accountId)!.proxy)}</span>
-              <NetScore accountId={active.accountId} proxyKey={proxyLabel(accountById.get(active.accountId)!.proxy)} />
+              {/* 显示公网出口 IP —— 127.0.0.1:7950 是内部实现，对用户没意义 */}
+              <span className="mono">
+                {!shAcct ? tr("直连", "Direct") : shReport?.starting ? tr("启动中…", "Starting…") : (shExitIp ?? tr("测出口…", "Measuring…"))}
+              </span>
+              <NetScore accountId={active.accountId} proxyKey={proxyLabel(shAcct!.proxy)} />
             </button>
           )}
           {active?.branch ? <span className="sh-br">branch {active.branch}</span> : null}

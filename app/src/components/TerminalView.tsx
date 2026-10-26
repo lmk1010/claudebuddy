@@ -171,6 +171,7 @@ export default function TerminalView({
             cols: term.cols,
             rows: term.rows,
             command: win.runsClaude ? "claude" : undefined,
+            rawCommand: win.runsClaude ? undefined : win.rawCommand,
             permission: win.permission,
             prompt: win.runsClaude ? takePendingPrompt(win.id) : undefined,
           });

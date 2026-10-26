@@ -19,3 +19,6 @@ release/
 .env
 .env.*
 release-archive/
+
+# 本机工具产生的目录（不是源码）
+.neox/

@@ -17,6 +17,7 @@ const os = require("node:os");
 const crypto = require("node:crypto");
 const { execFile, spawnSync } = require("node:child_process");
 const { L } = require("./i18n.cjs");
+const { findClaude } = require("./checkup.cjs");
 
 const HOME = process.env.CLAUDE_BUDDY_HOME || os.homedir();
 
@@ -48,11 +49,36 @@ function configDirOf(account) {
 
 // ─────────────────────────────────────────── 跨进程调用 claude
 
+/**
+ * claude 可执行文件的绝对路径。
+ *
+ * 不能直接 `execFile("claude")`：应用从 Dock / Finder 启动时 PATH 只有
+ * /usr/bin:/bin:/usr/sbin:/sbin，而 CLI 通常装在 ~/.npm-global/bin 或
+ * /opt/homebrew/bin。裸名 spawn 会 ENOENT，stdout 为空，JSON.parse 失败，
+ * 于是「登录着」的环境被报成 auth: unknown —— 界面上就是一个「未知」。
+ *
+ * checkup.cjs 早就为同一个坑做了 PATH + 常见位置兜底，这里复用它，
+ * 不再各写一套。找到的路径缓存住：这是同步探测，每次刷新都跑一遍太贵。
+ * 找不到时**不缓存**，用户装完 CLI 不用重启应用。
+ */
+let claudePathCache = null;
+
+function claudeBin() {
+  if (claudePathCache) return claudePathCache;
+  const found = findClaude();
+  claudePathCache = found ? found.path : null;
+  return claudePathCache;
+}
+
 /** 调 claude CLI，带超时。返回 { code, stdout, stderr } */
 function runClaude(args, env, timeout = 12000, cwd) {
+  const bin = claudeBin();
+  if (!bin) {
+    return Promise.resolve({ code: -1, stdout: "", stderr: "claude not found", timedOut: false });
+  }
   return new Promise((resolve) => {
     execFile(
-      "claude",
+      bin,
       args,
       {
         timeout,
@@ -96,13 +122,18 @@ function envForAccount(account, { includeProxy = true } = {}) {
     if (k === "CLAUDECODE" || k.startsWith("CLAUDE_CODE_")) delete env[k];
   }
   delete env.HTTPS_PROXY;
-  delete env.HTTP_PROXY;
-  delete env.https_proxy;
-  delete env.http_proxy;
-  delete env.ALL_PROXY;
-  delete env.all_proxy;
-  delete env.NO_PROXY;
-  delete env.no_proxy;
+    delete env.HTTP_PROXY;
+    delete env.https_proxy;
+    delete env.http_proxy;
+    delete env.ALL_PROXY;
+    delete env.all_proxy;
+    delete env.NO_PROXY;
+    delete env.no_proxy;
+    delete env.npm_config_proxy;
+    delete env.npm_config_https_proxy;
+    delete env.npm_config_noproxy;
+    delete env.YARN_HTTP_PROXY;
+    delete env.YARN_HTTPS_PROXY;
 
   /**
    * 会“把请求指到别人那儿”的变量。
@@ -176,13 +207,33 @@ function envForAccount(account, { includeProxy = true } = {}) {
           ? `${encodeURIComponent(p.username || "")}:${encodeURIComponent(p.password || "")}@`
           : "";
       const url = `${p.protocol}://${auth}${p.host}:${p.port}`;
-      // 大小写两套都设：Claude Code 两种都读（源码里 http_proxy || HTTP_PROXY）
-      env.HTTPS_PROXY = url;
-      env.HTTP_PROXY = url;
-      env.https_proxy = url;
-      env.http_proxy = url;
-      env.NO_PROXY = p.noProxy || "localhost,127.0.0.1,::1";
-      env.no_proxy = env.NO_PROXY;
+            // 大小写两套都设：Claude Code 两种都读（源码里 http_proxy || HTTP_PROXY）
+            env.HTTPS_PROXY = url;
+            env.HTTP_PROXY = url;
+            env.https_proxy = url;
+            env.http_proxy = url;
+            /**
+             * ALL_PROXY 之前是空的 —— 这是个真缺口。
+             *
+             * 有一类工具（部分 Rust / Go / gRPC 的客户端）只认 ALL_PROXY，不看
+             * HTTPS_PROXY。它们会因为"没配代理"而直连，而我们这边一切正常、
+             * 什么也看不出来。mihomo 的 mixed-port 同时提供 HTTP 和 SOCKS，
+             * 所以同一个地址填进去是有效的。
+             */
+            env.ALL_PROXY = url;
+            env.all_proxy = url;
+            env.NO_PROXY = p.noProxy || "localhost,127.0.0.1,::1";
+            env.no_proxy = env.NO_PROXY;
+            /**
+             * npm / pnpm 不读 HTTPS_PROXY，只读自己的 config。
+             * 环境里跑 `npm install` 是很常见的事，不设就是一条绕过代理的路。
+             */
+            env.npm_config_proxy = url;
+            env.npm_config_https_proxy = url;
+            env.npm_config_noproxy = env.NO_PROXY;
+            // yarn 用另一套变量名
+            env.YARN_HTTP_PROXY = url;
+            env.YARN_HTTPS_PROXY = url;
     }
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Account, AccountStatusSnapshot, PermissionMode, RecentProject } from "../lib/model";
-import { AUTH_LABEL, AUTH_PILL, PERMISSION_LABEL, greeting, proxyLabel } from "../lib/model";
+import type { Account, AccountStatusSnapshot, Exit, PermissionMode, RecentProject } from "../lib/model";
+import { AUTH_LABEL, AUTH_PILL, PERMISSION_LABEL, greeting, proxyLabel, proxyModeOf } from "../lib/model";
 import {
   IconArrowUp,
   IconChevronDown,
@@ -17,13 +17,15 @@ import {
 } from "./iconAliases";
 import Help, { Steps } from "./Help";
 import { useContextMenu, type MenuItem } from "./ContextMenu";
-import { NetScore } from "./NetReport";
+import { NetScore, useNetReport } from "./NetReport";
 import { tr } from "../lib/i18n";
 
 interface Props {
   username: string;
   accounts: Account[];
   activeAccount: Account | null;
+  /** 所有出口 —— 环境 tab 上要按它显示这个环境走哪条路 */
+  exits: Exit[];
   status: Record<string, AccountStatusSnapshot>;
   /** 每个环境正在跑几个会话，环境切换条上显示 */
   runningBy: Record<string, number>;
@@ -61,6 +63,16 @@ export default function Home(p: Props) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const acc = p.activeAccount;
+  /**
+   * 出口 IP 和分数必须来自**同一份报告**。
+   *
+   * 分开取（IP 从 state、分数从报告）会出现"显示 A 的 IP、配 B 的分数"——
+   * 两个数据源各自刷新，中间必然有不一致的时刻。同一个 hook 拿同一份就行，
+   * 它内部已有缓存与合并，多调一次不会多发请求。
+   */
+  const report = useNetReport(acc?.id, acc ? proxyLabel(acc.proxy) : "");
+  /** 公网出口 IP。拿不到才退回本机地址 —— 127.0.0.1:7950 对用户没意义 */
+  const exitIp = report?.ip ?? acc?.lastExitIp ?? null;
   // 没测过就是未知。不拿配置文件里那个旧值当事实，否则已登录也会被当成没登录
   const auth = acc ? (p.status[acc.id]?.auth ?? "unknown") : "unknown";
   const signedIn = auth === "signedIn";
@@ -164,6 +176,13 @@ export default function Home(p: Props) {
                       {a.label.slice(0, 1)}
                     </span>
                     <span className="envtab-n">{a.label}</span>
+                    {/* 这个环境走哪条路出去 —— 一个小色点，和「代理方式」卡同一个配色。
+                        直连也画（灰）—— 不画的话用户分不清"灰点"和"没点" */}
+                    {(() => {
+                      const pm = proxyModeOf(a, p.exits);
+                      const label = pm === "managed" ? tr("App 托管", "Managed by app") : pm === "own" ? tr("你自己的代理", "Your own proxy") : tr("直连", "Direct");
+                      return <span className={`envtab-pm pm-${pm}`} title={tr(`代理方式：${label}`, `Proxy mode: ${label}`)} />;
+                    })()}
                     {/* 登录好的不打标；没登录的挂一把小钥匙，一眼看出「这个要先登录」 */}
                     {st !== "signedIn" && (
                       <span className={`envtab-st${st === "suspended" ? " bad" : ""}`} title={AUTH_LABEL[st]}>
@@ -238,14 +257,23 @@ export default function Home(p: Props) {
                   {PERMISSION_LABEL[p.permission]}
                   <IconChevronDown size={11} />
                 </button>
-                {/* 出口：显示线路 + 信任分，点开去这个环境的「网络出口」 */}
+                {/* 出口：显示**公网出口 IP** + 信任分，点开去这个环境的「网络出口」
+                    之前这里显示的是 proxyLabel(proxy)，也就是 http://127.0.0.1:7950 ——
+                    那是本机端口，对用户没有意义。他要看的是 Claude 服务器看到的那个 IP。 */}
                 <button
                   className="chip"
                   onClick={() => acc && p.onEditNetwork(acc.id)}
-                  title={tr("这个环境的网络出口 · 点开查看体检、换线路", "This environment's network exit · click for health check and route switching")}
+                  title={
+                    acc
+                      ? tr(
+                          `Claude 看到的出口 IP${exitIp ? `：${exitIp}` : "（还没测到）"} · 本机线路 ${proxyLabel(acc.proxy)} · 点开查看体检、换线路`,
+                          `Exit IP Claude sees${exitIp ? `: ${exitIp}` : " (not measured yet)"} · local route ${proxyLabel(acc.proxy)} · click for health check and route switching`,
+                        )
+                      : tr("直连：不经过代理", "Direct: no proxy")
+                  }
                 >
                   <IconGlobe size={13} />
-                  <span className="mono">{acc ? proxyLabel(acc.proxy) : tr("直连", "Direct")}</span>
+                  <span className="mono">{acc ? (exitIp ?? tr("测出口…", "Measuring…")) : tr("直连", "Direct")}</span>
                   {acc && <NetScore accountId={acc.id} proxyKey={proxyLabel(acc.proxy)} />}
                 </button>
                 <button className="send" onClick={submit} disabled={Boolean(blocked)} title={blocked ?? tr("新建会话 ↵", "New session ↵")}>

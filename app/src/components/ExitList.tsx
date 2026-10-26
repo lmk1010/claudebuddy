@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { tr } from "../lib/i18n";
+import { askDetect } from "../lib/detect";
 import type { Account, Exit } from "../lib/model";
 import { exitKey } from "../lib/model";
 import type { ExitVerify, TunProbe } from "../lib/bridge";
-import { IconCopy, IconPlus, IconWarning } from "./iconAliases";
+import { IconCopy, IconPlus } from "./iconAliases";
 import Modal from "./Modal";
 import ExitPicker from "./ExitPicker";
+import ExitSubscribe from "./ExitSubscribe";
+import ExitMonitor from "./ExitMonitor";
 
 /**
  * 出口列表 —— 这台机器配了几个出口，各自是什么 IP，谁在用。
@@ -27,6 +30,9 @@ export default function ExitList({
   onRename,
   onDelete,
   onMeasure,
+  onRepaired,
+  onSwapNode,
+  onOpenShell,
 }: {
   exits: Exit[];
   accounts: Account[];
@@ -34,11 +40,32 @@ export default function ExitList({
   currentExitId?: string;
   onUse: (exitId: string | undefined) => void;
   /** 新建：传回调，由父层弹窗 */
-  onCreate: (exit: Omit<Exit, "id">) => void;
+  onCreate: (exit: Omit<Exit, "id"> & { id?: string }) => void;
   onRename?: (id: string, label: string) => void;
   onDelete?: (id: string) => void;
   /** 实测到一个出口的真实 IP 后，写回这个出口 */
   onMeasure?: (id: string, ip: string | null) => void;
+  /**
+   * 托管实例重启后端口可能变，回写给父层。
+   *
+   * 端口是实例分配的，不是存在出口里的常量 —— 实例崩了重起拿到新端口后
+   * 得把出口和用它的环境一起改掉，否则它们指着已经不存在的旧端口。
+   */
+  onRepaired?: (id: string, port: number, host: string) => void;
+  /**
+   * 托管出口换了节点。
+   *
+   * 之前换节点只能删掉重建：会丢掉测过的 IP、会打断正在用它的环境，
+   * 而且"重建"这个动作看起来像在删东西，用户不敢点。
+   */
+  onSwapNode?: (id: string, subId: string, node: string) => void;
+  /**
+   * 开一个空白终端（不经 claude）来自己测网络。
+   *
+   * 用户不信任"界面上那个 IP"是合理的 —— 那是应用测的，不是他自己验的。
+   * 给他一个真终端，能跑 curl、能看 env、能自己下结论。
+   */
+  onOpenShell?: () => void;
 }) {
   const [picking, setPicking] = useState(false);
   const [copiedCfg, setCopiedCfg] = useState(false);
@@ -75,6 +102,27 @@ export default function ExitList({
    * 于是界面显示的和实际走的是两回事。
    */
   const measure = async (e: Exit) => {
+    /**
+     * 先问，再发。
+     *
+     * 这一步会做两件往外的事：从出口端口探一次拿 IP（打 ipify），
+     * 再拿这个 IP 去 ip-api / proxycheck 查归属。两件都会把出口 IP
+     * 报给第三方，所以一次说清、一次确认。
+     *
+     * 拒绝就到此为止 —— 不标记为"失败"，因为什么都没发。
+     */
+    const allow = await askDetect({
+      targets: ["api.ipify.org", "ip-api.com", "proxycheck.io"],
+      exposes: tr(
+        `出口「${e.label}」的 IP 与归属（城市、运营商），以及请求时间。`,
+        `The IP and location (city, carrier) of exit “${e.label}”, plus the request time.`,
+      ),
+      why: tr(
+        "实测会从这个出口自己的端口发一次请求，拿回它真实的出口 IP —— 界面上的数字只有实测过才算数。",
+        "A measurement sends one request through this exit's own port to get its real exit IP. Only a measured number counts.",
+      ),
+    });
+    if (!allow) return;
     setTesting((s) => new Set(s).add(e.id));
     try {
       const r = await window.claudeBuddy.proxyTest({
@@ -115,20 +163,134 @@ export default function ExitList({
     await Promise.all(exits.map(measure));
   };
 
+  /**
+   * 重启一个托管出口的实例。
+   *
+   * 实例崩了、或订阅刷新后节点变了，从原来的节点重新拉一个。
+   * 端口可能是新的，所以要把真实端口回写 —— 不写的话环境还指着旧端口。
+   */
+  const restartManaged = async (e: Exit) => {
+    if (!e.managed) return;
+    setTesting((s) => new Set(s).add(e.id));
+    try {
+      const r = await window.claudeBuddy.exitStart({
+        exitId: e.id,
+        subId: e.managed.subId,
+        node: e.managed.node,
+      });
+      if (!r.ok || !r.port) {
+        setFresh((m) => ({ ...m, [e.id]: { ip: null, reason: r.reason ?? tr("实例启动失败", "Failed to start") } }));
+        return;
+      }
+      const host = r.host ?? "127.0.0.1";
+      onRepaired?.(e.id, r.port, host);
+      // 端口变了，之前测到的 IP 就不是这条线路的了 —— 清掉，让用户重测
+      setFresh((m) => {
+        const n = { ...m };
+        delete n[e.id];
+        return n;
+      });
+      setVerify((m) => {
+        const n = { ...m };
+        delete n[e.id];
+        return n;
+      });
+    } catch (err) {
+      setFresh((m) => ({ ...m, [e.id]: { ip: null, reason: (err as Error)?.message } }));
+    } finally {
+      setTesting((s) => {
+        const n = new Set(s);
+        n.delete(e.id);
+        return n;
+      });
+    }
+  };
+
   /** 谁在用这个出口 —— 用 exitKey 比，和迁移时同一套规则 */
   const usersOf = (e: Exit) =>
     accounts.filter((a) => a.exitId === e.id || (!a.exitId && exitKey(a.proxy) === exitKey(e.proxy)));
 
+  /**
+   * **不自动测。**
+   *
+   * 这里原来是"托管出口一起来就自动实测"，理由是托管该做到"起来即生效"。
+   * 但实测是往外发请求、把出口 IP 报给 ipify / ip-api —— 没有用户同意就发，
+   * 和「任何检测之前都要确认」直接矛盾。安全优先于便利。
+   *
+   * 代价是出口刚建好时显示「未实测」，需要点一下「实测出口」。
+   * 这一下是用户自己的选择，不是我们替他做的。
+   */
+
   const anyTesting = testing.size > 0;
+
+  /** 正在换节点的出口 + 新选的节点 */
+  const [swapFor, setSwapFor] = useState<Exit | null>(null);
+  const [swapPick, setSwapPick] = useState<{ subId: string; node: string; label: string } | null>(null);
+  const [swapping, setSwapping] = useState(false);
+  /** 正在监控连接的出口 */
+  const [monitorFor, setMonitorFor] = useState<Exit | null>(null);
+
+  /**
+   * 把托管出口换到另一个节点。
+   *
+   * 顺序和创建时一致：先起新实例（拿真端口），成功后才改出口本身。
+   * 失败就停在原地，旧实例还在跑 —— 不能先改状态再起实例，
+   * 那样失败之后出口指向一个不存在的节点。
+   */
+  const doSwap = async () => {
+    if (!swapFor || !swapPick) return;
+    setSwapping(true);
+    try {
+      const r = await window.claudeBuddy.exitStart({
+        exitId: swapFor.id,
+        subId: swapPick.subId,
+        node: swapPick.node,
+      });
+      if (!r.ok || !r.port) {
+        setFresh((m) => ({ ...m, [swapFor.id]: { ip: null, reason: r.reason ?? tr("实例启动失败", "Failed to start") } }));
+        return;
+      }
+      onRepaired?.(swapFor.id, r.port, r.host ?? "127.0.0.1");
+      onSwapNode?.(swapFor.id, swapPick.subId, swapPick.node);
+      // 换节点了，之前那个 IP 不是这条线路的
+      setFresh((m) => {
+        const n = { ...m };
+        delete n[swapFor.id];
+        return n;
+      });
+      setVerify((m) => {
+        const n = { ...m };
+        delete n[swapFor.id];
+        return n;
+      });
+      setSwapFor(null);
+      setSwapPick(null);
+    } catch (err) {
+      setFresh((m) => ({ ...m, [swapFor.id]: { ip: null, reason: (err as Error)?.message } }));
+    } finally {
+      setSwapping(false);
+    }
+  };
 
   return (
     <>
+      {/**
+       * TUN 提示 —— 中性，不是警告。
+       *
+       * 老版本这里写的是"当前是 TUN 模式，多出口不生效"。那个结论是照着
+       * "进程级代理变量会被 TUN 绕过"推出来的，但**实测不成立**：环境连的是
+       * 127.0.0.1 回环，TUN 不劫持回环流量，托管出口照常生效（实测：托管
+       * 172.245.62.112 vs 直连 185.186.60.71，两个不同）。
+       * 把正常状态报成故障，只会让人不敢用。
+       */}
       {tun?.active && (
-        <div className="tun-warn">
-          <IconWarning size={14} />
+        <div className="tun-note">
           <span>
-            <b>{tr("当前是 TUN 模式，多出口不生效", "TUN mode is on, so multiple exits do not work")}</b>
-            {tun.reason}
+            <b>{tr("检测到 TUN 模式", "TUN mode detected")}</b>
+            {tr(
+              "App 托管的出口不受影响：环境走 127.0.0.1 回环，TUN 不劫持回环流量。出口 IP 是真实的。",
+              "Managed exits are unaffected: the environment talks to 127.0.0.1 (loopback), which TUN does not hijack. The exit IP is real.",
+            )}
           </span>
         </div>
       )}
@@ -164,7 +326,35 @@ export default function ExitList({
             <small>{tr("用这台电脑当前的网络，不经过代理", "This Mac's own network, no proxy")}</small>
           </span>
           <span className="ex-ip mono">
-            {accounts.find((a) => !a.exitId)?.lastExitIp ?? tr("未测", "—")}
+            {(() => {
+              /**
+               * 直连那行显示的是什么，要说准。
+               *
+               * 它是**上次实测的缓存值**，不是"此刻的出口"。这台机器上 TUN 一开一关、
+               * 换 WiFi、切热点，直连出口就会变，而缓存还留着上一个 IP ——
+               * 用户看到一个国内 IP 会以为自己裸奔了，其实那是几天前的记录。
+               *
+               * 所以超过一周的记录必须标出来，别让旧数字冒充现状。
+               */
+              const d = accounts.find((a) => !a.exitId);
+              const ip = d?.lastExitIp;
+              if (!ip) return tr("未测", "—");
+              /**
+               * 直连出口的缓存必须很快过期。
+               *
+               * 它走的是本机网络 —— 换 WiFi、切热点、开/关 TUN、甚至运营商换出口，
+               * 这个数字立刻就变了。实测过：早上记的是合肥电信，几小时后已经是另一个地址。
+               * 所以这里不像固定出口那样给一周，而是一小时。
+               */
+              const age = d?.lastExitCheckedAt ? Date.now() - d.lastExitCheckedAt : Infinity;
+              const stale = age > 3600e3;
+              return (
+                <>
+                  {ip}
+                  {stale && <em className="ex-stale">{tr("旧", "old")}</em>}
+                </>
+              );
+            })()}
           </span>
         </button>
 
@@ -179,6 +369,21 @@ export default function ExitList({
            */
           const f = fresh[e.id];
           const ip = f ? f.ip : e.lastIp ?? null;
+          /**
+           * 这个 IP 是本次实测的，还是上次留下的？
+           *
+           * `f` 是本次会话里测出来的结果；没有 `f` 就说明用的是 `e.lastIp`
+           * 这个缓存 —— 它可能是几天前、甚至换节点之前量的。同一个数字，
+           * 含义完全不同，不能一样地显示。
+           */
+          const fromNow = Boolean(f?.ip);
+          /**
+           * 缓存值也要标过期。
+           *
+           * 一小时，不是一周：托管出口换过节点、节点本身失效、或者本机 TUN 状态变了，
+           * 量到的出口都会不一样。留着一周前的数字只会误导。
+           */
+          const stale = !fromNow && Boolean(e.lastIp) && Boolean(e.checkedAt) && Date.now() - e.checkedAt! > 3600e3;
           const failed = f && !f.ip;
           const on = currentExitId === e.id;
           const shared = users.length > 1;
@@ -191,14 +396,6 @@ export default function ExitList({
            * 一个是去查线路。
            */
           const pending = !ip && !failed;
-          /**
-           * TUN 模式下，测出来的 IP 不代表这个出口。
-           *
-           * 整机流量被 utun 接管时，curl 走 HTTPS_PROXY 出去的请求
-           * 会被透明代理重新路由 —— 量到的是 TUN 的出口，不是这个端口的。
-           * 这时候把数字标出来会误导人，必须标明「这个值不可信」。
-           */
-          const tainted = Boolean(ip) && Boolean(tun?.active);
           return (
             <div className={`ex-item-wrap${on ? " on" : ""}`} key={e.id}>
               <button className={`ex-item${on ? " on" : ""}`} onClick={() => onUse(e.id)}>
@@ -223,34 +420,54 @@ export default function ExitList({
                   ) : (
                     <b>{e.label}</b>
                   )}
-                  <small>
-                    {e.proxy.protocol}://{e.proxy.host}:{e.proxy.port}
+                  {/**
+                   * 一行元信息：标签 · 地址 · 谁在用。
+                   *
+                   * 之前全挤在一个 <small> 里靠 ` · ` 手拼，字宽不一（标签是彩色块、
+                   * 地址是等宽、用户名是普通字）时基线会错开，几行并排看着就是歪的。
+                   * 改成 flex + gap，每段自己对齐，标签高度也不再撑歪行高。
+                   */}
+                  <small className="ex-meta">
+                    {e.managed ? (
+                      <span className="ex-tag">{tr("App 托管", "Managed")}</span>
+                    ) : (
+                      <span className="ex-tag own">{tr("你自己的", "Your own")}</span>
+                    )}
+                    <span className="ex-addr">
+                      {e.proxy.protocol}://{e.proxy.host}:{e.proxy.port}
+                    </span>
                     {users.length > 0 && (
-                      <>
-                        {" · "}
+                      <span className="ex-user">
                         {tr(
                           `${users.map((u) => u.label).join("、")} 在用`,
                           `used by ${users.map((u) => u.label).join(", ")}`,
                         )}
-                      </>
+                      </span>
                     )}
                   </small>
                 </span>
-                <span className={`ex-ip mono${shared ? " bad" : ip ? (tainted ? " unk" : " ok") : failed ? " fail" : pending ? " pend" : ""}`}>
-                  {busy ? tr("测量中", "…") : ip ?? (failed ? tr("连不上", "Failed") : tr("待配置", "Pending"))}
+                <span className={`ex-ip mono${shared ? " bad" : ip ? (stale ? " old" : " ok") : failed ? " fail" : pending ? " pend" : ""}`}>
+                  {busy
+                    ? tr("测量中", "…")
+                    : ip ? (
+                        <>
+                          {ip}
+                          {/* 缓存值超过一周就明说，别让旧数字冒充现状 */}
+                          {stale && <em className="ex-stale">{tr("旧", "old")}</em>}
+                        </>
+                      ) : failed ? (
+                        tr("连不上", "Failed")
+                      ) : e.managed ? (
+                        tr("未实测", "Not measured")
+                      ) : (
+                        tr("待配置", "Pending")
+                      )}
                 </span>
               </button>
               {/* 测失败要说清为什么：端口没开、代理没跑、还是线路挂了 */}
               {failed && f?.reason && <div className="ex-fail">{f.reason}</div>}
-              {/* TUN 开着时，测到的 IP 是 TUN 的，不是这个端口的 —— 必须说明 */}
-              {tainted && (
-                <div className="ex-fail">
-                  {tr(
-                    "这个数字不可信：TUN 模式下所有流量都走同一个出口，测到的不是这个端口自己的 IP。关掉 TUN 再测。",
-                    "This number is unreliable: under TUN all traffic uses one exit, so this is not this port's own IP. Turn TUN off and measure again.",
-                  )}
-                </div>
-              )}
+              {/* 原来这里在 TUN 开着时把测到的 IP 标成「不可信」。删了 ——
+                  环境走 127.0.0.1 回环，TUN 碰不到，实测出口 IP 就是节点落地。 */}
               {/**
                * 归属核验：国家 · 城市 · ISP。
                *
@@ -292,21 +509,54 @@ export default function ExitList({
               {editing !== e.id && (
                 <div className="ex-acts">
                   {/**
-                   * 待配置的出口，第一个动作就是「怎么配」。
-                   *
-                   * 之前建完只显示「待配置」，然后什么都没有 —— 用户卡在这里，
-                   * 不知道下一步做什么。这一条是断掉的业务链上最关键的一环：
-                   * 明确告诉他这段 YAML 要贴到哪、贴完怎么回来。
-                   */}
-                  {pending && (
-                    <button className="det-k pri" onClick={() => setConfigFor(e.id)}>
-                      {tr("怎么配", "How to set up")}
+                                     * 待配置的出口，第一个动作就是「怎么配」。
+                                     *
+                                     * 之前建完只显示「待配置」，然后什么都没有 —— 用户卡在这里，
+                                     * 不知道下一步做什么。这一条是断掉的业务链上最关键的一环：
+                                     * 明确告诉他这段 YAML 要贴到哪、贴完怎么回来。
+                                     *
+                                     * 托管出口不走这条路：它的端口是应用自己开的，没有 YAML 要贴。
+                                     * 没测通只可能是实例没起来，所以给的是「重启实例」。
+                                     */}
+                                    {pending && !e.managed && (
+                                      <button className="det-k pri" onClick={() => setConfigFor(e.id)}>
+                                        {tr("怎么配", "How to set up")}
+                                      </button>
+                                    )}
+                                    {pending && e.managed && (
+                                      <button className="det-k pri" onClick={() => void restartManaged(e)} disabled={busy}>
+                                        {busy ? tr("启动中…", "Starting…") : tr("重启实例", "Restart instance")}
+                                      </button>
+                                    )}
+                  {/* 托管出口：看这个出口上真实的连接 —— 证明流量真的走了代理 */}
+                  {e.managed && (
+                    <button className="det-k" onClick={() => setMonitorFor(e)} disabled={busy}>
+                      {tr("连接监控", "Connections")}
+                    </button>
+                  )}
+                  {/* 托管出口换节点：不用删掉重建，实例会原地换掉 */}
+                  {e.managed && onSwapNode && (
+                    <button
+                      className="det-k"
+                      onClick={() => {
+                        setSwapFor(e);
+                        setSwapPick(null);
+                      }}
+                      disabled={busy}
+                    >
+                      {tr("换节点", "Change node")}
                     </button>
                   )}
                   {/* 实测：通过这个端口真发一次请求，量它自己的出口 IP */}
                   <button className="det-k" onClick={() => void measure(e)} disabled={busy}>
                     {busy ? tr("测量中…", "Measuring…") : tr("实测出口", "Measure exit")}
                   </button>
+                  {/* 自己验：开个真终端，不经过 claude，想跑什么都行 */}
+                  {onOpenShell && (
+                    <button className="det-k" onClick={onOpenShell}>
+                      {tr("开终端自己验", "Verify in a terminal")}
+                    </button>
+                  )}
                   <button
                     className="det-k"
                     onClick={() => {
@@ -481,6 +731,39 @@ export default function ExitList({
             </Modal>
           );
         })()}
+
+      {monitorFor && <ExitMonitor exit={monitorFor} onClose={() => setMonitorFor(null)} />}
+
+      {/*
+       * 换节点弹窗。
+       *
+       * 复用 ExitSubscribe —— 它已经是"订阅 + 节点列表"的完整选法，
+       * 换节点要的就是同一件事，没必要再写一个选法不一样的弹窗。
+       */}
+      {swapFor && (
+        <Modal onClose={() => setSwapFor(null)} className="xp" label={tr("换节点", "Change node")}>
+          {(close) => (
+            <>
+              <div className="xp-head">
+                <b>{tr("给这个出口换个节点", "Change this exit's node")}</b>
+                <small>
+                  {tr("当前：", "Now: ")}
+                  {swapFor.managed?.node ?? swapFor.label}
+                </small>
+              </div>
+              <ExitSubscribe selected={swapPick} onPick={setSwapPick} />
+              <div className="xp-foot">
+                <button className="btn ghost" onClick={close}>
+                  {tr("取消", "Cancel")}
+                </button>
+                <button className="btn pri" disabled={!swapPick || swapping} onClick={() => void doSwap()}>
+                  {swapping ? tr("切换中…", "Switching…") : tr("换到这个节点", "Switch to this node")}
+                </button>
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
     </>
   );
 }

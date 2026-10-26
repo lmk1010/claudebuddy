@@ -134,6 +134,22 @@ export function installBrowserFallback(): void {
     auditList: async () => [],
     proxyTest: async () => ({ ok: false, ip: null, reason: unsupported }),
 
+        /* 托管出口：内核和订阅都归主进程管，浏览器预览里没有这些能力 */
+        kernelStatus: async () => ({ ready: false, path: "", version: null, asset: "", error: unsupported }),
+        kernelInstall: async () => ({ ok: false, reason: unsupported }),
+        onKernelLog: () => () => {},
+        subList: async () => ({ list: [], reason: unsupported }),
+        subAdd: async () => ({ ok: false, reason: unsupported }),
+            subImportYaml: async () => ({ ok: false, reason: unsupported }),
+        subRefresh: async () => ({ ok: false, reason: unsupported }),
+        subRemove: async () => ({ ok: false, reason: unsupported }),
+        exitStart: async () => ({ ok: false, reason: unsupported }),
+        exitStop: async () => ({ ok: false, reason: unsupported }),
+        exitInstances: async () => [],
+            exitConnections: async () => ({ ok: false, reason: unsupported, list: [], up: 0, down: 0 }),
+            exitClearConnections: async () => ({ ok: false, reason: unsupported }),
+        onExitLog: () => () => {},
+
     /* 环境自检：浏览器里查不了真实环境，全部标成未知 */
     checkupRun: async () => ({
       ok: false,

@@ -436,6 +436,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* 等宽数字：几行 IP 右对齐时小数点/位数才对得齐 */
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 /* 结论标签：撞了才用告警色，独立用绿，没测过保持灰 ——
    不给"没测过"上颜色，否则一进来满屏都是黄的。 */
@@ -491,6 +494,9 @@
 
 /* 只是连了 VPN、流量没走 utun —— 中性提示，不制造焦虑 */
 .tun-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   padding: 9px 13px;
   margin-bottom: 12px;
   border-radius: 9px;
@@ -498,6 +504,196 @@
   font-size: 11.5px;
   line-height: 1.7;
   color: var(--t3);
+}
+/* 标题和正文之间必须有间距 —— 之前两者挨着，读起来是「检测到 TUN 模式App 托管的…」 */
+.tun-note b {
+  flex: none;
+  font-weight: var(--w-semibold);
+  color: var(--t2);
+}
+.tun-note span {
+  min-width: 0;
+}
+
+/* ── 连接监控 ── */
+.mon {
+  width: min(720px, 92vw);
+}
+.mon-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px;
+}
+.mon-head b {
+  display: block;
+  font-size: 14px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.mon-head small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--t4);
+}
+.mon-stats {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 0 18px 14px;
+}
+.mon-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mon-stat > span {
+  font-size: 10.5px;
+  color: var(--t4);
+}
+.mon-stat b {
+  font-size: 15px;
+  font-weight: var(--w-medium);
+  color: var(--t1);
+  font-variant-numeric: tabular-nums;
+}
+.mon-stat small {
+  font-size: 10px;
+  color: var(--t4);
+}
+.mon-acts {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+.mon-err {
+  margin: 0 18px 12px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  background: rgba(198, 69, 69, 0.07);
+  font-size: 11.5px;
+  color: #b04a4a;
+}
+.mon-body {
+  border-top: var(--hair) solid var(--ln);
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+}
+.mon-sec + .mon-sec {
+  border-top: var(--hair) solid var(--ln);
+}
+.mon-sec-h {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 18px 6px;
+}
+.mon-sec-h span {
+  font-size: 11.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t2);
+}
+.mon-sec-h small {
+  font-size: 10.5px;
+  color: var(--t4);
+}
+.mon-empty {
+  padding: 10px 18px 16px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--t4);
+}
+.mon-rows {
+  padding: 0 8px 10px;
+}
+/**
+ * 一行一条连接：域名 / 链路 / 字节。
+ *
+ * 三列用固定网格而不是 flex —— 否则长短不一的域名会把链路列推来推去，
+ * 几十行扫下来全是锯齿。域名那列可截断，字节列右对齐。
+ */
+.mon-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.mon-row:nth-child(odd) {
+  background: var(--tl);
+}
+.mon-host {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--t1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mon-chain {
+  overflow: hidden;
+  font-size: 10.5px;
+  color: var(--t4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mon-bytes {
+  font-size: 10.5px;
+  color: var(--t3);
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mon-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: var(--hair) solid var(--ln);
+}
+.mon-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--t4);
+}
+/**
+ * Claude 自己的流量 —— 单独标出来。
+ *
+ * 别的域名走没走代理后果有限；只有 api.anthropic.com 这条决定服务端
+ * 把这次请求算在哪个出口上。它必须在几十行域名里一眼可见。
+ */
+.mon-crit {
+  margin: 2px 18px 8px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  background: var(--tl);
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--t4);
+}
+.mon-crit.on {
+  background: rgba(78, 159, 99, 0.1);
+  color: #3f7f52;
+}
+.mon-crit.on b {
+  display: block;
+  font-weight: var(--w-semibold);
+  color: #33734a;
+}
+.mon-crit small {
+  display: block;
+  color: inherit;
+}
+.mon-row.crit {
+  background: rgba(78, 159, 99, 0.08);
+}
+.mon-row.crit .mon-host {
+  font-weight: var(--w-medium);
+  color: #33734a;
 }
 
 /* ══════════════════════ 出口列表 ══════════════════════ */
@@ -559,6 +755,374 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/**
+ * 出口行的元信息：标签 · 地址 · 谁在用。
+ *
+ * 用 flex 而不是靠字符串里的「·」拼：三段字号/字体都不同
+ * （标签是彩色小块、地址等宽、用户名普通字），拼在一起基线会错开，
+ * 几行并排就是锯齿。分开之后每段自己垂直居中，行高也稳定。
+ */
+.ex-main .ex-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ex-addr {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ex-user {
+  flex: none;
+  font-family: var(--sans);
+  color: var(--t3);
+}
+/* 标签固定行高，避免它把整行撑高、和没有标签的行错位 */
+.ex-tag {
+  flex: none;
+  line-height: 15px;
+}
+/* 旧记录标记：超过一周的实测值不能冒充"此刻的出口" */
+.ex-stale {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-family: var(--sans);
+  font-size: 9.5px;
+  font-style: normal;
+  color: #9a6e24;
+  background: rgba(181, 135, 58, 0.14);
+}
+/* 托管出口的标识。放在小字行而不是名字行 —— 名字行有 ellipsis，
+   插进去会把截断算错，长名字会被撑破 */
+.ex-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 10px;
+  color: #3f7f52;
+  background: rgba(78, 159, 99, 0.12);
+  vertical-align: 1px;
+}
+/* 非托管的出口用琥珀色，和「代理方式」卡上那个色点一致 ——
+   同一个概念到哪儿都是同一个颜色 */
+.ex-tag.own {
+  color: #9a6e24;
+  background: rgba(181, 135, 58, 0.14);
+}
+
+/* 代理方式 —— 一行。上一版是三张大卡片加描述，占了首屏一大块，
+   把真正要操作的出口列表挤到下面，每次选出口都得往下滑。
+   方式只是出口的一个属性，一行够用；版面留给出口本身。 */
+.pm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: var(--hair) solid var(--ln);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+.pm-k {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.pm-seg {
+  margin-left: auto;
+}
+/* 出口数量直接标在按钮上，代替“还没有出口”那句废话 */
+.pm-seg button small {
+  margin-left: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--t4);
+}
+/* 可折叠的区块头（出口体检）。箭头跟着开合转 */
+.em-fold-h {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.em-fold-h svg {
+  transition: transform 200ms var(--ease);
+  color: var(--t4);
+}
+/* 「出口体检」折叠头：标题可点开合，箭头收起时指右、展开时向下 */
+.em-sub-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.em-sub-c {
+  color: var(--t4);
+  transition: transform 200ms var(--ease);
+}
+.em-sub-c.rot {
+  transform: rotate(-90deg);
+}
+.em-fold-h svg.rot {
+  transform: rotate(-90deg);
+}
+/* 「出口体检」折叠头：点标题开合 */
+.em-sub-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.em-sub-t small {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--t4);
+}
+.em-sub-c {
+  color: var(--t4);
+  transition: transform 200ms var(--ease);
+}
+.em-sub-c.up {
+  transform: rotate(180deg);
+}
+/* 「出口体检」折叠头。点标题开合，箭头同步转 */
+.em-sub-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.em-sub-t small {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--t4);
+}
+.em-sub-c {
+  color: var(--t4);
+  transition: transform 200ms var(--ease);
+}
+.em-sub-c.rot {
+  transform: rotate(-90deg);
+}
+/* 「出口体检」折叠头。标题可点，箭头跟着开合转（收起 ▸ / 展开 ▾） */
+.em-sub-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.em-sub-s {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--t4);
+}
+.em-sub-c {
+  color: var(--t4);
+  transition: transform 200ms var(--ease);
+}
+.em-sub-c.rot {
+  transform: rotate(-90deg);
+}
+.pm-hint {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--t4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 只在给读屏软件留文案时用，视觉上不占位 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* 引导第 3 步仍然用三张卡片 —— 那里是"第一次选路"，值得展开讲清楚。
+   出口页是日常操作，所以那边收成一行。同一个概念，两种量级。 */
+.pm-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 620px) {
+  .pm-cards {
+    grid-template-columns: 1fr;
+  }
+}
+.pm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 12px;
+  border: var(--hair) solid var(--ln);
+  border-radius: 9px;
+  text-align: left;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    border-color var(--dur-snap) var(--ease-out);
+}
+.pm-card:hover:not(:disabled) {
+  background: var(--hv);
+}
+.pm-card.on {
+  border-color: var(--t2);
+  background: var(--sel);
+}
+.pm-card:disabled {
+  opacity: 0.55;
+}
+.pm-t {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pm-t b {
+  font-size: 12.5px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.pm-t em {
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-style: normal;
+  color: #3f7f52;
+  background: rgba(78, 159, 99, 0.12);
+}
+.pm-on {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--success);
+}
+.pm-card small {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--t3);
+}
+.pm-n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--t4);
+}
+
+/* 设置 · 节点来源。订阅是全局资源，所以它属于设置页而不是某个环境的抽屉 */
+.src-add {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.src-add .em-in {
+  flex: 1;
+  min-width: 0;
+}
+.src-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.src-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: var(--hair) solid var(--ln);
+  border-radius: 9px;
+}
+.src-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.src-main b {
+  font-size: 12.5px;
+  font-weight: var(--w-medium);
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.src-main small {
+  font-size: 11px;
+  color: var(--t4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.src-empty {
+  padding: 20px 2px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--t4);
+}
+.src-err {
+  margin: 0 0 12px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  background: rgba(198, 69, 69, 0.07);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: #b04a4a;
+}
+
+/* 引导第 3 步复用了「代理方式」那套卡片和 ExitSubscribe 组件 ——
+   同一个概念在引导里和设置里长得一样，用户不用重新学一遍 */
+.ob-modes {
+  margin: 10px 0 4px;
+}
+.ob-flow .xp-body {
+  padding: 0;
+}
+.ob-go {
+  margin-top: 12px;
+}
+.ob-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--tl);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--t3);
+}
+
+/* 环境 tab 上的代理方式色点。和「代理方式」卡同一个配色 ——
+   同一个概念在哪儿都是同一个颜色，用户不用重新记一遍 */
+.envtab-pm {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--ln2);
+}
+.envtab-pm.pm-managed {
+  background: #4e9f63;
+}
+.envtab-pm.pm-own {
+  background: #b5873a;
 }
 .ex-item .ex-ip {
   font-size: 11.5px;
@@ -777,6 +1341,75 @@
   line-height: 1.75;
   color: var(--t3);
 }
+/* 第一步：谁来跑这个代理。两张卡片，不是三个平铺 tab ——
+   它们不在同一个层级（前一个是"我们自己跑"，后两个是"用你的"） */
+.xp-choose {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 20px 0;
+}
+.xp-choose button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border: var(--hair) solid var(--ln);
+  border-radius: 10px;
+  text-align: left;
+  transition:
+    background var(--dur-snap) var(--ease-out),
+    border-color var(--dur-snap) var(--ease-out);
+}
+.xp-choose button:hover {
+  background: var(--hv);
+}
+.xp-choose button.on {
+  border-color: var(--t2);
+  background: var(--sel);
+}
+.xp-choose-t {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.xp-choose-t b {
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+  color: var(--t1);
+}
+.xp-choose-t em {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-style: normal;
+  color: #3f7f52;
+  background: rgba(78, 159, 99, 0.12);
+}
+.xp-choose small {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--t3);
+}
+@media (max-width: 520px) {
+  /* 窄窗口下并排会挤成一团，直接竖排 */
+  .xp-choose {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 「或者」——订阅地址和导入 YAML 之间的分隔 */
+.xp-or {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.xp-or span {
+  font-size: 11.5px;
+  color: var(--t4);
+}
+
 .xp-empty {
   padding: 28px 20px;
   font-size: 12.5px;
@@ -784,6 +1417,78 @@
   color: var(--t4);
   text-align: center;
 }
+
+/* 订阅：粘地址 → 拉节点。这是「用订阅」这条路的入口，放在最上面 */
+.xp-sub-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.xp-sub-add .em-in {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 多条订阅时的切换 chip。只有一条就不显示，省得占地方 */
+.xp-subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.xp-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--t2);
+  background: var(--tl);
+  transition: background var(--dur-snap) var(--ease-out);
+}
+.xp-sub:hover {
+  background: var(--hv);
+}
+.xp-sub.on {
+  background: var(--sel);
+  color: var(--t1);
+}
+.xp-sub small {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--t4);
+}
+
+/* 内核还没下载时的提示条。不是报错 —— 是"点一下就好" */
+.xp-kinstall {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--tl);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--t3);
+}
+.xp-kinstall .btn {
+  margin-left: auto;
+  flex: none;
+}
+
+/* 错误提示：订阅拉不下来、实例起不来都走这里 */
+.xp-err {
+  margin: 0 0 12px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  background: rgba(198, 69, 69, 0.07);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: #b04a4a;
+}
+
 .xp-src {
   display: flex;
   align-items: center;
@@ -1065,7 +1770,14 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
+  /*
+   * 不要 flex:1 撑满。
+   *
+   * 撑满之后条目只占上半截，下半截是一大片空白 —— 而底部的状态胶囊
+   * 又被这个空白推得离顶部很远，整列看着头重脚轻。让导航按内容高度排，
+   * 空白统一留在它和状态胶囊之间，视觉上更整齐。
+   */
+  flex: none;
 }
 /* 选中底色单独一层，切换时滑过去 */
 .em-ind {
@@ -1079,6 +1791,27 @@
     transform 260ms var(--ease),
     height 260ms var(--ease);
   pointer-events: none;
+}
+/**
+ * 抽屉导航的分组标题（安全 / 环境 / 应用）。
+ *
+ * 左右内边距和按钮一致（10px），视觉上左对齐；上下留白不对称 ——
+ * 上面大（和上一组拉开），下面小（贴着自己的条目），分组关系才看得出来。
+ */
+.em-nav-g {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 10px;
+  margin-top: 10px;
+  font-size: 10.5px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.05em;
+  color: var(--t4);
+}
+/* 第一组不需要上边距，它上面就是环境名 */
+.em-nav-g:first-child {
+  margin-top: 2px;
 }
 .em-nav button {
   position: relative;
@@ -1134,6 +1867,8 @@
   color: var(--danger);
 }
 .em-foot {
+  /* 导航不再撑满后，靠它把剩余空间吃掉，状态胶囊才会贴着侧栏底部 */
+  margin-top: auto;
   padding: 10px 8px 0;
 }
 
@@ -1196,6 +1931,11 @@
 /* 相邻卡片之间留一口气。
    之前 em-card 没有外边距，两块贴在一起，边界看着像一条粗线。 */
 .em-card + .em-card {
+  margin-top: 10px;
+}
+/* 出口体检卡的根是 .nr，不是 .em-card —— 只写上面那条的话，
+   体检卡和它下面的「出口对比」/「没配出口就不允许开会话」会贴成 0 间距。 */
+.nr + .em-card {
   margin-top: 10px;
 }
 
@@ -3087,6 +3827,95 @@
 .nr-fail .btn {
   margin-left: auto;
 }
+
+/* 未检测 / 用户取消。中性灰，不是错误 —— 什么都没发生，不该有告警色 */
+.nr-idle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--t3);
+}
+.nr-idle > span {
+  flex: 1;
+  min-width: 0;
+}
+.nr-idle .btn {
+  flex: none;
+}
+
+/* ── 检测确认弹窗 ── */
+.dgate {
+  width: min(560px, 92vw);
+  padding: 18px 20px 16px;
+}
+.dgate-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--t1);
+}
+.dgate-h svg {
+  color: #b5873a;
+  flex: none;
+}
+.dgate-h b {
+  font-size: 14px;
+  font-weight: var(--w-semibold);
+}
+.dgate-why {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--t2);
+}
+.dgate-sec {
+  margin-bottom: 12px;
+}
+.dgate-sec > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: var(--w-semibold);
+  color: var(--t4);
+}
+.dgate-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dgate-targets code {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--tl);
+  font-size: 11px;
+  color: var(--t2);
+}
+.dgate-expose {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(181, 135, 58, 0.08);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: #8a6420;
+}
+.dgate-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.dgate-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--t4);
+}
 .nr-spin {
   width: 14px;
   height: 14px;
@@ -4624,8 +5453,8 @@
 .hs-score {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px;
+  gap: 14px;
+  padding: 14px 16px;
   border-radius: 12px;
   margin-bottom: 12px;
   background: rgba(0, 0, 0, 0.02);
@@ -4633,30 +5462,78 @@
 .hs-score.lv-blocked {
   background: rgba(198, 69, 69, 0.07);
 }
+/* risk = 真出了问题（IP 撞、凭据失效）→ 红。setup 没有风险，只是还没配 ——
+   它跟 ok 一样是绿的，"待配置"只体现在文字上。
+   100 分却显示琥珀，用户第一反应就是这评分不对。 */
 .hs-score.lv-risk {
-  background: rgba(180, 130, 40, 0.08);
+  background: rgba(198, 69, 69, 0.05);
+}
+.hs-score.lv-setup {
+  background: rgba(78, 159, 99, 0.08);
 }
 .hs-score.lv-ok {
   background: rgba(78, 159, 99, 0.08);
 }
 .hs-num {
-  font-family: var(--mono);
-  font-size: 30px;
+  /**
+   * 分数：一个明确的数字块。
+   *
+   * 之前它就是个裸的 30px 数字，而 Anthropic Sans 的「0」又窄又高，
+   * 单独放在那儿读起来像一颗竖着的胶囊，不像分数。给它一个固定宽度的
+   * 方框 + 右侧分隔线，视觉上就和"标题 + 说明"分开，一眼知道左边是分数。
+   */
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  padding-right: 14px;
+  border-right: var(--hair) solid var(--ln);
+  font-family: var(--sans);
+  font-size: 34px;
+  font-weight: var(--w-semibold);
   line-height: 1;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 .hs-score.lv-blocked .hs-num {
   color: #c64545;
 }
 .hs-score.lv-risk .hs-num {
-  color: #a8792a;
+  color: #c64545;
+}
+.hs-score.lv-setup .hs-num {
+  color: #3f7f52;
 }
 .hs-score.lv-ok .hs-num {
   color: #3f7f52;
 }
+
+/**
+ * 检查项分组标题。
+ *
+ * 三类按「这件事属于哪个层面」分：安全（账号/出口/设备码）→ 环境隔离 →
+ * 应用与痕迹。用户要的是"哪个大、哪个小"，不是十行等宽的清单。
+ */
+.hs-group {
+  padding: 16px 0 6px;
+  font-size: 11px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.04em;
+  color: var(--t4);
+  text-transform: none;
+}
+.hs-group:first-child {
+  padding-top: 10px;
+}
 .hs-meta {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  /* 撑满剩下的宽度：之前不给 flex 值，它只占内容自然宽（92px），
+     604px 宽的卡片右侧空出 468px，看着像内容没渲染出来 */
+  flex: 1;
+  min-width: 0;
 }
 .hs-meta b {
   font-size: 13px;
@@ -5452,7 +6329,7 @@
   margin: 0;
 }
 .em-sub + .nr {
-  margin-bottom: 4px;
+  margin-bottom: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -8,6 +8,7 @@ import Help from "./Help";
 import { IconGlobe, IconRefresh } from "./iconAliases";
 import StatusIcon from "./StatusIcon";
 import { tr } from "../lib/i18n";
+import { askDetect } from "../lib/detect";
 
 /**
  * 网络测试 —— 专业版连通测试，单独一整页。
@@ -145,6 +146,25 @@ export default function NetTestPage({ accounts }: { accounts: Account[] }) {
   const [err, setErr] = useState<string | null>(null);
 
   const run = async () => {
+    /**
+     * 先问，再发。
+     *
+     * 这个测试会对 Claude Code 实际会连的几个域名反复发请求，并查 DNS、
+     * 探 IPv6 —— 每一轮都会把本机出口 IP 报给对方。跑的轮数越多、留的记录越多，
+     * 所以得先说清。
+     */
+    const allow = await askDetect({
+      targets: ["api.anthropic.com", "claude.ai", "console.anthropic.com", "cloudflare-dns.com", "ipinfo.io"],
+      exposes: tr(
+        `本机出口 IP、DNS 查询记录，以及每个域名 ${rounds} 轮的请求时间。`,
+        `This Mac's exit IP, DNS query records, and ${rounds} rounds of request timing per domain.`,
+      ),
+      why: tr(
+        "测的是真实连接路径：每一段耗时、抖动、失败率、有没有走 IPv6。不测看不出线路哪里慢。",
+        "It measures the real path: per-stage timing, jitter, failure rate, and whether IPv6 leaks. Without it you cannot tell where the route is slow.",
+      ),
+    });
+    if (!allow) return;
     setBusy(true);
     setErr(null);
     try {

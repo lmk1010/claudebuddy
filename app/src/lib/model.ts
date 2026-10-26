@@ -106,6 +106,73 @@ export interface Exit {
   lastIp?: string;
   /** 上次实测时间 */
   checkedAt?: number;
+  /**
+   * 由 App 自己拉起的 mihomo 实例托管。
+   *
+   * 有这一项时，这个出口不依赖用户本机的代理软件，也不要求手写 listeners：
+   * 应用启动时会照着 subId + node 起一个独立实例，端口由实例分配。
+   * proxy.port 在实例起来之前是占位值，起来后会被真实端口覆盖。
+   */
+  managed?: { subId: string; node: string };
+}
+
+/**
+ * 一个环境怎么出去 —— 这是产品里的一等概念，不是从 IP 数据里反推出来的。
+ *
+ * 三种方式覆盖了所有情况：
+ *   · direct  —— 用本机网络
+ *   · managed —— App 自带内核，为节点单起一个实例（不碰用户的配置）
+ *   · own     —— 复用用户已装好的代理软件，或他手填的端口
+ *
+ * 之所以要从数据推导而不是存字段：老数据里没有这个字段，新增一个就得
+ * 写迁移；而“出口带不带 managed”这件事数据里本来就有，推出来更准确，
+ * 也不会和 exitId 不同步。
+ */
+export type ProxyMode = "direct" | "managed" | "own";
+
+/** 三种方式的文案。顺序就是界面上的顺序 */
+export const PROXY_MODES: {
+  id: ProxyMode;
+  zh: string;
+  en: string;
+  dzh: string;
+  den: string;
+}[] = [
+  {
+    id: "direct",
+    zh: "直连",
+    en: "Direct",
+    dzh: "用这台电脑当前的网络，不经过任何代理",
+    den: "This Mac's own network, no proxy at all",
+  },
+  {
+    id: "managed",
+    zh: "App 托管",
+    en: "Managed by app",
+    dzh: "自带内核，每个节点单开一个实例。不用改你的配置，也不用重启任何东西",
+    den: "Bundled kernel, one instance per node. Nothing of yours to edit or restart",
+  },
+  {
+    id: "own",
+    zh: "你自己的代理",
+    en: "Your own proxy",
+    dzh: "复用你已经装好的代理软件，或者手填一个端口",
+    den: "Reuse the proxy app you already have, or type a port",
+  },
+];
+
+/**
+ * 这个环境现在走哪种方式。
+ *
+ * 判据是“它指向的那个出口带不带 managed”，而不是只看 proxy 有没有值 ——
+ * 后者会把托管出口也归到 own 里，界面上就会指错。
+ */
+export function proxyModeOf(account: Pick<Account, "exitId" | "proxy">, exits: Exit[]): ProxyMode {
+  const ex = exits.find((e) => e.id === account.exitId);
+  if (ex?.managed) return "managed";
+  const p = account.proxy;
+  if (p && p.protocol !== "none" && p.host) return "own";
+  return "direct";
 }
 
 /** 身份（~/.claude.json 里的两个 64 位 hex） */
@@ -203,11 +270,12 @@ export interface Account {
   enforceProxy?: boolean;
   /** 上次测到的出口 IP，用于发现 IP 跳变 */
   lastExitIp?: string;
+  /** 上面那个 IP 是什么时候测的。没有它就无法判断这个值是不是过期了 */
+  lastExitCheckedAt?: number;
   /** 会话里 Claude 说过「账号正在暂时风控」的时间；重新登录成功后清掉 */
   heldAt?: number;
   /** 这个环境登录时用哪个浏览器（browsersList 的 id），记住上次的选择 */
   loginBrowser?: string;
-  lastExitCheckedAt?: number;
 
   /** 身份 */
   identity: Identity;
@@ -239,6 +307,11 @@ export interface ShellWindow {
   exitIp?: string;
   /** 启动 Claude Code 时用的权限模式（建窗口时从首页的选择记下来，恢复会话时照旧） */
   permission?: PermissionMode;
+  /**
+   * 不经 claude，直接跑一条 shell 命令（跑完落到普通 shell）。
+   * 「开终端测 IP」用它 —— 进去就看到结果，不用自己敲。
+   */
+  rawCommand?: string;
 }
 
 // ─────────────────────────────────────────── 全局状态
@@ -285,9 +358,16 @@ export interface BuddyState {
   sidebarOpen: boolean;
 
   bannerDismissed: boolean;
-  /** 引导完成到第几步（1 环境 / 2 登录 / 3 网络 / 4 完成） */
-  onboardingStep: number;
-}
+    /** 引导完成到第几步（1 环境 / 2 登录 / 3 网络 / 4 完成） */
+    onboardingStep: number;
+    /**
+     * 新建环境时默认用哪种代理方式。
+     *
+     * 只有"默认值"这一个作用 —— 环境建好之后各自独立，改这里不影响已有环境。
+     * 不设的话按 managed：那是唯一不用用户先配好别的东西就能走通的。
+     */
+    defaultProxyMode?: ProxyMode;
+  }
 
 // ─────────────────────────────────────────── 运行期数据
 
@@ -471,7 +551,18 @@ export const AUTH_PILL: Record<AuthState, string> = {
 // ─────────────────────────────────────────── 健康度
 
 /** 绿 = 就绪，黄 = 有风险，红 = 账号级被风控 */
-export type HealthLevel = "ok" | "risk" | "blocked";
+/**
+ * 四种状态。区别的根在于「是没做，还是做错了」：
+ *
+ *   ok      一切就绪
+ *   setup   还有没配的东西（出口没配、还没登录）—— 提醒，但不是风险
+ *   risk    真出了问题（IP 撞了、设备码撞了、凭据失效）
+ *   blocked 账号级风控，先解决这个
+ *
+ * 之前只有 ok / risk 两档，于是"还没配出口"也被算成风险 ——
+ * 用户看到 9 项全绿却写着"有风险"，第一反应就是这评分坏了。
+ */
+export type HealthLevel = "ok" | "setup" | "risk" | "blocked";
 
 export interface Health {
   score: number;
@@ -500,6 +591,10 @@ export function healthOf(
 ): Health {
   const reasons: string[] = [];
   let score = 100;
+  /** 真出问题的条数。只有它 > 0 才算「有风险」 */
+  let problems = 0;
+  /** 还没配的条数。只提醒，不扣分、不算风险 */
+  let pending = 0;
   const others = all.filter((a) => a.id !== account.id);
 
   /** 没测过就是未知，不拿配置文件里那个旧值当事实 */
@@ -513,6 +608,7 @@ export function healthOf(
      * 去重新登录一个本来就好的账号。
      */
     score -= 5;
+    pending += 1;
     reasons.push(tr("登录态还没确认", "Sign-in state not confirmed yet"));
   }
 
@@ -532,15 +628,24 @@ export function healthOf(
 
   if (auth === "expired") {
     score -= 70;
+    problems += 1;
     reasons.push(tr("登录凭据已失效", "Sign-in expired"));
   } else if (auth === "signedOut") {
     score -= 40;
+    pending += 1;
     reasons.push(tr("这个环境还没登录", "Not signed in"));
   }
 
   const proxied = Boolean(account.proxy && account.proxy.protocol !== "none" && account.proxy.host);
   if (!proxied) {
-    score -= 25;
+    /**
+     * 直连不扣分。
+     *
+     * 它是"还没配"，不是"配错了"。刚建好环境、还没走到配出口那一步的
+     * 时候扣 25 分并标成有风险，等于把流程里的正常状态报成故障。
+     * 这件事由 pending 表达 —— 它不该和"IP 撞了"同权重。
+     */
+    pending += 1;
     reasons.push(tr("走直连，出口和本机一样", "Direct connection; exit matches this Mac"));
   }
 
@@ -549,6 +654,7 @@ export function healthOf(
     const same = others.filter((a) => a.lastExitIp === ip);
     if (same.length > 0) {
       score -= 35;
+      problems += 1;
       reasons.push(
         tr(
           `出口 IP 和「${same.map((a) => a.label).join("、")}」相同`,
@@ -558,6 +664,7 @@ export function healthOf(
     }
   } else if (proxied) {
     score -= 5;
+    pending += 1;
     reasons.push(tr("出口还没测过", "Exit has not been measured"));
   }
 
@@ -571,11 +678,13 @@ export function healthOf(
   const uid = ident?.userID ?? null;
   if (!uid) {
     score -= 10;
+    pending += 1;
     reasons.push(tr("还没生成设备码", "No device ID yet"));
   } else {
     const same = others.filter((a) => a.identity?.userID === uid);
     if (same.length > 0) {
       score -= 30;
+      problems += 1;
       reasons.push(
         tr(
           `设备码和「${same.map((a) => a.label).join("、")}」相同`,
@@ -587,15 +696,23 @@ export function healthOf(
 
   if (flags.stunDetected) {
     score -= 40;
+    problems += 1;
     reasons.push(tr("有程序在发 STUN，真实公网 IP 已暴露", "Something sends STUN; the real public IP is exposed"));
   }
   if (flags.desktopRunning) {
     score -= 15;
+    problems += 1;
     reasons.push(tr("Claude Desktop 正开着，它共用整机身份", "Claude Desktop is running and shares this machine's identity"));
   }
 
   score = Math.max(0, Math.min(100, score));
-  const level: HealthLevel = score >= 85 ? "ok" : "risk";
+  /**
+   * 分级只看"有没有真问题"，不看总分。
+   *
+   * 分数是给"风险"用的，未配置项不进分数 —— 所以不能用分数倒推状态：
+   * 一个全绿但还没配出口的环境是 100 分，它该显示"待配置"而不是"就绪"。
+   */
+  const level: HealthLevel = problems > 0 ? "risk" : pending > 0 ? "setup" : "ok";
   return { score, level, reasons };
 }
 
