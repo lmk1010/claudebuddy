@@ -47,6 +47,20 @@ function configDirOf(account) {
   return path.join(HOME, account.configDir);
 }
 
+/**
+ * 本机时区。
+ *
+ * 环境没显式配 TZ 时用它，不要退回写死的 Asia/Shanghai ——
+ * 出口在美国、env 却报上海，等于白配一个出口。
+ */
+function systemTz() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 // ─────────────────────────────────────────── 跨进程调用 claude
 
 /**
@@ -187,7 +201,13 @@ function envForAccount(account, { includeProxy = true } = {}) {
   env.TERM_PROGRAM = t.termProgram || "Apple_Terminal";
   env.LANG = t.lang || "en_US.UTF-8";
   env.LC_ALL = env.LANG;
-  env.TZ = t.tz || "Asia/Shanghai";
+  /**
+   * 没配就用本机时区，不要退回写死的上海。
+   *
+   * 出口在美国、环境却报 Asia/Shanghai，一眼就看出是套壳；
+   * 而且用户把 macOS 时区改成洛杉矶之后，这里仍然报上海 —— 改了等于没改。
+   */
+  env.TZ = t.tz || systemTz();
 
   env.CLAUDE_BUDDY = "1";
   /**

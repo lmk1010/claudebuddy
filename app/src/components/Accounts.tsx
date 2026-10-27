@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Account, AccountStatusSnapshot } from "../lib/model";
 import type { KeychainEntry, ScannedDir, SessionSummary, TraceItem, DesktopProbe, LeakReport } from "../lib/bridge";
-import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, proxyModeOf, relTime, tierLabel, type Exit, type ProxyMode, type SimilarityReport } from "../lib/model";
+import { ACCOUNT_TINTS, AUTH_LABEL, healthOf, proxyLabel, proxyModeOf, relTime, tierLabel, LANG_OPTIONS, TERM_OPTIONS, TZ_OPTIONS, systemTz, type Exit, type ProxyMode, type SimilarityReport } from "../lib/model";
 import LoginConsole from "./LoginConsole";
 import HealthSection from "./EnvHealth";
 import ExitList from "./ExitList";
@@ -820,13 +820,49 @@ export function EnvModal({
                   </div>
                   <div className="em-card">
                     <Row title={tr("终端类型", "Terminal type")} desc="TERM / TERM_PROGRAM">
-                      <code className="em-code">{account.terminal?.term ?? "—"}</code>
+                      <select
+                        className="em-sel"
+                        value={account.terminal?.term ?? ""}
+                        onChange={(e) => onPatch({ terminal: { ...account.terminal, term: e.target.value } })}
+                      >
+                        {withCurrent(TERM_OPTIONS, account.terminal?.term).map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
                     </Row>
                     <Row title={tr("语言", "Language")} desc="LANG">
-                      <code className="em-code">{account.terminal?.lang ?? "—"}</code>
+                      <select
+                        className="em-sel"
+                        value={account.terminal?.lang ?? ""}
+                        onChange={(e) => onPatch({ terminal: { ...account.terminal, lang: e.target.value } })}
+                      >
+                        {withCurrent(LANG_OPTIONS, account.terminal?.lang).map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
                     </Row>
-                    <Row title={tr("时区", "Time zone")} desc="TZ">
-                      <code className="em-code">{account.terminal?.tz ?? "—"}</code>
+                    <Row
+                      title={tr("时区", "Time zone")}
+                      desc={tr("TZ · 跟出口对齐才自然", "TZ · should match the exit")}
+                      tip={
+                        <button
+                          className="em-relink"
+                          title={tr("用本机系统时区", "Use the machine's time zone")}
+                          onClick={() => onPatch({ terminal: { ...account.terminal, tz: systemTz() } })}
+                        >
+                          {tr("用本机", "Local")}
+                        </button>
+                      }
+                    >
+                      <select
+                        className="em-sel"
+                        value={account.terminal?.tz ?? ""}
+                        onChange={(e) => onPatch({ terminal: { ...account.terminal, tz: e.target.value } })}
+                      >
+                        {withCurrent(TZ_OPTIONS, account.terminal?.tz).map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
                     </Row>
                     <Row
                       title={tr("和其他环境拉开差距", "Differentiate from other environments")}
@@ -976,6 +1012,18 @@ function Row({ title, desc, tip, children }: { title: string; desc?: ReactNode; 
       <span className="em-row-c">{children}</span>
     </div>
   );
+}
+
+/**
+ * 下拉选项：把当前值也塞进去。
+ *
+ * 配置里可能存着预设之外的值（手动改过文件、或者系统时区是别的城市）。
+ * 不补的话 <select> 找不到匹配项，界面就是一片空白 —— 用户以为配置丢了。
+ */
+function withCurrent(opts: readonly string[], current?: string): string[] {
+  const list = opts as readonly string[];
+  if (!current || list.includes(current)) return list.slice();
+  return [current, ...list];
 }
 
 function GeneralSection({
@@ -1363,7 +1411,7 @@ function NetworkSection({
         accountId={account.id}
         proxyKey={proxyLabel(p)}
         lastIp={account.lastExitIp ?? null}
-        tz={account.terminal?.tz ?? "Asia/Shanghai"}
+        tz={account.terminal?.tz ?? systemTz()}
         onIp={onIp}
         onAlign={onAlign}
       />

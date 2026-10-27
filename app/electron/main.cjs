@@ -2108,7 +2108,7 @@ ipcMain.handle("account:netReport", async (_e, { id }) => {
   score = Math.max(0, Math.min(100, Math.round(score)));
 
   const loc = tr.loc || info?.countryCode || "";
-  const tz = (a.terminal && a.terminal.tz) || "Asia/Shanghai";
+  const tz = (a.terminal && a.terminal.tz) || systemTz();
   const lang = (a.terminal && a.terminal.lang) || "en_US.UTF-8";
   const ipTz = info?.timezone || "";
   const zhCountries = new Set(["CN", "TW", "HK", "MO", "SG"]);
@@ -2145,6 +2145,20 @@ ipcMain.handle("account:netReport", async (_e, { id }) => {
     },
   };
 });
+
+/**
+ * 本机时区。
+ *
+ * 以前这里兜底写死 Asia/Shanghai：用户把系统改成洛杉矶，体检仍按上海比对，
+ * 于是永远报「时区不一致」——用户点了对齐也白点。
+ */
+function systemTz() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
 
 /** 某个时区当前的 UTC 偏移（分钟）。时区名不同但偏移一样的不算不一致 */
 function offsetOf(tz) {

@@ -385,6 +385,15 @@ export default function NetReportCard({
               </button>
             )}
           </Line>
+          {/* 不一致时把后果说清楚：只标一个红字，用户不知道要不要管 */}
+          {!cs.tzOk && (
+            <p className="nr-hint">
+              {tr(
+                `出口在 ${cs.ipTz}，环境却报 ${cs.tz} —— 请求里的时间戳和时区对不上，比真实位置更容易被看出是代理。点「对齐」修掉。`,
+                `The exit is in ${cs.ipTz} but the environment reports ${cs.tz}. Timestamps won't line up with the claimed location, which makes the proxy easier to spot. Click Align.`,
+              )}
+            </p>
+          )}
           <Line k={tr("环境时区", "Env zone")}>
             <span className="mono nr-trunc">{cs.tz}</span>
           </Line>

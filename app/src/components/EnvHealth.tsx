@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { Account, AccountStatusSnapshot, AuthState } from "../lib/model";
-import { healthOf } from "../lib/model";
+import { healthOf, systemTz } from "../lib/model";
 import type { DesktopProbe, LeakReport, TraceItem } from "../lib/bridge";
 import { tr } from "../lib/i18n";
 import { IconCheck, IconWarning } from "./iconAliases";
@@ -254,7 +254,7 @@ export default function HealthSection({
           state="ok"
           label={tr("终端画像", "Terminal")}
           value={account.terminal?.term || "xterm-256color"}
-          note={`${account.terminal?.lang || "en_US.UTF-8"} · ${account.terminal?.tz || "Asia/Shanghai"}`}
+          note={`${account.terminal?.lang || "en_US.UTF-8"} · ${account.terminal?.tz || systemTz()}`}
         />
         <div className="hs-group">{tr("应用与痕迹", "App & traces")}</div>
         <Row

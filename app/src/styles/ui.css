@@ -77,7 +77,7 @@
   flex-direction: column;
 }
 .dlg-md {
-  width: 560px;
+  width: min(560px, calc(100vw - 80px));
 }
 
 /* 对话框底部按钮：右对齐，和正文之间留一条分隔 */
@@ -516,8 +516,27 @@
 }
 
 /* ── 连接监控 ── */
+/**
+ * 监控窗的尺寸。
+ *
+ * 宽度不能直接写 92vw：遮罩自己还有 40px 内边距，两者相加就超过视口，
+ * 窄窗时对话框会被挤出右边。用「视口减去遮罩留白」来算。
+ *
+ * 纵向用 flex 而不是给列表一个死的 max-height：内容一多，底栏（说明文字 +
+ * 关闭按钮）会被顶出对话框外面，看起来就是被裁掉一半。让列表自己负责滚动，
+ * 头尾两块永远留在框内。
+ */
 .mon {
-  width: min(720px, 92vw);
+  width: min(720px, calc(100vw - 80px));
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
+  overflow: hidden;
+}
+.mon-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .mon-head {
   display: flex;
@@ -578,8 +597,6 @@
 }
 .mon-body {
   border-top: var(--hair) solid var(--ln);
-  max-height: min(52vh, 460px);
-  overflow-y: auto;
 }
 .mon-sec + .mon-sec {
   border-top: var(--hair) solid var(--ln);
@@ -1284,7 +1301,7 @@
 /* ── 新建出口弹窗 ──
    比普通对话框宽：左边节点列表要放得下名字 + 类型。 */
 .dlg.xp {
-  width: 560px;
+  width: min(560px, calc(100vw - 80px));
   max-height: calc(100vh - 120px);
   padding: 0;
   display: flex;
@@ -1716,8 +1733,12 @@
 
 /* ══════════════════════ 编辑环境弹窗 ══════════════════════ */
 
+/**
+ * 宽度必须给视口上限：遮罩自己还有 40px 内边距，写死 900px 的话
+ * 窗口一窄就顶出右边（实测 900px 窗口下右缘跑到 940px）。
+ */
 .dlg.em {
-  width: 900px;
+  width: min(900px, calc(100vw - 80px));
   height: 620px;
   max-height: calc(100vh - 80px);
   display: grid;
@@ -2004,6 +2025,50 @@
   padding: 3px 8px;
   border-radius: 6px;
   white-space: nowrap;
+}
+/* 终端画像的下拉：贴着 .em-code 的外观，但可点。
+   原生 select 的箭头在各平台不一致，这里只留自己画的那一个。 */
+.em-sel {
+  appearance: none;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--t2);
+  background: var(--tile);
+  padding: 4px 22px 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  max-width: 200px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--t3) 50%),
+    linear-gradient(135deg, var(--t3) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+.em-sel:hover {
+  color: var(--t1);
+}
+.em-sel:focus-visible {
+  outline: 2px solid var(--t3);
+  outline-offset: 1px;
+}
+[data-theme="dark"] .em-sel {
+  background-color: rgba(250, 249, 245, 0.06);
+}
+/* 「时区」旁边的小按钮：一键抓本机时区 */
+.em-relink {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  color: var(--t3);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.em-relink:hover {
+  color: var(--t1);
 }
 [data-theme="dark"] .em-code {
   background: rgba(250, 249, 245, 0.06);
@@ -4116,6 +4181,13 @@
 }
 .nr-fix:hover span:last-child {
   color: var(--coral);
+}
+/* 不一致的原因说明：跟 .nr-line 同一左缩进，读起来是那条的补充 */
+.nr-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--t4);
 }
 .nr-foot {
   display: flex;

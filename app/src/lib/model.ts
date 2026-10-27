@@ -233,10 +233,29 @@ export const TZ_OPTIONS = [
   "Europe/Berlin",
 ] as const;
 
+/**
+ * 本机系统时区。
+ *
+ * 以前这里写死 "Asia/Shanghai"：用户把 macOS 时区改成洛杉矶，环境里报上去的
+ * 仍然是上海，跟出口对不上 —— 用户以为改过了，其实改的是系统那一个。
+ * 默认值跟着系统走，用户换地方就不用再改一遍。
+ */
+export function systemTz(): string {
+  try {
+    // 兜底给 UTC，不能退回上海 —— 这里再写死一次就等于修复没做，
+    // 而「本机到底在哪」我们确实不知道时，UTC 是不撒谎的答案。
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 export const DEFAULT_TERMINAL: TerminalProfile = {
   term: "xterm-256color",
   lang: "en_US.UTF-8",
-  tz: "Asia/Shanghai",
+  get tz() {
+    return systemTz();
+  },
 };
 
 /** 一个账号 = 一间屋子 */
@@ -358,6 +377,13 @@ export interface BuddyState {
   sidebarOpen: boolean;
 
   bannerDismissed: boolean;
+  /**
+   * 已经把写死的 Asia/Shanghai 迁到本机时区了。
+   *
+   * 只在旧版本留下的默认值上迁一次：用户后来自己选回上海是有意的，
+   * 每次启动都改就等于不让他选。
+   */
+  tzMigrated?: boolean;
     /** 引导完成到第几步（1 环境 / 2 登录 / 3 网络 / 4 完成） */
     onboardingStep: number;
     /**
@@ -758,6 +784,26 @@ export function exitLabel(e: Exit): string {
 export function exitKey(p: ProxyConfig): string {
   if (p.protocol === "none" || !p.host) return "direct";
   return `${p.protocol}://${p.host}:${p.port}`;
+}
+
+/**
+ * 老存档升级：把没人动过的默认时区换成机器所在时区。
+ *
+ * 旧版的默认画像写死 Asia/Shanghai，于是用户把 macOS 改成洛杉矶之后，
+ * 环境上报的仍是上海 —— 跟出口对不上，一眼就看得出是套壳。
+ *
+ * 只改「还停在旧默认值」的那些，并且打完标记就不再跑：用户主动选回上海
+ * 是合理需求（比如人真在国内），不能每次启动都给他改回去。
+ */
+export function migrateTimeZone(state: BuddyState): BuddyState {
+  if (state.tzMigrated) return state;
+  const sys = systemTz();
+  const accounts = state.accounts.map((a) =>
+    (a.terminal?.tz ?? "Asia/Shanghai") === "Asia/Shanghai"
+      ? { ...a, terminal: { ...a.terminal, tz: sys } }
+      : a,
+  );
+  return { ...state, accounts, tzMigrated: true };
 }
 
 /**

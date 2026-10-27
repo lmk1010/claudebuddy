@@ -54,6 +54,7 @@ import {
   compareEnvironments,
   suggestDistinctTerminal,
   migrateExits,
+  migrateTimeZone,
   type Account,
   type AccountStatusSnapshot,
   type BuddyState,
@@ -278,16 +279,18 @@ export default function App() {
             : [];
         const keptActive = wins.some((w) => w.id === raw.activeWindowId);
         setState(
-          migrateExits({
-            ...EMPTY_STATE,
-            ...raw,
-            accounts: accs,
-            windows: wins,
-            activeWindowId: raw.restoreSessions !== false && keptActive ? (raw.activeWindowId ?? null) : null,
-            activeAccountId: raw.activeAccountId ?? raw.accounts[0]?.id ?? null,
-            theme: isTheme(raw.theme) ? raw.theme : "system",
-            view: isView(raw.view) && !(raw.restoreSessions === false && raw.view === "session") ? raw.view : "home",
-          }),
+          migrateTimeZone(
+            migrateExits({
+              ...EMPTY_STATE,
+              ...raw,
+              accounts: accs,
+              windows: wins,
+              activeWindowId: raw.restoreSessions !== false && keptActive ? (raw.activeWindowId ?? null) : null,
+              activeAccountId: raw.activeAccountId ?? raw.accounts[0]?.id ?? null,
+              theme: isTheme(raw.theme) ? raw.theme : "system",
+              view: isView(raw.view) && !(raw.restoreSessions === false && raw.view === "session") ? raw.view : "home",
+            }),
+          ),
         );
       } else {
         setState((s) => ({ ...s, theme: i.darkMode ? "dark" : "light" }));

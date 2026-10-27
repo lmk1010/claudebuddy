@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { tr } from "../lib/i18n";
 
 /**
@@ -9,9 +10,17 @@ import { tr } from "../lib/i18n";
  *   · 遮罩 position: fixed，整窗压暗
  *   · 关闭先播退场（淡出 + 微缩），播完才真正卸载
  *   · 叠了多层时，Esc 只关最上面那一层
+ *
+ * 渲染到 body 下、层级按叠放顺序递增：
+ * 在弹窗里再开弹窗（环境抽屉 → 连接监控）时，如果两者都写死 z-index: 60，
+ * 第二层那层半透明遮罩是压不住第一层的 —— 用户会同时看见两个关闭按钮，
+ * 还会误点到底下那个。
  */
 const stack: number[] = [];
 let seq = 0;
+
+/** 第一层弹窗的层级；每多一层加 2（遮罩与对话框各占一级） */
+const BASE_Z = 60;
 
 /** 退场动画时长，跟 CSS 里 .mask.out 的动画保持一致 */
 const EXIT_MS = 150;
@@ -44,6 +53,12 @@ export default function Modal({
 }) {
   const { closing, close } = useExit(onClose);
   const idRef = useRef(0);
+  /**
+   * 层级在首次渲染时就定下来：此刻 stack 里还没有自己，
+   * 所以第一层拿 60、第二层 62。之后 stack 变了也不需要重排 ——
+   * 弹窗一旦打开，它相对其他层的先后就不该再跳。
+   */
+  const [z] = useState(() => BASE_Z + stack.length * 2);
 
   useEffect(() => {
     const id = ++seq;
@@ -71,12 +86,17 @@ export default function Modal({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [close, onEnter]);
 
-  return (
-    <div className={`mask${closing ? " out" : ""}`} onMouseDown={(e) => e.target === e.currentTarget && close()}>
+  return createPortal(
+    <div
+      className={`mask${closing ? " out" : ""}`}
+      style={{ zIndex: z }}
+      onMouseDown={(e) => e.target === e.currentTarget && close()}
+    >
       <div className={`dlg ${className}`} role="dialog" aria-modal="true" aria-label={label}>
         {children(close)}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
