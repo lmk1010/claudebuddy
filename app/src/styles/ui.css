@@ -6416,3 +6416,29 @@
     transition: none !important;
   }
 }
+
+.pg::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  -webkit-app-region: drag;
+}
+
+.dlg-drag-handle {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 24px;
+  cursor: grab;
+  -webkit-app-region: no-drag;
+}
+.dlg-drag-handle:active {
+  cursor: grabbing;
+}
+.dlg.dragging, .dlg.dragging * { cursor: grabbing !important; user-select: none !important; }
