@@ -168,6 +168,12 @@ DESIGN.md            设计系统
 - 未做 Apple 公证，首次打开可能需要手动放行
 - 账号是否被限制不在本地判断，见上文
 
+## 社区
+
+本项目参与并支持 [linux.do](https://linux.do) 社区。
+
+This project actively participates in and supports the [linux.do](https://linux.do) community. Stars, trials, issues and pull requests about environment isolation, per-account exit IP verification, request rhythm, 403 layer attribution and terminal UX are all welcome.
+
 ## 许可
 
 MIT，见 [LICENSE](LICENSE)。
