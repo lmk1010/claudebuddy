@@ -59,6 +59,38 @@ export default function Modal({
    * 弹窗一旦打开，它相对其他层的先后就不该再跳。
    */
   const [z] = useState(() => BASE_Z + stack.length * 2);
+  const dlgRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const dlg = dlgRef.current;
+    if (!dlg) return;
+    const rect = dlg.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startLeft = rect.left;
+    const startTop = rect.top;
+    dlg.style.position = "fixed";
+    dlg.style.left = `${startLeft}px`;
+    dlg.style.top = `${startTop}px`;
+    dlg.style.margin = "0";
+    dlg.style.animation = "none";
+    setDragging(true);
+    const onMove = (event: PointerEvent) => {
+      const left = Math.max(8, Math.min(window.innerWidth - rect.width - 8, startLeft + event.clientX - startX));
+      const top = Math.max(8, Math.min(window.innerHeight - rect.height - 8, startTop + event.clientY - startY));
+      dlg.style.left = `${left}px`;
+      dlg.style.top = `${top}px`;
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      setDragging(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  };
 
   useEffect(() => {
     const id = ++seq;
@@ -92,7 +124,8 @@ export default function Modal({
       style={{ zIndex: z }}
       onMouseDown={(e) => e.target === e.currentTarget && close()}
     >
-      <div className={`dlg ${className}`} role="dialog" aria-modal="true" aria-label={label}>
+      <div ref={dlgRef} className={`dlg ${className}${dragging ? " dragging" : ""}`} role="dialog" aria-modal="true" aria-label={label}>
+        <div className="dlg-drag-handle" onPointerDown={startDrag} aria-hidden="true" />
         {children(close)}
       </div>
     </div>,
